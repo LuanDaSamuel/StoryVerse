@@ -343,19 +343,38 @@ const ChapterEditorPage: React.FC = () => {
                 selection.removeAllRanges();
                 selection.addRange(range);
             } else {
-                // For selected text, use a more robust method that creates <span> tags.
+                // Use a unique background color to mark the selection, as it's more reliable than `fontSize`.
+                const DUMMY_COLOR_RGB = 'rgb(1, 2, 3)';
                 document.execCommand('styleWithCSS', false, 'true');
-                document.execCommand('fontSize', false, '7'); // Dummy value
-                
-                const fontElements = editorRef.current.querySelectorAll<HTMLElement>('font[size="7"]');
-                fontElements.forEach(fontElement => {
-                    const span = document.createElement('span');
-                    span.style.fontSize = size;
-                    // Move children from <font> to <span>
-                    while (fontElement.firstChild) {
-                        span.appendChild(fontElement.firstChild);
+                document.execCommand('hiliteColor', false, DUMMY_COLOR_RGB);
+
+                // Find all the temporary spans we just created.
+                const tempSpans = Array.from(editorRef.current.querySelectorAll<HTMLElement>(`span[style*="background-color: ${DUMMY_COLOR_RGB}"]`));
+
+                tempSpans.forEach(span => {
+                    const parent = span.parentElement;
+
+                    // Case 1: The selection was already inside a font-size span, and we selected all of its text.
+                    // This creates a nested span. We need to merge them to prevent incorrect styling.
+                    if (
+                        parent &&
+                        parent.tagName === 'SPAN' &&
+                        parent.style.fontSize &&
+                        parent.textContent === span.textContent
+                    ) {
+                        // Modify the parent's font size directly.
+                        parent.style.fontSize = size;
+                        // Then, unwrap the temporary inner span by moving its children out.
+                        while (span.firstChild) {
+                            parent.insertBefore(span.firstChild, span);
+                        }
+                        parent.removeChild(span);
+                    } else {
+                        // Case 2: A simple selection, or a partial selection within another span.
+                        // Just replace the background color with the font size.
+                        span.style.backgroundColor = '';
+                        span.style.fontSize = size;
                     }
-                    fontElement.parentNode?.replaceChild(span, fontElement);
                 });
             }
         });
