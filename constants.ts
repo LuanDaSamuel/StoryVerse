@@ -79,29 +79,32 @@ export const TAG_OPTIONS: string[] = [
 ];
 
 /**
- * Core function to apply typographic replacements using a robust, standard algorithm.
+ * Core function to apply typographic replacements. This version is more robust
+ * and handles common contractions and nested quotes more reliably.
  * @param text The input string.
  * @returns The typographically enhanced string.
  */
 function applyTypographicReplacements(text: string): string {
     if (!text) return text;
 
-    // This is a robust, well-tested approach for English smart quotes.
-    // The order of replacement operations is critical.
     return text
-        // Replace three dots with an ellipsis character.
         .replace(/\.\.\./g, '…')
-        // Replace two dashes with an em-dash.
         .replace(/--/g, '—')
-        // Replace opening double quotes that are preceded by a space or start of line.
-        .replace(/(^|[-\u2014\s(\[{"\xA0])"/g, "$1“")
-        // Replace remaining double quotes with closing double quotes.
-        .replace(/"/g, '”')
-        // Replace opening single quotes that are preceded by a space or start of line.
-        .replace(/(^|[-\u2014\s(\[{"\xA0])'/g, "$1‘")
-        // Replace remaining single quotes with closing single quotes (apostrophes).
-        .replace(/'/g, '’');
+        // Handle common English contractions and possessives first
+        .replace(/(\w)'t\b/g, '$1’t')
+        .replace(/(\w)'s\b/g, '$1’s')
+        .replace(/(\w)'re\b/g, '$1’re')
+        .replace(/(\w)'ll\b/g, '$1’ll')
+        .replace(/(\w)'ve\b/g, '$1’ve')
+        .replace(/(\w)'d\b/g, '$1’d')
+        // Handle opening quotes. A quote is considered "opening" if it's at the
+        // start of the string, or preceded by whitespace or certain punctuation.
+        .replace(/(^|\s|[[({“‘])"/g, '$1“') // Double quotes
+        .replace(/"/g, '”') // Any remaining double quotes are closing ones
+        .replace(/(^|\s|[[({“‘])'/g, '$1‘') // Single quotes
+        .replace(/'/g, '’'); // Any remaining single quotes are closing ones or apostrophes
 }
+
 
 /**
  * Applies typographic enhancements to a plain text string.
@@ -125,6 +128,11 @@ export function enhanceHtml(htmlString: string): string {
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = htmlString;
     
+    // Normalize the DOM tree. This is the key fix: it merges adjacent text
+    // nodes, which prevents the smart quote logic from failing when the browser
+    // editor fragments text.
+    tempDiv.normalize();
+
     const walk = (node: Node) => {
         if (node.nodeType === Node.TEXT_NODE) {
             node.textContent = applyTypographicReplacements(node.textContent || '');
