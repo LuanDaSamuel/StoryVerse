@@ -781,7 +781,6 @@ const ChapterEditorPage: React.FC = () => {
                         {isFormatPanelOpen && (
                             <div
                                 className="absolute bottom-full mb-2 p-4 rounded-lg shadow-lg bg-stone-900/80 border border-white/10 backdrop-blur-sm w-[320px]"
-                                onMouseDown={(e) => e.preventDefault()}
                             >
                                 <div className="space-y-4">
                                     <ToolbarDropdown label="Paragraph Style" value={currentFormat.paragraphStyle} onChange={(e) => applyParagraphStyle(e.target.value)}>
