@@ -7,25 +7,48 @@ import { BackIcon, BookOpenIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightI
 import { enhancePlainText, enhanceHtml } from '../constants';
 
 // --- Reusable Components ---
-interface AccordionProps {
-    title: string;
-    icon: React.ReactNode;
+const ChapterListModal: React.FC<{
     isOpen: boolean;
-    onToggle: () => void;
-    children: React.ReactNode;
-    fullWidthBorder?: boolean;
-}
+    onClose: () => void;
+    novel: { id: string; chapters: { id: string; title: string }[] };
+    currentChapterId: string;
+    themeClasses: any;
+}> = ({ isOpen, onClose, novel, currentChapterId, themeClasses }) => {
+    if (!isOpen) return null;
 
-const Accordion: React.FC<AccordionProps> = ({ title, icon, isOpen, onToggle, children, fullWidthBorder = false }) => {
-    const { themeClasses } = useContext(ProjectContext);
-    const borderClass = fullWidthBorder ? '' : `border-b ${themeClasses.border}`;
     return (
-        <div className={borderClass}>
-            <button onClick={onToggle} className="w-full flex justify-between items-center py-3 px-4 font-semibold text-left">
-                <div className="flex items-center space-x-3">{icon}<span>{title}</span></div>
-                <ChevronDownIcon className={`w-5 h-5 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-            </button>
-            {isOpen && <div className="pb-4 pt-2 px-4">{children}</div>}
+        <div 
+            className="fixed inset-0 bg-black bg-opacity-60 z-[60] flex items-center justify-center p-4 font-sans"
+            onClick={onClose}
+            role="dialog"
+            aria-modal="true"
+        >
+            <div 
+                className={`w-full max-w-md p-6 rounded-lg shadow-2xl ${themeClasses.bgSecondary} ${themeClasses.accentText} border ${themeClasses.border}`}
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold">Chapter Outline</h2>
+                    <button onClick={onClose} className={`p-1 rounded-full hover:${themeClasses.bgTertiary}`}>
+                        <CloseIcon className="w-6 h-6" />
+                    </button>
+                </div>
+                <nav className="max-h-[60vh] overflow-y-auto -mr-2 pr-2">
+                    <ul className="space-y-1">
+                        {novel.chapters.map(c => (
+                            <li key={c.id}>
+                                <Link
+                                    to={`/novel/${novel.id}/edit/${c.id}`}
+                                    onClick={onClose}
+                                    className={`block w-full text-left px-3 py-2 rounded-md transition-colors ${c.id === currentChapterId ? `${themeClasses.bgTertiary}` : `hover:${themeClasses.bgTertiary}`}`}
+                                >
+                                    {enhancePlainText(c.title || 'Untitled Chapter')}
+                                </Link>
+                            </li>
+                        ))}
+                    </ul>
+                </nav>
+            </div>
         </div>
     );
 };
@@ -160,9 +183,9 @@ const ChapterEditorPage: React.FC = () => {
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const toolbarRef = useRef<HTMLDivElement>(null);
     
-    const [openAccordion, setOpenAccordion] = useState<string | null>('format');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isFindReplaceOpen, setIsFindReplaceOpen] = useState(false);
+    const [isChapterListModalOpen, setIsChapterListModalOpen] = useState(false);
     const [activeFormats, setActiveFormats] = useState({ isBold: false, isItalic: false });
     const [currentFormat, setCurrentFormat] = useState({
         paragraphStyle: 'p',
@@ -605,10 +628,6 @@ const ChapterEditorPage: React.FC = () => {
         };
     }, [handleSelectionChange]);
     
-    const handleAccordionToggle = (accordionId: string) => {
-        setOpenAccordion(prev => (prev === accordionId ? null : prev));
-    };
-    
     const handleReplaceAll = (find: string, replace: string, scope: 'current' | 'all') => {
       if (!projectData || !novel || novelIndex === -1 || !find) {
         setIsFindReplaceOpen(false);
@@ -655,7 +674,7 @@ const ChapterEditorPage: React.FC = () => {
       setIsFindReplaceOpen(false);
     };
 
-    if (!projectData || !novel || !chapter) {
+    if (!projectData || !novel || !chapter || !chapterId) {
         return (
             <div className={`flex h-screen items-center justify-center ${themeClasses.bg}`}>
                 <p>Loading chapter...</p>
@@ -665,7 +684,7 @@ const ChapterEditorPage: React.FC = () => {
 
     return (
         <>
-            <div className={`relative flex h-screen font-serif ${themeClasses.bg} ${themeClasses.text}`}>
+            <div className={`flex h-screen font-serif ${themeClasses.bg} ${themeClasses.text}`}>
                 {/* Backdrop for sidebar */}
                 {isSidebarOpen && (
                     <div
@@ -725,23 +744,26 @@ const ChapterEditorPage: React.FC = () => {
                         <hr className={`border-t ${themeClasses.border} w-full`}/>
 
                         <div className="flex-1 overflow-y-auto">
-                            <Accordion title="Chapter Outline" icon={<BookOpenIcon className="w-5 h-5" />} isOpen={openAccordion === 'outline'} onToggle={() => handleAccordionToggle('outline')} fullWidthBorder>
-                                <div className="space-y-2">
-                                {novel.chapters.map(c => (
-                                    <Link 
-                                            key={c.id} 
-                                            to={`/novel/${novel.id}/edit/${c.id}`}
-                                            className={`block p-2 rounded-md transition-colors ${c.id === chapterId ? `${themeClasses.bgTertiary}` : `hover:${themeClasses.bgTertiary}`}`}
-                                    >
-                                    {enhancePlainText(c.title || 'Untitled Chapter')}
-                                    </Link>
-                                ))}
+                           <div className={`border-b ${themeClasses.border}`}>
+                                <button
+                                    onClick={() => setIsChapterListModalOpen(true)}
+                                    className="w-full flex justify-between items-center py-3 px-4 font-semibold text-left"
+                                >
+                                    <div className="flex items-center space-x-3">
+                                        <BookOpenIcon className="w-5 h-5" />
+                                        <span>Chapter Outline</span>
+                                    </div>
+                                </button>
+                            </div>
+                             <div className={`border-b ${themeClasses.border}`}>
+                                <div className="w-full flex items-center py-3 px-4 font-semibold text-left">
+                                    <div className="flex items-center space-x-3">
+                                        <TextIcon className="w-5 h-5" />
+                                        <span>Format</span>
+                                    </div>
                                 </div>
-                            </Accordion>
-                            <hr className={`border-t ${themeClasses.border} w-full`}/>
-                            <Accordion title="Format" icon={<TextIcon className="w-5 h-5" />} isOpen={openAccordion === 'format'} onToggle={() => handleAccordionToggle('format')} fullWidthBorder>
-                                <div className="space-y-4">
-                                    <EditorDropdown label="Paragraph Style" value={currentFormat.paragraphStyle} onChange={(e) => applyParagraphStyle(e.target.value)}>
+                                <div className="pb-4 pt-2 px-4 space-y-4">
+                                     <EditorDropdown label="Paragraph Style" value={currentFormat.paragraphStyle} onChange={(e) => applyParagraphStyle(e.target.value)}>
                                         <option value="p">Paragraph</option>
                                         <option value="h1">Heading 1</option>
                                         <option value="h2">Heading 2</option>
@@ -772,7 +794,7 @@ const ChapterEditorPage: React.FC = () => {
                                         </div>
                                     </div>
                                 </div>
-                            </Accordion>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -814,6 +836,14 @@ const ChapterEditorPage: React.FC = () => {
                 isOpen={isFindReplaceOpen}
                 onClose={() => setIsFindReplaceOpen(false)}
                 onReplaceAll={handleReplaceAll}
+            />
+            
+            <ChapterListModal
+                isOpen={isChapterListModalOpen}
+                onClose={() => setIsChapterListModalOpen(false)}
+                novel={novel}
+                currentChapterId={chapterId}
+                themeClasses={themeClasses}
             />
         </>
     );
