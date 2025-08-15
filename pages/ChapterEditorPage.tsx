@@ -666,6 +666,15 @@ const ChapterEditorPage: React.FC = () => {
     return (
         <>
             <div className={`relative flex h-screen font-serif ${themeClasses.bg} ${themeClasses.text}`}>
+                {/* Backdrop for mobile sidebar */}
+                {isSidebarOpen && (
+                    <div
+                        onClick={() => setIsSidebarOpen(false)}
+                        className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+                        aria-hidden="true"
+                    />
+                )}
+                
                 <div ref={scrollContainerRef} className="flex-1 overflow-y-auto relative">
                      <div className={`sticky top-0 z-10 px-8 md:px-16 lg:px-24 pt-6 pb-4 ${themeClasses.bg} bg-opacity-80 backdrop-blur-sm border-b ${themeClasses.border}`}>
                         <button onClick={() => navigate(`/novel/${novelId}`)} className={`flex items-center space-x-2 ${themeClasses.text} opacity-70 hover:opacity-100`}>
@@ -693,12 +702,16 @@ const ChapterEditorPage: React.FC = () => {
                         />
                     </div>
                 </div>
-
-                <div className={`
-                    transition-all duration-300 ease-in-out flex-shrink-0
-                    ${isSidebarOpen ? 'w-80' : 'w-0'}
-                    overflow-hidden
-                `}>
+                
+                <div
+                    className={`
+                        fixed top-0 right-0 h-full z-40 transition-transform duration-300 ease-in-out 
+                        lg:relative lg:z-auto lg:transform-none lg:transition-all lg:flex-shrink-0
+                        overflow-hidden
+                        ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}
+                        ${isSidebarOpen ? 'lg:w-80' : 'lg:w-0'}
+                    `}
+                >
                     <div className={`w-80 h-full ${themeClasses.bgSecondary} ${themeClasses.accentText} text-sm font-sans border-l ${themeClasses.border} flex flex-col`}>
                         <div className={`px-4 py-3 flex justify-between items-center border-b ${themeClasses.border}`}>
                             <span className="font-bold text-base">EDITOR TOOLS</span>
@@ -788,7 +801,7 @@ const ChapterEditorPage: React.FC = () => {
                     <button
                         onClick={() => setIsSidebarOpen(true)}
                         className={`
-                            absolute top-4 right-4 z-30 p-2 rounded-md
+                            absolute top-4 right-4 z-20 p-2 rounded-md
                             ${themeClasses.bgSecondary} ${themeClasses.accentText}
                             hover:opacity-80 shadow-lg border ${themeClasses.border}
                         `}
