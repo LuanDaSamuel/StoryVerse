@@ -328,15 +328,37 @@ const ChapterEditorPage: React.FC = () => {
     
     const applyFontSize = (size: string) => {
         applyAndSaveFormat(() => {
-            document.execCommand('fontSize', false, '1'); // Placeholder size
-            const fontElements = editorRef.current?.getElementsByTagName('font');
-            if (fontElements) {
-                for(let i = 0; i < fontElements.length; i++) {
-                    if (fontElements[i].size === '1') {
-                        fontElements[i].removeAttribute('size');
-                        fontElements[i].style.fontSize = size;
+            if (!editorRef.current) return;
+            editorRef.current.focus();
+            const selection = window.getSelection();
+            if (!selection?.rangeCount) return;
+
+            if (selection.isCollapsed) {
+                const range = selection.getRangeAt(0);
+                const span = document.createElement('span');
+                span.style.fontSize = size;
+                span.textContent = '\u200B'; // Zero-width space
+                range.insertNode(span);
+                
+                range.selectNodeContents(span);
+                range.collapse(false);
+                selection.removeAllRanges();
+                selection.addRange(range);
+            } else {
+                // For selected text, use a more robust method that creates <span> tags.
+                document.execCommand('styleWithCSS', false, 'true');
+                document.execCommand('fontSize', false, '7'); // Dummy value
+                
+                const fontElements = editorRef.current.querySelectorAll<HTMLElement>('font[size="7"]');
+                fontElements.forEach(fontElement => {
+                    const span = document.createElement('span');
+                    span.style.fontSize = size;
+                    // Move children from <font> to <span>
+                    while (fontElement.firstChild) {
+                        span.appendChild(fontElement.firstChild);
                     }
-                }
+                    fontElement.parentNode?.replaceChild(span, fontElement);
+                });
             }
         });
     };
@@ -397,6 +419,41 @@ const ChapterEditorPage: React.FC = () => {
             }, 10);
         }
     };
+    
+    const handleBlur = useCallback(() => {
+        if (!editorRef.current) return;
+        const editor = editorRef.current;
+
+        // Save cursor position
+        const selection = window.getSelection();
+        let range: Range | null = null;
+        if (selection && selection.rangeCount > 0) {
+            try {
+                range = selection.getRangeAt(0).cloneRange();
+            } catch (e) {
+                console.warn("Could not get selection range.", e);
+            }
+        }
+        
+        const originalContent = editor.innerHTML;
+        const enhancedContent = enhanceHtml(originalContent);
+
+        if (originalContent !== enhancedContent) {
+             editor.innerHTML = enhancedContent;
+             // Restore cursor position
+            if (range && selection) {
+                try {
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                } catch (e) {
+                    console.warn("Could not restore selection range after enhancing HTML.", e);
+                }
+            }
+            // After modifying the DOM in-place, sync the changes back to React state.
+            updateChapterField('content', editor.innerHTML);
+        }
+    }, [updateChapterField]);
+
 
     // --- Effects ---
     useEffect(() => {
@@ -523,15 +580,7 @@ const ChapterEditorPage: React.FC = () => {
                             contentEditable
                             suppressContentEditableWarning
                             onInput={(e) => updateChapterField('content', e.currentTarget.innerHTML)}
-                            onBlur={(e) => {
-                                const editor = e.currentTarget;
-                                const currentContent = editor.innerHTML;
-                                const enhancedContent = enhanceHtml(currentContent);
-                                if (currentContent !== enhancedContent) {
-                                    editor.innerHTML = enhancedContent;
-                                    updateChapterField('content', enhancedContent);
-                                }
-                            }}
+                            onBlur={handleBlur}
                             onKeyDown={handleKeyDown}
                             className="w-full text-lg leading-relaxed outline-none story-content"
                             style={{ color: 'inherit' }}
