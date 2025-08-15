@@ -85,16 +85,28 @@ export const TAG_OPTIONS: string[] = [
  */
 function applyTypographicReplacements(text: string): string {
     if (!text) return text;
+    // The order of these replacements is important.
     return text
-        .replace(/\.\.\./g, '…')   // Ellipsis
-        .replace(/--/g, '—')     // em-dash
-        // Opening double quotes: after whitespace, start of line, or open bracket-like chars
-        .replace(/(^|\s|\[|\(|\{)\"/g, '$1“')
-        // Any remaining double quotes are closing ones
+        // Ellipsis and em-dash
+        .replace(/\.\.\./g, '…')
+        .replace(/--/g, '—')
+        
+        // Straight single quotes to curly
+        // Apostrophes in contractions, e.g., "don't", "we've"
+        .replace(/(\w)'(\w)/g, '$1’$2')
+        // Special case for years, e.g., "'90s"
+        .replace(/'(\d\ds)\b/g, '’$1')
+        // Common starting contractions, e.g., "'em", "'tis"
+        .replace(/(^|\s)'(em|tis|twas|til|cause)\b/gi, '$1’$2')
+        
+        // Opening single quotes
+        .replace(/(^|\s|["(\[{“])'/g, '$1‘')
+        
+        // Opening double quotes
+        .replace(/(^|\s|[(\[{‘])"/g, '$1“')
+
+        // Any remaining quotes are closing ones
         .replace(/"/g, '”')
-        // Opening single quotes: after whitespace, start of line, or open bracket-like chars
-        .replace(/(^|\s|\[|\(|\{)\'/g, '$1‘')
-        // Any remaining single quotes are closing ones / apostrophes
         .replace(/'/g, '’');
 }
 
