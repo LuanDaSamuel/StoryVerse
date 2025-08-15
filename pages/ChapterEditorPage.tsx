@@ -4,7 +4,7 @@ import React, { useContext, useEffect, useMemo, useRef, useState, useCallback } 
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { BackIcon, BookOpenIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, TextIcon, SearchIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, CloseIcon } from '../components/Icons';
-import { enhancePlainText } from '../constants';
+import { enhancePlainText, enhanceHtml } from '../constants';
 
 // --- Reusable Components ---
 interface AccordionProps {
@@ -405,11 +405,20 @@ const ChapterEditorPage: React.FC = () => {
             return;
         }
 
-        if (editorRef.current && chapter && editorRef.current.innerHTML !== chapter.content) {
-            editorRef.current.innerHTML = chapter.content || '';
+        if (editorRef.current && chapter) {
+            const initialContent = chapter.content || '';
+            const enhancedContent = enhanceHtml(initialContent);
+
+            if (editorRef.current.innerHTML !== enhancedContent) {
+                editorRef.current.innerHTML = enhancedContent;
+            }
+
+            if (initialContent !== enhancedContent) {
+                updateChapterField('content', enhancedContent);
+            }
         }
         handleSelectionChange();
-    }, [chapter, handleSelectionChange]);
+    }, [chapter, handleSelectionChange, updateChapterField]);
 
     useEffect(() => {
         const editorEl = editorRef.current;
@@ -514,6 +523,15 @@ const ChapterEditorPage: React.FC = () => {
                             contentEditable
                             suppressContentEditableWarning
                             onInput={(e) => updateChapterField('content', e.currentTarget.innerHTML)}
+                            onBlur={(e) => {
+                                const editor = e.currentTarget;
+                                const currentContent = editor.innerHTML;
+                                const enhancedContent = enhanceHtml(currentContent);
+                                if (currentContent !== enhancedContent) {
+                                    editor.innerHTML = enhancedContent;
+                                    updateChapterField('content', enhancedContent);
+                                }
+                            }}
                             onKeyDown={handleKeyDown}
                             className="w-full text-lg leading-relaxed outline-none story-content"
                             style={{ color: 'inherit' }}

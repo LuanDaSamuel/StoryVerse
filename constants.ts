@@ -84,14 +84,18 @@ export const TAG_OPTIONS: string[] = [
  * @returns The typographically enhanced string.
  */
 function applyTypographicReplacements(text: string): string {
+    if (!text) return text;
     return text
-        .replace(/\.\.\./g, '…')
-        // Smart double quotes
-        .replace(/(^|\s|[\[({<—-])"/g, '$1“') // Opening
-        .replace(/"/g, '”') // Closing
-        // Smart single quotes
-        .replace(/(^|\s|[\[({<—-])'/g, "$1‘") // Opening
-        .replace(/'/g, '’'); // Closing/Apostrophe
+        .replace(/\.\.\./g, '…')   // Ellipsis
+        .replace(/--/g, '—')     // em-dash
+        // Opening double quotes: after whitespace, start of line, or open bracket-like chars
+        .replace(/(^|\s|\[|\(|\{)\"/g, '$1“')
+        // Any remaining double quotes are closing ones
+        .replace(/"/g, '”')
+        // Opening single quotes: after whitespace, start of line, or open bracket-like chars
+        .replace(/(^|\s|\[|\(|\{)\'/g, '$1‘')
+        // Any remaining single quotes are closing ones / apostrophes
+        .replace(/'/g, '’');
 }
 
 /**
