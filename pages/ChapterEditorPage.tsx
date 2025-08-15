@@ -380,6 +380,62 @@ const ChapterEditorPage: React.FC = () => {
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+        // Smart quotes and other typographic replacements
+        if (["'", "\"", ".", "-"].includes(e.key)) {
+            const selection = window.getSelection();
+            if (selection && selection.rangeCount > 0) {
+                const range = selection.getRangeAt(0);
+                const textNode = range.startContainer;
+                const offset = range.startOffset;
+
+                // Ensure we are working with a text node
+                if (textNode.nodeType === Node.TEXT_NODE && textNode.textContent !== null) {
+                    const precedingText = textNode.textContent.substring(0, offset);
+
+                    if (e.key === "'") {
+                        e.preventDefault();
+                        const charToInsert = /\w$/.test(precedingText) ? '’' : '‘';
+                        document.execCommand('insertText', false, charToInsert);
+                        return;
+                    }
+
+                    if (e.key === "\"") {
+                        e.preventDefault();
+                        const precedingChar = precedingText.slice(-1);
+                        const charToInsert = (precedingText.length === 0 || /\s|\(|\[|\{/.test(precedingChar)) ? '“' : '”';
+                        document.execCommand('insertText', false, charToInsert);
+                        return;
+                    }
+
+                    if (e.key === '.' && precedingText.endsWith('..')) {
+                        e.preventDefault();
+                        range.setStart(textNode, offset - 2);
+                        range.setEnd(textNode, offset);
+                        range.deleteContents();
+                        range.insertNode(document.createTextNode('…'));
+                        range.collapse(false);
+                        selection.removeAllRanges();
+                        selection.addRange(range);
+                        editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+                        return;
+                    }
+
+                    if (e.key === '-' && precedingText.endsWith('-')) {
+                        e.preventDefault();
+                        range.setStart(textNode, offset - 1);
+                        range.setEnd(textNode, offset);
+                        range.deleteContents();
+                        range.insertNode(document.createTextNode('—'));
+                        range.collapse(false);
+                        selection.removeAllRanges();
+                        selection.addRange(range);
+                        editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+                        return;
+                    }
+                }
+            }
+        }
+    
         if (e.key === 'Enter') {
             // Use a timeout to allow the DOM to update after the key press.
             setTimeout(() => {
@@ -419,41 +475,6 @@ const ChapterEditorPage: React.FC = () => {
             }, 10);
         }
     };
-    
-    const handleBlur = useCallback(() => {
-        if (!editorRef.current) return;
-        const editor = editorRef.current;
-
-        // Save cursor position
-        const selection = window.getSelection();
-        let range: Range | null = null;
-        if (selection && selection.rangeCount > 0) {
-            try {
-                range = selection.getRangeAt(0).cloneRange();
-            } catch (e) {
-                console.warn("Could not get selection range.", e);
-            }
-        }
-        
-        const originalContent = editor.innerHTML;
-        const enhancedContent = enhanceHtml(originalContent);
-
-        if (originalContent !== enhancedContent) {
-             editor.innerHTML = enhancedContent;
-             // Restore cursor position
-            if (range && selection) {
-                try {
-                    selection.removeAllRanges();
-                    selection.addRange(range);
-                } catch (e) {
-                    console.warn("Could not restore selection range after enhancing HTML.", e);
-                }
-            }
-            // After modifying the DOM in-place, sync the changes back to React state.
-            updateChapterField('content', editor.innerHTML);
-        }
-    }, [updateChapterField]);
-
 
     // --- Effects ---
     useEffect(() => {
@@ -580,7 +601,6 @@ const ChapterEditorPage: React.FC = () => {
                             contentEditable
                             suppressContentEditableWarning
                             onInput={(e) => updateChapterField('content', e.currentTarget.innerHTML)}
-                            onBlur={handleBlur}
                             onKeyDown={handleKeyDown}
                             className="w-full text-lg leading-relaxed outline-none story-content"
                             style={{ color: 'inherit' }}
