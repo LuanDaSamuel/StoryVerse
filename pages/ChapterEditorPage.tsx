@@ -741,13 +741,12 @@ const ChapterEditorPage: React.FC = () => {
                             <p className="text-3xl font-bold">{(chapter.wordCount || 0).toLocaleString()}</p>
                             <p className={themeClasses.textSecondary}>WORDS</p>
                         </div>
-                        <hr className={`border-t ${themeClasses.border} w-full`}/>
 
                         <div className="flex-1 overflow-y-auto">
                            <div className={`border-b ${themeClasses.border}`}>
                                 <button
                                     onClick={() => setIsChapterListModalOpen(true)}
-                                    className="w-full flex justify-between items-center py-3 px-4 font-semibold text-left"
+                                    className={`w-full flex justify-between items-center py-3 px-4 font-semibold text-left transition-colors hover:${themeClasses.bgTertiary}`}
                                 >
                                     <div className="flex items-center space-x-3">
                                         <BookOpenIcon className="w-5 h-5" />
