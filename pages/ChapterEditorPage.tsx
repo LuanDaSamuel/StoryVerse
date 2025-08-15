@@ -159,7 +159,6 @@ const ChapterEditorPage: React.FC = () => {
     const editorRef = useRef<HTMLDivElement>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const toolbarRef = useRef<HTMLDivElement>(null);
-    const isEditorUpdate = useRef(false);
     
     const [openAccordion, setOpenAccordion] = useState<string | null>('format');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -192,7 +191,6 @@ const ChapterEditorPage: React.FC = () => {
 
     const updateChapterField = useCallback((field: 'title' | 'content', value: string) => {
         if (projectData && novelIndex !== -1 && chapterIndex !== -1) {
-            isEditorUpdate.current = true;
             const updatedProjectData = { ...projectData };
             const updatedNovels = [...updatedProjectData.novels];
             const updatedChapters = [...updatedNovels[novelIndex].chapters];
@@ -380,58 +378,125 @@ const ChapterEditorPage: React.FC = () => {
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-        // Smart quotes and other typographic replacements
-        if (["'", "\"", ".", "-"].includes(e.key)) {
-            const selection = window.getSelection();
-            if (selection && selection.rangeCount > 0) {
-                const range = selection.getRangeAt(0);
-                const textNode = range.startContainer;
+        const selection = window.getSelection();
+        if (!selection || !selection.rangeCount) {
+             if (e.key === 'Enter') {
+                // Use a timeout to allow the DOM to update after the key press.
+                setTimeout(() => {
+                    const selection = window.getSelection();
+                    if (!selection?.rangeCount) return;
+
+                    // Find the element containing the cursor.
+                    const range = selection.getRangeAt(0);
+                    let element = range.startContainer;
+                    if (element.nodeType === Node.TEXT_NODE) {
+                        element = element.parentElement!;
+                    }
+                    
+                    if (!(element instanceof HTMLElement)) return;
+
+                    const toolbarEl = toolbarRef.current;
+                    const scrollContainerEl = scrollContainerRef.current;
+
+                    if (!toolbarEl || !scrollContainerEl) return;
+                    
+                    const elementRect = element.getBoundingClientRect();
+                    const toolbarRect = toolbarEl.getBoundingClientRect();
+                    
+                    const buffer = 20; 
+
+                    if (elementRect.bottom > toolbarRect.top - buffer) {
+                        const scrollAmount = elementRect.bottom - (toolbarRect.top - buffer);
+                        
+                        scrollContainerEl.scrollBy({
+                            top: scrollAmount,
+                            behavior: 'smooth',
+                        });
+                    }
+                }, 10);
+            }
+            return;
+        }
+
+        const range = selection.getRangeAt(0);
+
+        const handleQuotePair = (key: '"' | "'") => {
+            e.preventDefault();
+            const openQuote = key === '"' ? '“' : '‘';
+            const closeQuote = key === '"' ? '”' : '’';
+
+            if (range.collapsed) {
+                const textNode = document.createTextNode(openQuote + closeQuote);
+                range.insertNode(textNode);
+                range.setStart(textNode, 1);
+                range.setEnd(textNode, 1);
+                selection.removeAllRanges();
+                selection.addRange(range);
+            } else {
+                const selectedContent = range.extractContents();
+                const fragment = document.createDocumentFragment();
+                fragment.appendChild(document.createTextNode(openQuote));
+                fragment.appendChild(selectedContent);
+                fragment.appendChild(document.createTextNode(closeQuote));
+                range.insertNode(fragment);
+                range.collapse(false);
+                selection.removeAllRanges();
+                selection.addRange(range);
+            }
+            editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+        };
+
+        if (e.key === '"') {
+            handleQuotePair('"');
+            return;
+        }
+
+        if (e.key === "'") {
+            let isApostrophe = false;
+            if (range.collapsed && range.startContainer.nodeType === Node.TEXT_NODE) {
+                const textContent = range.startContainer.textContent || '';
+                const precedingChar = textContent.charAt(range.startOffset - 1);
+                if (/\w/.test(precedingChar)) {
+                    isApostrophe = true;
+                }
+            }
+
+            if (isApostrophe) {
+                e.preventDefault();
+                document.execCommand('insertText', false, '’');
+            } else {
+                handleQuotePair("'");
+            }
+            return;
+        }
+
+        if (['.', '-'].includes(e.key)) {
+            if (range.collapsed && range.startContainer.nodeType === Node.TEXT_NODE) {
+                const textNode = range.startContainer as Text;
                 const offset = range.startOffset;
 
-                // Ensure we are working with a text node
-                if (textNode.nodeType === Node.TEXT_NODE && textNode.textContent !== null) {
-                    const precedingText = textNode.textContent.substring(0, offset);
+                if (e.key === '.' && textNode.textContent?.substring(offset - 2, offset) === '..') {
+                    e.preventDefault();
+                    range.setStart(textNode, offset - 2);
+                    range.deleteContents();
+                    range.insertNode(document.createTextNode('…'));
+                    range.collapse(false);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                    editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+                    return;
+                }
 
-                    if (e.key === "'") {
-                        e.preventDefault();
-                        const charToInsert = /\w$/.test(precedingText) ? '’' : '‘';
-                        document.execCommand('insertText', false, charToInsert);
-                        return;
-                    }
-
-                    if (e.key === "\"") {
-                        e.preventDefault();
-                        const precedingChar = precedingText.slice(-1);
-                        const charToInsert = (precedingText.length === 0 || /\s|\(|\[|\{/.test(precedingChar)) ? '“' : '”';
-                        document.execCommand('insertText', false, charToInsert);
-                        return;
-                    }
-
-                    if (e.key === '.' && precedingText.endsWith('..')) {
-                        e.preventDefault();
-                        range.setStart(textNode, offset - 2);
-                        range.setEnd(textNode, offset);
-                        range.deleteContents();
-                        range.insertNode(document.createTextNode('…'));
-                        range.collapse(false);
-                        selection.removeAllRanges();
-                        selection.addRange(range);
-                        editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
-                        return;
-                    }
-
-                    if (e.key === '-' && precedingText.endsWith('-')) {
-                        e.preventDefault();
-                        range.setStart(textNode, offset - 1);
-                        range.setEnd(textNode, offset);
-                        range.deleteContents();
-                        range.insertNode(document.createTextNode('—'));
-                        range.collapse(false);
-                        selection.removeAllRanges();
-                        selection.addRange(range);
-                        editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
-                        return;
-                    }
+                if (e.key === '-' && textNode.textContent?.substring(offset - 1, offset) === '-') {
+                    e.preventDefault();
+                    range.setStart(textNode, offset - 1);
+                    range.deleteContents();
+                    range.insertNode(document.createTextNode('—'));
+                    range.collapse(false);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                    editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+                    return;
                 }
             }
         }
@@ -478,25 +543,30 @@ const ChapterEditorPage: React.FC = () => {
 
     // --- Effects ---
     useEffect(() => {
-        if (isEditorUpdate.current) {
-            isEditorUpdate.current = false;
-            return;
-        }
-
         if (editorRef.current && chapter) {
-            const initialContent = chapter.content || '';
+            const editorHadFocus = document.activeElement === editorRef.current;
+            const initialContent = chapter.content || '<p><br></p>';
             const enhancedContent = enhanceHtml(initialContent);
 
             if (editorRef.current.innerHTML !== enhancedContent) {
                 editorRef.current.innerHTML = enhancedContent;
             }
 
-            if (initialContent !== enhancedContent) {
-                updateChapterField('content', enhancedContent);
+            if (editorHadFocus) {
+                editorRef.current.focus();
+                const selection = window.getSelection();
+                if (selection) {
+                    const range = document.createRange();
+                    range.selectNodeContents(editorRef.current);
+                    range.collapse(false); // Go to end
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                }
             }
         }
         handleSelectionChange();
-    }, [chapter, handleSelectionChange, updateChapterField]);
+    }, [chapterId]);
+
 
     useEffect(() => {
         const editorEl = editorRef.current;
