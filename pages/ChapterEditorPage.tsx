@@ -53,31 +53,31 @@ const ChapterListModal: React.FC<{
     );
 };
 
-interface EditorDropdownProps {
+interface ToolbarDropdownProps {
     label: string;
     value: string;
     onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
     children: React.ReactNode;
 }
 
-const EditorDropdown: React.FC<EditorDropdownProps> = ({ label, value, onChange, children }) => {
-    const { themeClasses } = useContext(ProjectContext);
+const ToolbarDropdown: React.FC<ToolbarDropdownProps> = ({ label, value, onChange, children }) => {
     return (
         <div>
-            <label className={`block text-xs font-semibold mb-1 ${themeClasses.textSecondary}`}>{label}</label>
+            <label className="block text-xs font-semibold mb-1 text-white/70">{label}</label>
             <div className="relative">
                 <select
                     value={value}
                     onChange={onChange}
-                    className={`w-full appearance-none px-3 py-2 rounded-md ${themeClasses.input} border ${themeClasses.border} focus:outline-none focus:ring-2 focus:${themeClasses.accentBorder}`}
+                    className="w-full appearance-none px-3 py-2 text-sm rounded-md bg-white/10 text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-white/50"
                 >
                     {children}
                 </select>
-                <ChevronDownIcon className={`w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${themeClasses.textSecondary}`} />
+                <ChevronDownIcon className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-white/70" />
             </div>
         </div>
     );
 };
+
 
 const fontOptions = [
     { name: 'Times New Roman', value: '"Times New Roman", Times, serif' },
@@ -186,6 +186,7 @@ const ChapterEditorPage: React.FC = () => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isFindReplaceOpen, setIsFindReplaceOpen] = useState(false);
     const [isChapterListModalOpen, setIsChapterListModalOpen] = useState(false);
+    const [isFormatPanelOpen, setIsFormatPanelOpen] = useState(false);
     const [activeFormats, setActiveFormats] = useState({ isBold: false, isItalic: false });
     const [currentFormat, setCurrentFormat] = useState({
         paragraphStyle: 'p',
@@ -628,6 +629,22 @@ const ChapterEditorPage: React.FC = () => {
         };
     }, [handleSelectionChange]);
     
+     useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (toolbarRef.current && !toolbarRef.current.contains(event.target as Node)) {
+                setIsFormatPanelOpen(false);
+            }
+        };
+
+        if (isFormatPanelOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isFormatPanelOpen]);
+    
     const handleReplaceAll = (find: string, replace: string, scope: 'current' | 'all') => {
       if (!projectData || !novel || novelIndex === -1 || !find) {
         setIsFindReplaceOpen(false);
@@ -754,38 +771,43 @@ const ChapterEditorPage: React.FC = () => {
                                     </div>
                                 </button>
                             </div>
-                             <div className={`border-b ${themeClasses.border}`}>
-                                <div className="w-full flex items-center py-3 px-4 font-semibold text-left">
-                                    <div className="flex items-center space-x-3">
-                                        <TextIcon className="w-5 h-5" />
-                                        <span>Format</span>
-                                    </div>
-                                </div>
-                                <div className="pb-4 pt-2 px-4 space-y-4">
-                                     <EditorDropdown label="Paragraph Style" value={currentFormat.paragraphStyle} onChange={(e) => applyParagraphStyle(e.target.value)}>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Pinned Toolbar */}
+                <div className="absolute bottom-0 left-0 w-full flex justify-center pb-4 z-20 pointer-events-none">
+                    <div ref={toolbarRef} className="relative pointer-events-auto">
+                        {isFormatPanelOpen && (
+                            <div
+                                className="absolute bottom-full mb-2 p-4 rounded-lg shadow-lg bg-stone-900/80 border border-white/10 backdrop-blur-sm w-[320px]"
+                                onMouseDown={(e) => e.preventDefault()}
+                            >
+                                <div className="space-y-4">
+                                    <ToolbarDropdown label="Paragraph Style" value={currentFormat.paragraphStyle} onChange={(e) => applyParagraphStyle(e.target.value)}>
                                         <option value="p">Paragraph</option>
                                         <option value="h1">Heading 1</option>
                                         <option value="h2">Heading 2</option>
-                                    </EditorDropdown>
-                                    <EditorDropdown label="Font" value={currentFormat.font} onChange={(e) => applyFont(e.target.value)}>
+                                    </ToolbarDropdown>
+                                    <ToolbarDropdown label="Font" value={currentFormat.font} onChange={(e) => applyFont(e.target.value)}>
                                         {fontOptions.map(font => <option key={font.name} value={font.value}>{font.name}</option>)}
-                                    </EditorDropdown>
+                                    </ToolbarDropdown>
                                     <div className="grid grid-cols-2 gap-4">
-                                    <EditorDropdown label="Size" value={currentFormat.size} onChange={(e) => applyFontSize(e.target.value)}>
+                                        <ToolbarDropdown label="Size" value={currentFormat.size} onChange={(e) => applyFontSize(e.target.value)}>
                                             <option value="14px">14</option>
                                             <option value="16px">16</option>
                                             <option value="18px">18</option>
                                             <option value="20px">20</option>
                                             <option value="24px">24</option>
-                                    </EditorDropdown>
-                                    <EditorDropdown label="Line Spacing" value={currentFormat.lineHeight} onChange={(e) => applyLineHeight(e.target.value)}>
+                                        </ToolbarDropdown>
+                                        <ToolbarDropdown label="Line Spacing" value={currentFormat.lineHeight} onChange={(e) => applyLineHeight(e.target.value)}>
                                             <option value="1">Single</option>
                                             <option value="1.5">1.5</option>
                                             <option value="2">Double</option>
-                                    </EditorDropdown>
+                                        </ToolbarDropdown>
                                     </div>
                                     <div>
-                                        <label className={`block text-xs font-semibold mb-2 ${themeClasses.textSecondary}`}>Color</label>
+                                        <label className="block text-xs font-semibold mb-2 text-white/70">Color</label>
                                         <div className="flex space-x-2">
                                             {['#3B2F27', '#3B82F6', '#FBBF24', '#22C55E', '#EC4899'].map(color => (
                                                 <button key={color} onClick={() => applyColor(color)} className="w-6 h-6 rounded-full border border-gray-400" style={{backgroundColor: color}}></button>
@@ -794,25 +816,21 @@ const ChapterEditorPage: React.FC = () => {
                                     </div>
                                 </div>
                             </div>
+                        )}
+                        <div
+                            className="flex items-center space-x-1 p-1 rounded-full shadow-lg bg-stone-900/70 border border-white/10 backdrop-blur-sm"
+                            onMouseDown={(e) => e.preventDefault()}
+                        >
+                            <button onClick={() => setIsFormatPanelOpen(p => !p)} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors ${isFormatPanelOpen ? 'bg-white/20' : ''}`}><TextIcon className="w-5 h-5"/></button>
+                            <div className="w-px h-5 bg-white/20 mx-1"></div>
+                            <button onClick={() => applyFormat('bold')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors ${activeFormats.isBold ? 'bg-white/20' : ''}`}><BoldIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyFormat('italic')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors ${activeFormats.isItalic ? 'bg-white/20' : ''}`}><ItalicIcon className="w-5 h-5"/></button>
+                            <div className="w-px h-5 bg-white/20 mx-1"></div>
+                            <button onClick={() => setIsFindReplaceOpen(true)} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors`}><SearchIcon className="w-5 h-5"/></button>
+                            <div className="w-px h-5 bg-white/20 mx-1"></div>
+                            <button onClick={() => applyFormat('undo')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors`}><UndoIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyFormat('redo')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors`}><RedoIcon className="w-5 h-5"/></button>
                         </div>
-                    </div>
-                </div>
-
-                {/* Pinned Toolbar */}
-                <div
-                    ref={toolbarRef}
-                    className="absolute bottom-0 left-0 w-full flex justify-center pb-4 z-20 pointer-events-none"
-                >
-                    <div className="flex items-center space-x-1 p-1 rounded-full shadow-lg bg-stone-900/70 border border-white/10 backdrop-blur-sm pointer-events-auto"
-                      onMouseDown={(e) => e.preventDefault()}
-                    >
-                        <button onClick={() => applyFormat('bold')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors ${activeFormats.isBold ? 'bg-white/20' : ''}`}><BoldIcon className="w-5 h-5"/></button>
-                        <button onClick={() => applyFormat('italic')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors ${activeFormats.isItalic ? 'bg-white/20' : ''}`}><ItalicIcon className="w-5 h-5"/></button>
-                        <div className="w-px h-5 bg-white/20 mx-1"></div>
-                        <button onClick={() => setIsFindReplaceOpen(true)} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors`}><SearchIcon className="w-5 h-5"/></button>
-                        <div className="w-px h-5 bg-white/20 mx-1"></div>
-                        <button onClick={() => applyFormat('undo')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors`}><UndoIcon className="w-5 h-5"/></button>
-                        <button onClick={() => applyFormat('redo')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors`}><RedoIcon className="w-5 h-5"/></button>
                     </div>
                 </div>
             </div>
