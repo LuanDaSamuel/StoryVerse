@@ -399,41 +399,6 @@ const ChapterEditorPage: React.FC = () => {
     const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
         const selection = window.getSelection();
         if (!selection || !selection.rangeCount) {
-             if (e.key === 'Enter') {
-                // Use a timeout to allow the DOM to update after the key press.
-                setTimeout(() => {
-                    const selection = window.getSelection();
-                    if (!selection?.rangeCount) return;
-
-                    // Find the element containing the cursor.
-                    const range = selection.getRangeAt(0);
-                    let element = range.startContainer;
-                    if (element.nodeType === Node.TEXT_NODE) {
-                        element = element.parentElement!;
-                    }
-                    
-                    if (!(element instanceof HTMLElement)) return;
-
-                    const toolbarEl = toolbarRef.current;
-                    const scrollContainerEl = scrollContainerRef.current;
-
-                    if (!toolbarEl || !scrollContainerEl) return;
-                    
-                    const elementRect = element.getBoundingClientRect();
-                    const toolbarRect = toolbarEl.getBoundingClientRect();
-                    
-                    const buffer = 20; 
-
-                    if (elementRect.bottom > toolbarRect.top - buffer) {
-                        const scrollAmount = elementRect.bottom - (toolbarRect.top - buffer);
-                        
-                        scrollContainerEl.scrollBy({
-                            top: scrollAmount,
-                            behavior: 'smooth',
-                        });
-                    }
-                }, 10);
-            }
             return;
         }
 
@@ -521,14 +486,55 @@ const ChapterEditorPage: React.FC = () => {
         }
     
         if (e.key === 'Enter') {
-            // Use a timeout to allow the DOM to update after the key press.
+            // This timeout allows the browser to execute its default 'Enter' behavior (creating a new paragraph)
+            // before we run our logic to fix the styling and scroll position.
             setTimeout(() => {
-                const selection = window.getSelection();
-                if (!selection?.rangeCount) return;
+                const newSelection = window.getSelection();
+                if (!newSelection?.rangeCount || !editorRef.current) return;
+                const newRange = newSelection.getRangeAt(0);
+                
+                // --- 1. Fix Font Size Inheritance ---
+                let currentBlock = newRange.startContainer;
+                while (currentBlock && currentBlock.parentNode !== editorRef.current) {
+                    currentBlock = currentBlock.parentNode;
+                }
+                
+                if (currentBlock instanceof HTMLElement) {
+                    const isNewBlockEmpty = (currentBlock.textContent?.trim() === '' && currentBlock.children.length === 0) || currentBlock.innerHTML === '<br>';
+                    
+                    if (isNewBlockEmpty) {
+                        const previousBlock = currentBlock.previousElementSibling;
+                        if (previousBlock instanceof HTMLElement) {
+                            // Find the very last element in the previous block to get its style.
+                            let styleSource: Element = previousBlock;
+                            while (styleSource.lastElementChild) {
+                                styleSource = styleSource.lastElementChild;
+                            }
+                            
+                            const computedStyle = window.getComputedStyle(styleSource);
+                            const fontSize = computedStyle.fontSize;
+                            const defaultFontSize = window.getComputedStyle(editorRef.current).fontSize;
+                            
+                            // If the previous line had a custom font size, apply it to the new line.
+                            if (fontSize && fontSize !== defaultFontSize) {
+                                currentBlock.innerHTML = ''; // Clear the default <br>
+                                const styleCarrier = document.createElement('span');
+                                styleCarrier.style.fontSize = fontSize;
+                                styleCarrier.innerHTML = '&#8203;'; // Use a zero-width space as a placeholder for the cursor.
+                                currentBlock.appendChild(styleCarrier);
+                                
+                                // Place the cursor inside our new styled span.
+                                newRange.setStart(styleCarrier.firstChild!, 1);
+                                newRange.collapse(true);
+                                newSelection.removeAllRanges();
+                                newSelection.addRange(newRange);
+                            }
+                        }
+                    }
+                }
 
-                // Find the element containing the cursor.
-                const range = selection.getRangeAt(0);
-                let element = range.startContainer;
+                // --- 2. Adjust Scroll Position ---
+                let element = newRange.startContainer;
                 if (element.nodeType === Node.TEXT_NODE) {
                     element = element.parentElement!;
                 }
@@ -537,26 +543,17 @@ const ChapterEditorPage: React.FC = () => {
 
                 const toolbarEl = toolbarRef.current;
                 const scrollContainerEl = scrollContainerRef.current;
-
                 if (!toolbarEl || !scrollContainerEl) return;
                 
                 const elementRect = element.getBoundingClientRect();
                 const toolbarRect = toolbarEl.getBoundingClientRect();
-                
-                // Add a buffer so text doesn't sit exactly on the toolbar line.
                 const buffer = 20; 
 
-                // Check if the bottom of the current line is getting obscured by the toolbar.
                 if (elementRect.bottom > toolbarRect.top - buffer) {
-                    // Calculate how much to scroll to bring the line above the toolbar with the buffer.
                     const scrollAmount = elementRect.bottom - (toolbarRect.top - buffer);
-                    
-                    scrollContainerEl.scrollBy({
-                        top: scrollAmount,
-                        behavior: 'smooth',
-                    });
+                    scrollContainerEl.scrollBy({ top: scrollAmount, behavior: 'smooth' });
                 }
-            }, 10);
+            }, 0); // Timeout 0 ensures this runs immediately after the browser's default action.
         }
     };
 
