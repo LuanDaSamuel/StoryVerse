@@ -794,21 +794,22 @@ const ChapterEditorPage: React.FC = () => {
                         <button onClick={() => applyFormat('redo')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors`}><RedoIcon className="w-5 h-5"/></button>
                     </div>
                 </div>
-
-                 {!isSidebarOpen && (
-                    <button
-                        onClick={() => setIsSidebarOpen(true)}
-                        className={`
-                            absolute top-4 right-4 z-20 p-2 rounded-md
-                            ${themeClasses.bgSecondary} ${themeClasses.accentText}
-                            hover:opacity-80 shadow-lg border ${themeClasses.border}
-                        `}
-                        aria-label="Open editor tools"
-                    >
-                        <ChevronLeftIcon className="w-5 h-5" />
-                    </button>
-                )}
             </div>
+
+            {!isSidebarOpen && (
+                <button
+                    onClick={() => setIsSidebarOpen(true)}
+                    className={`
+                        fixed top-4 right-4 z-30 p-2 rounded-md
+                        ${themeClasses.bgSecondary} ${themeClasses.accentText}
+                        hover:opacity-80 shadow-lg border ${themeClasses.border}
+                    `}
+                    aria-label="Open editor tools"
+                >
+                    <ChevronLeftIcon className="w-5 h-5" />
+                </button>
+            )}
+
             <FindReplaceModal 
                 isOpen={isFindReplaceOpen}
                 onClose={() => setIsFindReplaceOpen(false)}
