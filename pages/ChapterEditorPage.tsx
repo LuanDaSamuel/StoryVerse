@@ -666,11 +666,11 @@ const ChapterEditorPage: React.FC = () => {
     return (
         <>
             <div className={`relative flex h-screen font-serif ${themeClasses.bg} ${themeClasses.text}`}>
-                {/* Backdrop for mobile sidebar */}
+                {/* Backdrop for sidebar */}
                 {isSidebarOpen && (
                     <div
                         onClick={() => setIsSidebarOpen(false)}
-                        className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+                        className="fixed inset-0 bg-black/50 z-30"
                         aria-hidden="true"
                     />
                 )}
@@ -703,13 +703,11 @@ const ChapterEditorPage: React.FC = () => {
                     </div>
                 </div>
                 
+                {/* Editor Tools Sidebar */}
                 <div
                     className={`
-                        fixed top-0 right-0 h-full z-40 transition-transform duration-300 ease-in-out 
-                        lg:relative lg:z-auto lg:transform-none lg:transition-all lg:flex-shrink-0
-                        overflow-hidden
+                        fixed top-0 right-0 h-full z-40 transition-transform duration-300 ease-in-out
                         ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}
-                        ${isSidebarOpen ? 'lg:w-80' : 'lg:w-0'}
                     `}
                 >
                     <div className={`w-80 h-full ${themeClasses.bgSecondary} ${themeClasses.accentText} text-sm font-sans border-l ${themeClasses.border} flex flex-col`}>
