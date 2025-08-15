@@ -1,0 +1,6 @@
+{
+  "name": "StoryVerse",
+  "description": "A web-based application for writers to create, manage, and write their novels. All your work is saved locally in a project file on your computer.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}

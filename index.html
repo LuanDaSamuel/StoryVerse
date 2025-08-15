@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23D2B48C'%3E%3Cpath fill-rule='evenodd' d='M7 2a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H7zM8 6h8v2H8V6zm0 5h8v1H8v-1zm0 3h6v1H8v-1z' clip-rule='evenodd'/%3E%3C/svg%3E" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="A web-based application for writers to create, manage, and write their novels. All your work is saved locally in a project file on your computer." />
+    <meta name="theme-color" content="#5D4C40">
+    <title>StoryVerse</title>
+    
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Times New Roman"', 'Times', 'serif'],
+                        serif: ['"Times New Roman"', 'Times', 'serif'],
+                    },
+                }
+            }
+        }
+    </script>
+
+    <style>
+      /* 
+        These styles create a classic book-like paragraph format for both the editor and the reader.
+        - The first line of each paragraph is indented.
+        - Vertical space is added between paragraphs for better readability.
+        - The first paragraph after a heading is not indented, for better typographic flow.
+      */
+      .story-content p {
+        text-indent: 2em;
+        margin-bottom: 1em;
+      }
+      .story-content h1 + p,
+      .story-content h2 + p,
+      .story-content h3 + p {
+        text-indent: 0;
+      }
+    </style>
+
+    <!-- 
+      Import Map for ES Modules.
+      This defines aliases for JavaScript modules, allowing for clean import
+      statements in the application code (e.g., `import React from 'react'`).
+      All dependencies are loaded from a CDN (esm.sh) and pinned to stable versions.
+    -->
+    <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@19.1.1",
+    "react-dom/client": "https://esm.sh/react-dom@19.1.1/client",
+    "react-router-dom": "https://esm.sh/react-router-dom@6.23.1",
+    "idb-keyval": "https://esm.sh/idb-keyval@6.2.1",
+    "react-dom/": "https://esm.sh/react-dom@^19.1.1/",
+    "react/": "https://esm.sh/react@^19.1.1/",
+    "mammoth": "https://esm.sh/mammoth@1.7.2"
+  }
+}
+</script>
+  <link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <!-- The root container where the React application will be mounted. -->
+    <div id="root"></div>
+
+    <!-- Main entry point for the application's JavaScript. -->
+    <script type="module" src="/index.tsx"></script>
+
+    <!-- Fallback content for users with JavaScript disabled. -->
+    <noscript>
+      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; background-color: #5D4C40; color: #F5EADD;">
+        <h1>JavaScript is required to run StoryVerse</h1>
+        <p>Please enable JavaScript in your browser settings to continue.</p>
+      </div>
+    </noscript>
+  </body>
+</html>
