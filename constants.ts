@@ -91,21 +91,13 @@ function applyTypographicReplacements(text: string): string {
         .replace(/\.\.\./g, '…')
         .replace(/--/g, '—')
         
-        // Straight single quotes to curly
-        // Apostrophes in contractions, e.g., "don't", "we've"
-        .replace(/(\w)'(\w)/g, '$1’$2')
-        // Special case for years, e.g., "'90s"
-        .replace(/'(\d\ds)\b/g, '’$1')
-        // Common starting contractions, e.g., "'em", "'tis"
-        .replace(/(^|\s)'(em|tis|twas|til|cause)\b/gi, '$1’$2')
+        // Opening double quotes: after start of string, space, dash, or open bracket
+        .replace(/(^|\s|--|\[|\()"/g, '$1“')
         
-        // Opening single quotes
-        .replace(/(^|\s|["(\[{“])'/g, '$1‘')
-        
-        // Opening double quotes
-        .replace(/(^|\s|[(\[{‘])"/g, '$1“')
+        // Opening single quotes: after start of string, space, dash, or open bracket
+        .replace(/(^|\s|--|\[|\()'/g, '$1‘')
 
-        // Any remaining quotes are closing ones
+        // Any remaining quotes are closing ones; this also handles apostrophes correctly.
         .replace(/"/g, '”')
         .replace(/'/g, '’');
 }
