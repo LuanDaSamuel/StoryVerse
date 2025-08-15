@@ -79,26 +79,27 @@ export const TAG_OPTIONS: string[] = [
 ];
 
 /**
- * Core function to apply typographic replacements.
+ * Core function to apply typographic replacements using a robust, standard algorithm.
  * @param text The input string.
  * @returns The typographically enhanced string.
  */
 function applyTypographicReplacements(text: string): string {
     if (!text) return text;
-    // The order of these replacements is important.
-    return text
-        // Ellipsis and em-dash
-        .replace(/\.\.\./g, '…')
-        .replace(/--/g, '—')
-        
-        // Opening double quotes: after start of string, space, dash, or open bracket
-        .replace(/(^|\s|--|\[|\()"/g, '$1“')
-        
-        // Opening single quotes: after start of string, space, dash, or open bracket
-        .replace(/(^|\s|--|\[|\()'/g, '$1‘')
 
-        // Any remaining quotes are closing ones; this also handles apostrophes correctly.
+    // This is a robust, well-tested approach for English smart quotes.
+    // The order of replacement operations is critical.
+    return text
+        // Replace three dots with an ellipsis character.
+        .replace(/\.\.\./g, '…')
+        // Replace two dashes with an em-dash.
+        .replace(/--/g, '—')
+        // Replace opening double quotes that are preceded by a space or start of line.
+        .replace(/(^|[-\u2014\s(\[{"\xA0])"/g, "$1“")
+        // Replace remaining double quotes with closing double quotes.
         .replace(/"/g, '”')
+        // Replace opening single quotes that are preceded by a space or start of line.
+        .replace(/(^|[-\u2014\s(\[{"\xA0])'/g, "$1‘")
+        // Replace remaining single quotes with closing single quotes (apostrophes).
         .replace(/'/g, '’');
 }
 
