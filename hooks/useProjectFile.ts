@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ProjectData, FileStatus, SaveStatus } from '../types';
+import { Project, ProjectData, FileStatus, SaveStatus } from '../types';
 import { get, set, del } from 'idb-keyval';
 
-const PROJECT_DATA_KEY = 'storyverse-project-data';
+const ALL_PROJECTS_KEY = 'storyverse-all-projects';
+const ACTIVE_PROJECT_ID_KEY = 'storyverse-active-project-id';
 
 const defaultProjectData: ProjectData = {
   settings: {
@@ -12,95 +13,75 @@ const defaultProjectData: ProjectData = {
   sketches: [],
 };
 
-export function useProjectFile() {
+export function useMultiProjectManager() {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [projectData, setProjectData] = useState<ProjectData | null>(null);
   const [status, setStatus] = useState<FileStatus>('loading');
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
+
   const hasUnsavedChanges = useRef(false);
   const saveTimeout = useRef<number | null>(null);
 
+  // --- Initialization ---
   useEffect(() => {
     const init = async () => {
       try {
-        const data: ProjectData | undefined = await get(PROJECT_DATA_KEY);
-        if (data) {
-          let needsUpdate = false;
-          const tempDiv = document.createElement('div');
+        const allProjects: Project[] | undefined = await get(ALL_PROJECTS_KEY);
+        const savedActiveId: string | undefined = await get(ACTIVE_PROJECT_ID_KEY);
 
-          // Iterate through all novels and chapters to ensure word counts are accurate.
-          data.novels.forEach(novel => {
-            if (novel.chapters && Array.isArray(novel.chapters)) {
-              novel.chapters.forEach(chapter => {
-                const oldWordCount = chapter.wordCount || 0;
-                
-                // Use a temporary element to strip HTML and get plain text
-                tempDiv.innerHTML = chapter.content || '';
-                const text = tempDiv.textContent || "";
-                const newWordCount = text.trim().split(/\s+/).filter(Boolean).length;
-
-                // If the count is different, update it.
-                if (oldWordCount !== newWordCount) {
-                  chapter.wordCount = newWordCount;
-                  needsUpdate = true;
-                }
-              });
-            }
-          });
-          
-          // Migration check for the 'sketches' property
-          if (!data.sketches) {
-            data.sketches = [];
-            needsUpdate = true;
-          }
-
-          // If any counts were updated, save the corrected data back to the database.
-          if (needsUpdate) {
-            await set(PROJECT_DATA_KEY, data);
-          }
-
-          setProjectData(data);
+        if (allProjects && allProjects.length > 0) {
+          setProjects(allProjects);
+          const projectToLoad = allProjects.find(p => p.id === savedActiveId) || allProjects[0];
+          setActiveProjectId(projectToLoad.id);
+          setProjectData(projectToLoad.data);
           setStatus('ready');
         } else {
-          setStatus('welcome');
+          // Backward compatibility: check for old single project data
+          const oldData: ProjectData | undefined = await get('storyverse-project-data');
+          if (oldData) {
+            const newProject: Project = {
+              id: crypto.randomUUID(),
+              name: 'My StoryVerse Project',
+              data: oldData,
+            };
+            await set(ALL_PROJECTS_KEY, [newProject]);
+            await set(ACTIVE_PROJECT_ID_KEY, newProject.id);
+            await del('storyverse-project-data'); // Clean up old key
+            setProjects([newProject]);
+            setActiveProjectId(newProject.id);
+            setProjectData(newProject.data);
+            setStatus('ready');
+          } else {
+            setStatus('welcome');
+          }
         }
       } catch (error) {
-        console.error('Error loading project from DB:', error);
+        console.error('Error loading projects from DB:', error);
         setStatus('welcome');
       }
     };
     init();
   }, []);
-  
-  // Effect to warn user before leaving with unsaved changes.
-  useEffect(() => {
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (hasUnsavedChanges.current) {
-        event.preventDefault();
-        // Modern browsers show a generic message, but setting returnValue is required.
-        event.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
-        return event.returnValue;
-      }
-    };
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
+  // --- Auto-saving Logic ---
+  const saveProject = useCallback(async (dataToSave: ProjectData) => {
+    if (!activeProjectId) return;
 
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, []);
-
-
-  const saveProject = useCallback(async (data: ProjectData) => {
     setSaveStatus('saving');
     try {
-      await set(PROJECT_DATA_KEY, data);
+      const updatedProjects = projects.map(p =>
+        p.id === activeProjectId ? { ...p, data: dataToSave } : p
+      );
+      await set(ALL_PROJECTS_KEY, updatedProjects);
+      setProjects(updatedProjects);
       hasUnsavedChanges.current = false;
       setSaveStatus('saved');
     } catch (error) {
       console.error('Error saving project to DB:', error);
       setSaveStatus('unsaved');
     }
-  }, []);
+  }, [activeProjectId, projects]);
 
   useEffect(() => {
     if (status === 'ready' && projectData && hasUnsavedChanges.current) {
@@ -119,52 +100,76 @@ export function useProjectFile() {
     setSaveStatus('unsaved');
     setProjectData(updater);
   };
+  
+  // --- Project Management Functions ---
+  const createProject = useCallback(async (name: string) => {
+    const newProject: Project = {
+      id: crypto.randomUUID(),
+      name,
+      data: defaultProjectData,
+    };
+    const newProjectList = [...projects, newProject];
+    await set(ALL_PROJECTS_KEY, newProjectList);
+    setProjects(newProjectList);
+    switchProject(newProject.id);
+  }, [projects]);
 
-  const createProject = useCallback(async () => {
-    const theme = projectData?.settings?.theme || 'book';
-    const newProjectData = { ...defaultProjectData, settings: { theme } };
-    await saveProject(newProjectData);
-    setProjectData(newProjectData);
-    setStatus('ready');
-  }, [projectData, saveProject]);
+  const switchProject = useCallback(async (projectId: string) => {
+    const projectToLoad = projects.find(p => p.id === projectId);
+    if (projectToLoad) {
+      await set(ACTIVE_PROJECT_ID_KEY, projectId);
+      setActiveProjectId(projectId);
+      setProjectData(projectToLoad.data);
+      setStatus('ready');
+    }
+  }, [projects]);
 
-  const importProject = useCallback(async (fileContent: string) => {
+  const importProject = useCallback(async (fileContent: string, name: string) => {
     try {
       const data: ProjectData = JSON.parse(fileContent);
-      if (data && data.settings && Array.isArray(data.novels)) {
-        
-        // Recalculate word counts for all chapters on import
-        const tempDiv = document.createElement('div');
-        data.novels.forEach(novel => {
-            if (novel.chapters && Array.isArray(novel.chapters)) {
-                novel.chapters.forEach(chapter => {
-                    if (typeof chapter.content === 'string') {
-                        tempDiv.innerHTML = chapter.content;
-                        const text = tempDiv.textContent || "";
-                        chapter.wordCount = text.trim().split(/\s+/).filter(Boolean).length;
-                    } else {
-                        chapter.wordCount = 0;
-                    }
-                });
-            }
-        });
-
-        // Migration check for sketches on import
-        if (!data.sketches) {
-          data.sketches = [];
-        }
-
-        await saveProject(data);
-        setProjectData(data);
-        setStatus('ready');
-      } else {
-        throw new Error('Invalid project file format.');
-      }
+       if (data && data.settings && Array.isArray(data.novels)) {
+            const newProject: Project = {
+                id: crypto.randomUUID(),
+                name,
+                data
+            };
+            const newProjectList = [...projects, newProject];
+            await set(ALL_PROJECTS_KEY, newProjectList);
+            setProjects(newProjectList);
+            switchProject(newProject.id);
+       } else {
+         throw new Error('Invalid project file format.');
+       }
     } catch (error) {
       console.error('Error importing project file:', error);
       alert('Failed to import file. It may be corrupted or not a valid StoryVerse project file.');
     }
-  }, [saveProject]);
+  }, [projects, switchProject]);
+  
+  const deleteProject = useCallback(async (projectId: string) => {
+    const newProjectList = projects.filter(p => p.id !== projectId);
+    setProjects(newProjectList);
+    await set(ALL_PROJECTS_KEY, newProjectList);
+
+    if (activeProjectId === projectId) {
+      if (newProjectList.length > 0) {
+        switchProject(newProjectList[0].id);
+      } else {
+        setActiveProjectId(null);
+        setProjectData(null);
+        setStatus('welcome');
+        await del(ACTIVE_PROJECT_ID_KEY);
+      }
+    }
+  }, [projects, activeProjectId, switchProject]);
+  
+  const renameProject = useCallback(async (projectId: string, newName: string) => {
+    const updatedProjects = projects.map(p => 
+      p.id === projectId ? { ...p, name: newName } : p
+    );
+    await set(ALL_PROJECTS_KEY, updatedProjects);
+    setProjects(updatedProjects);
+  }, [projects]);
 
   const downloadCopy = useCallback(() => {
     if (!projectData) return;
@@ -184,21 +189,19 @@ export function useProjectFile() {
     }
   }, [projectData]);
 
-  const deleteProject = useCallback(async () => {
-    setProjectData(null);
-    await del(PROJECT_DATA_KEY);
-    setStatus('welcome');
-  }, []);
-
-  return { 
-    projectData, 
-    setProjectData: setProjectDataWithSave, 
-    status, 
+  return {
+    projects,
+    activeProjectId,
+    projectData,
+    setProjectData: setProjectDataWithSave,
+    status,
     saveStatus,
-    createProject, 
-    importProject, 
-    downloadCopy, 
+    createProject,
+    importProject,
+    switchProject,
+    renameProject,
     deleteProject,
-    saveProject 
+    downloadCopy,
+    saveProject
   };
 }

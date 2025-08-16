@@ -1,15 +1,24 @@
 import React, { createContext } from 'react';
-import { ProjectData, Theme, ThemeConfig, SaveStatus } from '../types';
+import { ProjectData, Theme, ThemeConfig, SaveStatus, Project } from '../types';
 
 interface ProjectContextType {
   projectData: ProjectData | null;
   setProjectData: React.Dispatch<React.SetStateAction<ProjectData | null>>;
   downloadCopy: () => void;
-  unlinkFile: () => void; // This will be mapped to deleteProject for compatibility
+  unlinkFile: (projectId: string) => void;
   saveProject: (data: ProjectData) => Promise<void>;
   theme: Theme;
   themeClasses: ThemeConfig;
   saveStatus: SaveStatus;
+  
+  // For multi-project management
+  projects: Project[];
+  activeProjectId: string | null;
+  createProject: (name: string) => Promise<void>;
+  importProject: (fileContent: string, name: string) => Promise<void>;
+  switchProject: (projectId: string) => void;
+  deleteProject: (projectId: string) => Promise<void>;
+  renameProject: (projectId: string, newName: string) => Promise<void>;
 }
 
 export const ProjectContext = createContext<ProjectContextType>({
@@ -33,4 +42,13 @@ export const ProjectContext = createContext<ProjectContextType>({
     logoColor: '',
   },
   saveStatus: 'saved',
+
+  // Multi-project defaults
+  projects: [],
+  activeProjectId: null,
+  createProject: async () => {},
+  importProject: async () => {},
+  switchProject: () => {},
+  deleteProject: async () => {},
+  renameProject: async () => {},
 });
