@@ -145,13 +145,14 @@ const DemosPage: React.FC = () => {
     const handleDocxImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file || !projectData) {
-            e.target.value = '';
+            e.target.value = ''; // Reset input
             return;
         }
 
         try {
             const arrayBuffer = await file.arrayBuffer();
             
+            // This style map is still useful for converting Word headings into HTML headings within the content.
             const styleMap = [
                 "p[style-name='Title'] => h1:fresh",
                 "p[style-name='Heading 1'] => h1:fresh",
@@ -161,56 +162,30 @@ const DemosPage: React.FC = () => {
 
             const { value: html } = await mammoth.convertToHtml({ arrayBuffer }, { styleMap });
 
-            const newSketches: Sketch[] = [];
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = html;
-
-            let currentTitle = file.name.replace(/\.docx$/, '');
-            let contentAccumulator = '';
-            const nodes = Array.from(tempDiv.childNodes);
-
-            for (const node of nodes) {
-                if (node.nodeName.toUpperCase() === 'H1') {
-                    if (contentAccumulator.trim()) {
-                        const now = new Date().toISOString();
-                        newSketches.push({
-                            id: crypto.randomUUID(),
-                            title: currentTitle,
-                            content: contentAccumulator.trim(),
-                            createdAt: now,
-                            updatedAt: now,
-                        });
-                    }
-                    currentTitle = node.textContent?.trim() || 'Untitled Sketch';
-                    contentAccumulator = '';
-                } else {
-                    contentAccumulator += (node as HTMLElement).outerHTML || node.textContent || '';
-                }
-            }
+            // Create a single new sketch from the entire document content.
+            const now = new Date().toISOString();
+            const newSketch: Sketch = {
+                id: crypto.randomUUID(),
+                title: file.name.replace(/\.docx$/, ''), // Use filename for the title
+                content: html, // Use the full converted HTML for the content
+                createdAt: now,
+                updatedAt: now,
+            };
             
-            if (contentAccumulator.trim() || (newSketches.length === 0 && html.trim())) {
-                const now = new Date().toISOString();
-                newSketches.push({
-                    id: crypto.randomUUID(),
-                    title: currentTitle,
-                    content: contentAccumulator.trim() || html,
-                    createdAt: now,
-                    updatedAt: now,
-                });
-            }
+            // Add the new sketch to the beginning of the sketches array.
+            const updatedSketches = [newSketch, ...sketches];
+            setProjectData({ ...projectData, sketches: updatedSketches });
             
-            if (newSketches.length > 0) {
-                const updatedSketches = [...newSketches, ...sketches];
-                setProjectData({ ...projectData, sketches: updatedSketches });
-                setSelectedSketchId(newSketches[0].id);
-                setIsSketchesListOpen(false);
-            }
+            // Select the newly created sketch and hide the list.
+            setSelectedSketchId(newSketch.id);
+            setIsSketchesListOpen(false);
 
         } catch (error) {
             console.error(`Error processing file ${file.name}:`, error);
             alert(`Failed to process ${file.name}. It might be corrupted or not a valid .docx file.`);
         }
         
+        // Reset file input to allow selecting the same file again.
         e.target.value = '';
     };
 
