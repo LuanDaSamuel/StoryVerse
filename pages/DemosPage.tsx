@@ -1,4 +1,5 @@
 
+
 import React, { useState, useContext, useEffect, useMemo, useRef, useCallback } from 'react';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { Sketch } from '../types';
@@ -61,6 +62,15 @@ const DemosPage: React.FC = () => {
         return sketches.find(s => s.id === selectedSketchId) || null;
     }, [sketches, selectedSketchId]);
     
+    const editorStyle = useMemo(() => {
+        if (theme === 'book') {
+            const colorClass = THEME_CONFIG.book.text;
+            const colorValue = colorClass.match(/\[(.*?)\]/)?.[1] || '#F5EADD';
+            return { color: colorValue };
+        }
+        return { color: 'inherit' };
+    }, [theme]);
+
     const colorPalette = useMemo(() => {
         if (theme === 'book') {
             const textColor = THEME_CONFIG.book.text.match(/\[(.*?)\]/)?.[1] || '#F5EADD';
@@ -135,34 +145,73 @@ const DemosPage: React.FC = () => {
     const handleDocxImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file || !projectData) {
-            e.target.value = ''; // Reset input
+            e.target.value = '';
             return;
         }
 
         try {
             const arrayBuffer = await file.arrayBuffer();
-            const { value: html } = await mammoth.convertToHtml({ arrayBuffer });
-
-            const now = new Date().toISOString();
-            const newSketch: Sketch = {
-                id: crypto.randomUUID(),
-                title: file.name.replace(/\.docx$/, ''),
-                content: html,
-                createdAt: now,
-                updatedAt: now,
-            };
             
-            const updatedSketches = [newSketch, ...sketches];
-            setProjectData({ ...projectData, sketches: updatedSketches });
-            setSelectedSketchId(newSketch.id);
-            setIsSketchesListOpen(false);
+            const styleMap = [
+                "p[style-name='Title'] => h1:fresh",
+                "p[style-name='Heading 1'] => h1:fresh",
+                "p[style-name='Heading 2'] => h2:fresh",
+                "p[style-name='Heading 3'] => h3:fresh",
+            ];
+
+            const { value: html } = await mammoth.convertToHtml({ arrayBuffer }, { styleMap });
+
+            const newSketches: Sketch[] = [];
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = html;
+
+            let currentTitle = file.name.replace(/\.docx$/, '');
+            let contentAccumulator = '';
+            const nodes = Array.from(tempDiv.childNodes);
+
+            for (const node of nodes) {
+                if (node.nodeName.toUpperCase() === 'H1') {
+                    if (contentAccumulator.trim()) {
+                        const now = new Date().toISOString();
+                        newSketches.push({
+                            id: crypto.randomUUID(),
+                            title: currentTitle,
+                            content: contentAccumulator.trim(),
+                            createdAt: now,
+                            updatedAt: now,
+                        });
+                    }
+                    currentTitle = node.textContent?.trim() || 'Untitled Sketch';
+                    contentAccumulator = '';
+                } else {
+                    contentAccumulator += (node as HTMLElement).outerHTML || node.textContent || '';
+                }
+            }
+            
+            if (contentAccumulator.trim() || (newSketches.length === 0 && html.trim())) {
+                const now = new Date().toISOString();
+                newSketches.push({
+                    id: crypto.randomUUID(),
+                    title: currentTitle,
+                    content: contentAccumulator.trim() || html,
+                    createdAt: now,
+                    updatedAt: now,
+                });
+            }
+            
+            if (newSketches.length > 0) {
+                const updatedSketches = [...newSketches, ...sketches];
+                setProjectData({ ...projectData, sketches: updatedSketches });
+                setSelectedSketchId(newSketches[0].id);
+                setIsSketchesListOpen(false);
+            }
 
         } catch (error) {
             console.error(`Error processing file ${file.name}:`, error);
             alert(`Failed to process ${file.name}. It might be corrupted or not a valid .docx file.`);
         }
         
-        e.target.value = ''; // Reset file input to allow selecting same file again
+        e.target.value = '';
     };
 
     // --- Formatting Logic ---
@@ -182,14 +231,48 @@ const DemosPage: React.FC = () => {
         }
 
         let element = selection.anchorNode;
-        if (element.nodeType === 3) element = element.parentNode!;
+        if (element.nodeType === 3) {
+            element = element.parentNode!;
+        }
+
         if (!(element instanceof HTMLElement)) return;
 
+        let detectedParagraphStyle = 'p';
+        let detectedLineHeight = '1.5';
+        
+        let blockElement: HTMLElement | null = element;
+        while (blockElement && blockElement !== editorRef.current) {
+            const tagName = blockElement.tagName.toLowerCase();
+            if (['p', 'h1', 'h2'].includes(tagName)) {
+                detectedParagraphStyle = tagName;
+                const styles = window.getComputedStyle(blockElement);
+                if (styles.lineHeight && styles.lineHeight !== 'normal') {
+                    const lh = parseFloat(styles.lineHeight);
+                    const fs = parseFloat(styles.fontSize);
+                    if (fs > 0) {
+                        const calculatedLh = Math.round((lh / fs) * 10) / 10;
+                         if ([1, 1.5, 2].includes(calculatedLh)) {
+                            detectedLineHeight = String(calculatedLh);
+                        }
+                    }
+                }
+                break;
+            }
+            blockElement = blockElement.parentElement;
+        }
+
         const inlineStyles = window.getComputedStyle(element);
+        const detectedSize = inlineStyles.fontSize;
+        
         const family = inlineStyles.fontFamily;
         const matchedFont = fontOptions.find(f => family.includes(f.name))?.value || fontOptions[0].value;
-        
-        setCurrentFormat(prev => ({ ...prev, font: matchedFont, size: inlineStyles.fontSize }));
+
+        setCurrentFormat({
+            paragraphStyle: detectedParagraphStyle,
+            font: matchedFont,
+            size: detectedSize,
+            lineHeight: detectedLineHeight,
+        });
     }, []);
 
     const handleSelectionChange = useCallback(() => {
@@ -211,18 +294,115 @@ const DemosPage: React.FC = () => {
     };
     
     const applyParagraphStyle = (style: string) => applyAndSaveFormat(() => document.execCommand('formatBlock', false, style));
-    const applyFont = (fontValue: string) => applyAndSaveFormat(() => document.execCommand('fontName', false, fontOptions.find(f => f.value === fontValue)?.name || 'serif'));
+    
+    const applyFont = (fontValue: string) => {
+        const fontName = fontOptions.find(f => f.value === fontValue)?.name || 'serif';
+        applyAndSaveFormat(() => document.execCommand('fontName', false, fontName));
+    };
+
     const applyColor = (color: string) => applyAndSaveFormat(() => document.execCommand('foreColor', false, color));
-    const applyFontSize = (size: string) => applyAndSaveFormat(() => document.execCommand('fontSize', false, '1')); // Dummy command, actual logic is complex
-    const applyLineHeight = (height: string) => applyAndSaveFormat(() => { /* Complex logic placeholder */ });
+    
+    const applyFontSize = (size: string) => {
+        applyAndSaveFormat(() => {
+            if (!editorRef.current) return;
+            editorRef.current.focus();
+            const selection = window.getSelection();
+            if (!selection?.rangeCount) return;
+
+            if (selection.isCollapsed) {
+                const range = selection.getRangeAt(0);
+                const span = document.createElement('span');
+                span.style.fontSize = size;
+                span.textContent = '\u200B';
+                range.insertNode(span);
+                
+                range.selectNodeContents(span);
+                range.collapse(false);
+                selection.removeAllRanges();
+                selection.addRange(range);
+                return;
+            }
+
+            const DUMMY_COLOR_RGB = 'rgb(1, 2, 3)';
+            document.execCommand('styleWithCSS', false, 'true');
+            document.execCommand('hiliteColor', false, DUMMY_COLOR_RGB);
+
+            const tempSpans = Array.from(editorRef.current.querySelectorAll<HTMLElement>(`span[style*="background-color: ${DUMMY_COLOR_RGB}"]`));
+            
+            const parentsToClean = new Set<Node>();
+
+            tempSpans.forEach(span => {
+                if (span.parentElement) {
+                    parentsToClean.add(span.parentElement);
+                }
+                span.style.backgroundColor = '';
+                span.style.fontSize = size;
+                
+                if (!span.getAttribute('style')?.trim()) {
+                    const parent = span.parentNode;
+                    if (parent) {
+                        while (span.firstChild) {
+                            parent.insertBefore(span.firstChild, span);
+                        }
+                        parent.removeChild(span);
+                    }
+                }
+            });
+
+            parentsToClean.forEach(parent => {
+                let child = parent.firstChild;
+                while (child) {
+                    const next = child.nextSibling;
+                    if (
+                        next &&
+                        child instanceof HTMLSpanElement &&
+                        next instanceof HTMLSpanElement &&
+                        child.style.cssText === next.style.cssText
+                    ) {
+                        while (next.firstChild) {
+                            child.appendChild(next.firstChild);
+                        }
+                        parent.removeChild(next);
+                    } else {
+                        child = next;
+                    }
+                }
+                parent.normalize();
+            });
+        });
+    };
+    
+    const applyLineHeight = (height: string) => {
+        applyAndSaveFormat(() => {
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0) return;
+            let node = selection.getRangeAt(0).startContainer;
+            if (node.nodeType === 3) node = node.parentNode!;
+            while(node && node !== editorRef.current) {
+                if(node instanceof HTMLElement && ['P', 'H1', 'H2', 'DIV'].includes(node.tagName)) {
+                    node.style.lineHeight = height;
+                    return;
+                }
+                node = node.parentNode!;
+            }
+        });
+    };
     
     useEffect(() => {
         const editorEl = editorRef.current;
         document.addEventListener('selectionchange', handleSelectionChange);
-        if (editorEl) editorEl.addEventListener('keyup', handleSelectionChange);
+        if (editorEl) {
+            editorEl.addEventListener('keyup', handleSelectionChange);
+            editorEl.addEventListener('mouseup', handleSelectionChange);
+            editorEl.addEventListener('focus', handleSelectionChange);
+        }
         return () => {
             document.removeEventListener('selectionchange', handleSelectionChange);
-            if(editorEl) editorEl.removeEventListener('keyup', handleSelectionChange);
+            if(editorEl) {
+                editorEl.removeEventListener('keyup', handleSelectionChange);
+                editorEl.removeEventListener('mouseup', handleSelectionChange);
+                editorEl.removeEventListener('focus', handleSelectionChange);
+            }
         };
     }, [handleSelectionChange]);
     
@@ -322,6 +502,7 @@ const DemosPage: React.FC = () => {
                                 suppressContentEditableWarning
                                 onInput={(e) => handleUpdateSketch('content', e.currentTarget.innerHTML)}
                                 className={`w-full text-lg leading-relaxed outline-none story-content ${themeClasses.text}`}
+                                style={editorStyle}
                             />
                         </div>
                     ) : (
@@ -342,9 +523,28 @@ const DemosPage: React.FC = () => {
                     {isFormatPanelOpen && (
                         <div className="absolute bottom-full mb-2 p-4 rounded-lg shadow-lg bg-stone-900/80 border border-white/10 backdrop-blur-sm w-[320px]">
                             <div className="space-y-4">
+                                <ToolbarDropdown label="Paragraph Style" value={currentFormat.paragraphStyle} onChange={(e) => applyParagraphStyle(e.target.value)}>
+                                    <option value="p">Paragraph</option>
+                                    <option value="h1">Heading 1</option>
+                                    <option value="h2">Heading 2</option>
+                                </ToolbarDropdown>
                                 <ToolbarDropdown label="Font" value={currentFormat.font} onChange={(e) => applyFont(e.target.value)}>
                                     {fontOptions.map(font => <option key={font.name} value={font.value}>{font.name}</option>)}
                                 </ToolbarDropdown>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <ToolbarDropdown label="Size" value={currentFormat.size} onChange={(e) => applyFontSize(e.target.value)}>
+                                        <option value="14px">14</option>
+                                        <option value="16px">16</option>
+                                        <option value="18px">18</option>
+                                        <option value="20px">20</option>
+                                        <option value="24px">24</option>
+                                    </ToolbarDropdown>
+                                    <ToolbarDropdown label="Line Spacing" value={currentFormat.lineHeight} onChange={(e) => applyLineHeight(e.target.value)}>
+                                        <option value="1">Single</option>
+                                        <option value="1.5">1.5</option>
+                                        <option value="2">Double</option>
+                                    </ToolbarDropdown>
+                                </div>
                                 <div>
                                     <label className="block text-xs font-semibold mb-2 text-white/70">Color</label>
                                     <div className="flex space-x-2">
