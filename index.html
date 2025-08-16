@@ -39,44 +39,6 @@
       .story-content h3 + p {
         text-indent: 0;
       }
-
-      /* Always-visible line numbers for the chapter editor */
-      .editor-container {
-        /* Establish a counter for line numbers at the editor level. */
-        counter-reset: line-number;
-        /* The padding provides space for the line numbers to sit in. */
-        padding-left: 3.5rem;
-      }
-
-      /* Target all direct children of the editor (e.g., <p>, <h1>) to treat them as lines. */
-      .editor-container > * {
-        position: relative;
-      }
-
-      .editor-container > *::before {
-        position: absolute;
-        /* Position the line number in the padding area to the left of the text. */
-        left: -3.5rem;
-        top: 0;
-        width: 3rem;
-        padding-right: 0.5rem; /* Space between number and text */
-        
-        /* Increment and display the line number counter. */
-        counter-increment: line-number;
-        content: counter(line-number);
-
-        /* Style the line numbers to be subtle and non-intrusive. */
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-        text-align: right;
-        color: currentColor; /* Inherits the main text color. */
-        opacity: 0.4; /* Makes the color less prominent. */
-        font-size: 0.875em; /* A bit smaller than the main text. */
-        line-height: inherit;
-
-        /* Prevent users from accidentally selecting or interacting with the line numbers. */
-        user-select: none;
-        pointer-events: none;
-      }
     </style>
 
     <!-- 

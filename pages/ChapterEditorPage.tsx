@@ -756,7 +756,7 @@ const ChapterEditorPage: React.FC = () => {
                             suppressContentEditableWarning
                             onInput={(e) => updateChapterField('content', e.currentTarget.innerHTML)}
                             onKeyDown={handleKeyDown}
-                            className="w-full text-lg leading-relaxed outline-none story-content editor-container"
+                            className="w-full text-lg leading-relaxed outline-none story-content"
                             style={editorStyle}
                         />
                     </div>
