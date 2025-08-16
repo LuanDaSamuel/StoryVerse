@@ -1,9 +1,7 @@
-
-
 import React, { useState, useContext, useEffect, useMemo, useRef, useCallback } from 'react';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { Sketch } from '../types';
-import { UploadIcon, PlusIcon, TrashIcon, LightbulbIcon, ChevronDownIcon, TextIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, Bars3Icon, CloseIcon } from '../components/Icons';
+import { UploadIcon, PlusIcon, TrashIcon, LightbulbIcon, ChevronDownIcon, TextIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, Bars3Icon, CloseIcon, ListBulletIcon } from '../components/Icons';
 import { enhanceHtml, enhancePlainText } from '../constants';
 import { THEME_CONFIG } from '../constants';
 import * as mammoth from 'mammoth';
@@ -80,6 +78,88 @@ const SketchesOutlineModal: React.FC<{
     );
 };
 
+interface Heading {
+  id: string;
+  text: string;
+  level: number;
+}
+
+const DocumentOutlineModal: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    editorRef: React.RefObject<HTMLDivElement>;
+    themeClasses: any;
+}> = ({ isOpen, onClose, editorRef, themeClasses }) => {
+    const [headings, setHeadings] = useState<Heading[]>([]);
+
+    useEffect(() => {
+        if (isOpen && editorRef.current) {
+            const headingElements = Array.from(editorRef.current.querySelectorAll('h1, h2'));
+            const newHeadings = headingElements.map((el, index) => {
+                const htmlEl = el as HTMLElement;
+                if (!htmlEl.id) {
+                    htmlEl.id = `temp-heading-id-${index}`;
+                }
+                return {
+                    id: htmlEl.id,
+                    text: htmlEl.textContent || 'Untitled Heading',
+                    level: parseInt(htmlEl.tagName.substring(1), 10),
+                };
+            });
+            setHeadings(newHeadings);
+        }
+    }, [isOpen, editorRef]);
+
+    const handleHeadingClick = (id: string) => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        onClose();
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div 
+            className="fixed inset-0 bg-black bg-opacity-60 z-[60] flex items-center justify-center p-4 font-sans"
+            onClick={onClose}
+            role="dialog"
+            aria-modal="true"
+        >
+            <div 
+                className={`w-full max-w-md p-6 rounded-lg shadow-2xl ${themeClasses.bgSecondary} ${themeClasses.accentText} border ${themeClasses.border}`}
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold">Document Outline</h2>
+                    <button onClick={onClose} className={`p-1 rounded-full hover:${themeClasses.bgTertiary}`}>
+                        <CloseIcon className="w-6 h-6" />
+                    </button>
+                </div>
+                {headings.length > 0 ? (
+                    <nav className="max-h-[60vh] overflow-y-auto -mr-2 pr-2">
+                        <ul className="space-y-1">
+                            {headings.map(heading => (
+                                <li key={heading.id}>
+                                    <button
+                                        onClick={() => handleHeadingClick(heading.id)}
+                                        className={`w-full text-left px-3 py-2 rounded-md transition-colors hover:${themeClasses.bgTertiary} ${heading.level === 2 ? 'pl-8' : ''}`}
+                                    >
+                                        {enhancePlainText(heading.text)}
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    </nav>
+                ) : (
+                    <p className={themeClasses.textSecondary}>No headings (H1, H2) found in this sketch.</p>
+                )}
+            </div>
+        </div>
+    );
+};
+
 const ToolbarDropdown: React.FC<{
     label: string;
     value: string;
@@ -114,6 +194,7 @@ const DemosPage: React.FC = () => {
     const { projectData, setProjectData, theme, themeClasses } = useContext(ProjectContext);
     const [selectedSketchId, setSelectedSketchId] = useState<string | null>(null);
     const [isOutlineModalOpen, setIsOutlineModalOpen] = useState(false);
+    const [isDocumentOutlineOpen, setIsDocumentOutlineOpen] = useState(false);
 
     const editorRef = useRef<HTMLDivElement>(null);
     const toolbarRef = useRef<HTMLDivElement>(null);
@@ -231,8 +312,6 @@ const DemosPage: React.FC = () => {
         try {
             const arrayBuffer = await file.arrayBuffer();
             
-            // This style map preserves semantic structure (Headings) from the DOCX file
-            // without splitting the document into multiple sketches.
             const styleMap = [
                 "p[style-name='Title'] => h1:fresh",
                 "p[style-name='Heading 1'] => h2:fresh",
@@ -607,6 +686,9 @@ const DemosPage: React.FC = () => {
                         <button onClick={() => setIsOutlineModalOpen(true)} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors`}>
                             <Bars3Icon className="w-5 h-5"/>
                         </button>
+                        <button onClick={() => setIsDocumentOutlineOpen(true)} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed`} disabled={!selectedSketchId}>
+                            <ListBulletIcon className="w-5 h-5"/>
+                        </button>
                         <div className="w-px h-5 bg-white/20 mx-1"></div>
                         <button onClick={() => setIsFormatPanelOpen(p => !p)} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors ${isFormatPanelOpen ? 'bg-white/20' : ''}`}><TextIcon className="w-5 h-5"/></button>
                         <div className="w-px h-5 bg-white/20 mx-1"></div>
@@ -618,6 +700,13 @@ const DemosPage: React.FC = () => {
                     </div>
                 </div>
             </div>
+
+            <DocumentOutlineModal
+                isOpen={isDocumentOutlineOpen}
+                onClose={() => setIsDocumentOutlineOpen(false)}
+                editorRef={editorRef}
+                themeClasses={themeClasses}
+            />
 
         </div>
     );
