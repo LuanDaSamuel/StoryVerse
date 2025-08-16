@@ -503,6 +503,13 @@ const DemosPage: React.FC = () => {
                             <p className={`mt-2 max-w-md ${themeClasses.textSecondary}`}>
                                 This is your space for ideas, notes, and short stories. Create a new sketch to get started.
                             </p>
+                            <button
+                                onClick={handleCreateSketch}
+                                className={`mt-8 flex items-center justify-center space-x-2 px-6 py-3 text-lg font-semibold rounded-lg transition-colors ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}
+                            >
+                                <PlusIcon className="w-6 h-6" />
+                                <span>Create First Sketch</span>
+                            </button>
                         </div>
                     )}
                 </div>
