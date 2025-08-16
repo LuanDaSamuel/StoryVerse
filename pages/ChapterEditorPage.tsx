@@ -4,7 +4,7 @@ import React, { useContext, useEffect, useMemo, useRef, useState, useCallback } 
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { BackIcon, BookOpenIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, TextIcon, SearchIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, CloseIcon } from '../components/Icons';
-import { enhancePlainText, enhanceHtml } from '../constants';
+import { enhancePlainText, enhanceHtml, THEME_CONFIG } from '../constants';
 
 // --- Reusable Components ---
 const ChapterListModal: React.FC<{
@@ -177,7 +177,7 @@ const FindReplaceModal: React.FC<FindReplaceModalProps> = ({ isOpen, onClose, on
 const ChapterEditorPage: React.FC = () => {
     const { novelId, chapterId } = useParams<{ novelId: string; chapterId: string }>();
     const navigate = useNavigate();
-    const { projectData, setProjectData, themeClasses } = useContext(ProjectContext);
+    const { projectData, setProjectData, theme, themeClasses } = useContext(ProjectContext);
     
     const editorRef = useRef<HTMLDivElement>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -194,6 +194,29 @@ const ChapterEditorPage: React.FC = () => {
         size: '18px',
         lineHeight: '1.5',
     });
+
+    const editorStyle = useMemo(() => {
+        // For the book theme, we need to explicitly set the color because
+        // contentEditable's default styling can interfere with inheritance on a dark background.
+        if (theme === 'book') {
+            const colorClass = THEME_CONFIG.book.text;
+            // Extracts the hex code from the Tailwind class, e.g., 'text-[#F5EADD]' -> '#F5EADD'
+            const colorValue = colorClass.match(/\[(.*?)\]/)?.[1] || '#F5EADD';
+            return { color: colorValue };
+        }
+        // For other themes, 'inherit' works fine and is more flexible.
+        return { color: 'inherit' };
+    }, [theme]);
+    
+    const colorPalette = useMemo(() => {
+        if (theme === 'book') {
+            const textColor = THEME_CONFIG.book.text.match(/\[(.*?)\]/)?.[1] || '#F5EADD';
+            // For the book theme, replace the dark brown with the theme's main text color (off-white).
+            return [textColor, '#3B82F6', '#FBBF24', '#22C55E', '#EC4899'];
+        }
+        // Default palette for other themes.
+        return ['#3B2F27', '#3B82F6', '#FBBF24', '#22C55E', '#EC4899'];
+    }, [theme]);
     
     const { novel, chapter, chapterIndex, novelIndex } = useMemo(() => {
         if (!projectData?.novels || !novelId || !chapterId) return { novel: null, chapter: null, chapterIndex: -1, novelIndex: -1 };
@@ -733,8 +756,8 @@ const ChapterEditorPage: React.FC = () => {
                             suppressContentEditableWarning
                             onInput={(e) => updateChapterField('content', e.currentTarget.innerHTML)}
                             onKeyDown={handleKeyDown}
-                            className="w-full text-lg leading-relaxed outline-none story-content"
-                            style={{ color: 'inherit' }}
+                            className="w-full text-lg leading-relaxed outline-none story-content editor-container"
+                            style={editorStyle}
                         />
                     </div>
                 </div>
@@ -808,7 +831,7 @@ const ChapterEditorPage: React.FC = () => {
                                     <div>
                                         <label className="block text-xs font-semibold mb-2 text-white/70">Color</label>
                                         <div className="flex space-x-2">
-                                            {['#3B2F27', '#3B82F6', '#FBBF24', '#22C55E', '#EC4899'].map(color => (
+                                            {colorPalette.map(color => (
                                                 <button key={color} onClick={() => applyColor(color)} className="w-6 h-6 rounded-full border border-gray-400" style={{backgroundColor: color}}></button>
                                             ))}
                                         </div>
