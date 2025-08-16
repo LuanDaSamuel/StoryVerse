@@ -134,8 +134,8 @@ export const RedoIcon = (props: React.SVGProps<SVGSVGElement>) => (
 );
 
 export const LightbulbIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a3 3 0 0 0-3-3m3 3a3 3 0 0 0 3-3m-3 3V6.75M9 21h6m-6-6h6m-6-3h6m-6-3h6M12 18a6 6 0 0 1-6-6c0-3.314 2.686-6 6-6s6 2.686 6 6-2.686 6-6 6z" />
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
+      <path d="M12 2C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7zM9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1z"/>
     </svg>
 );
 
