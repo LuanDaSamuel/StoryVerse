@@ -451,19 +451,13 @@ const ChapterEditorPage: React.FC = () => {
 
         const range = selection.getRangeAt(0);
 
-        const handleQuotePair = (key: '"' | "'") => {
+        if (e.key === '"' || e.key === "'") {
             e.preventDefault();
-            const openQuote = key === '"' ? '“' : '‘';
-            const closeQuote = key === '"' ? '”' : '’';
+            const openQuote = e.key === '"' ? '“' : '‘';
+            const closeQuote = e.key === '"' ? '”' : '’';
 
-            if (range.collapsed) {
-                const textNode = document.createTextNode(openQuote + closeQuote);
-                range.insertNode(textNode);
-                range.setStart(textNode, 1);
-                range.setEnd(textNode, 1);
-                selection.removeAllRanges();
-                selection.addRange(range);
-            } else {
+            if (!range.collapsed) {
+                // If text is selected, wrap it with smart quotes
                 const selectedContent = range.extractContents();
                 const fragment = document.createDocumentFragment();
                 fragment.appendChild(document.createTextNode(openQuote));
@@ -473,31 +467,32 @@ const ChapterEditorPage: React.FC = () => {
                 range.collapse(false);
                 selection.removeAllRanges();
                 selection.addRange(range);
-            }
-            editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
-        };
+            } else {
+                // If no text is selected, insert a single smart quote based on context
+                let precedingChar = '';
+                if (range.startContainer.nodeType === Node.TEXT_NODE && range.startOffset > 0) {
+                    precedingChar = range.startContainer.textContent?.charAt(range.startOffset - 1) || '';
+                }
 
-        if (e.key === '"') {
-            handleQuotePair('"');
-            return;
-        }
-
-        if (e.key === "'") {
-            let isApostrophe = false;
-            if (range.collapsed && range.startContainer.nodeType === Node.TEXT_NODE) {
-                const textContent = range.startContainer.textContent || '';
-                const precedingChar = textContent.charAt(range.startOffset - 1);
-                if (/\w/.test(precedingChar)) {
-                    isApostrophe = true;
+                if (e.key === "'") {
+                    // Handle apostrophe vs. opening/closing single quotes
+                    if (/\w/.test(precedingChar)) {
+                        document.execCommand('insertText', false, '’'); // Apostrophe
+                    } else if (precedingChar.trim() === '' || '([{'.includes(precedingChar)) {
+                        document.execCommand('insertText', false, '‘'); // Opening single quote
+                    } else {
+                        document.execCommand('insertText', false, '’'); // Closing single quote
+                    }
+                } else { // key is '"'
+                    // Handle opening/closing double quotes
+                    if (precedingChar.trim() === '' || '([{'.includes(precedingChar)) {
+                        document.execCommand('insertText', false, '“'); // Opening double quote
+                    } else {
+                        document.execCommand('insertText', false, '”'); // Closing double quote
+                    }
                 }
             }
-
-            if (isApostrophe) {
-                e.preventDefault();
-                document.execCommand('insertText', false, '’');
-            } else {
-                handleQuotePair("'");
-            }
+            editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
             return;
         }
 
