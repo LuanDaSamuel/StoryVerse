@@ -3,8 +3,9 @@
 import React, { useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
-import { BackIcon, BookOpenIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, TextIcon, SearchIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, CloseIcon } from '../components/Icons';
+import { BackIcon, BookOpenIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, TextIcon, SearchIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, CloseIcon, Bars3Icon, DownloadIcon } from '../components/Icons';
 import { enhancePlainText, enhanceHtml, THEME_CONFIG } from '../constants';
+import ExportModal from '../components/ExportModal';
 
 // --- Reusable Components ---
 const ChapterListModal: React.FC<{
@@ -314,6 +315,7 @@ const ChapterEditorPage: React.FC = () => {
     const [isFindReplaceOpen, setIsFindReplaceOpen] = useState(false);
     const [isChapterListModalOpen, setIsChapterListModalOpen] = useState(false);
     const [isFormatPanelOpen, setIsFormatPanelOpen] = useState(false);
+    const [isExportModalOpen, setIsExportModalOpen] = useState(false);
     const [activeFormats, setActiveFormats] = useState({ isBold: false, isItalic: false });
     const [currentFormat, setCurrentFormat] = useState({
         paragraphStyle: 'p',
@@ -962,8 +964,30 @@ const ChapterEditorPage: React.FC = () => {
                                     className={`w-full flex justify-between items-center py-3 px-4 font-semibold text-left transition-colors hover:${themeClasses.bgTertiary}`}
                                 >
                                     <div className="flex items-center space-x-3">
-                                        <BookOpenIcon className="w-5 h-5" />
+                                        <Bars3Icon className="w-5 h-5" />
                                         <span>Chapter Outline</span>
+                                    </div>
+                                </button>
+                            </div>
+                            <div className={`border-b ${themeClasses.border}`}>
+                                <button
+                                    onClick={() => navigate(`/novel/${novelId}/read/${chapterId}`)}
+                                    className={`w-full flex justify-between items-center py-3 px-4 font-semibold text-left transition-colors hover:${themeClasses.bgTertiary}`}
+                                >
+                                    <div className="flex items-center space-x-3">
+                                        <BookOpenIcon className="w-5 h-5" />
+                                        <span>Read Novel</span>
+                                    </div>
+                                </button>
+                            </div>
+                            <div className={`border-b ${themeClasses.border}`}>
+                                <button
+                                    onClick={() => setIsExportModalOpen(true)}
+                                    className={`w-full flex justify-between items-center py-3 px-4 font-semibold text-left transition-colors hover:${themeClasses.bgTertiary}`}
+                                >
+                                    <div className="flex items-center space-x-3">
+                                        <DownloadIcon className="w-5 h-5" />
+                                        <span>Export Novel</span>
                                     </div>
                                 </button>
                             </div>
@@ -1051,6 +1075,12 @@ const ChapterEditorPage: React.FC = () => {
                 onReplaceAllInNovel={handleReplaceAllInNovel}
             />
             
+            <ExportModal
+                isOpen={isExportModalOpen}
+                onClose={() => setIsExportModalOpen(false)}
+                novel={novel}
+            />
+
             <ChapterListModal
                 isOpen={isChapterListModalOpen}
                 onClose={() => setIsChapterListModalOpen(false)}
