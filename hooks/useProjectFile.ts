@@ -9,6 +9,7 @@ const defaultProjectData: ProjectData = {
     theme: 'book',
   },
   novels: [],
+  sketches: [],
 };
 
 export function useProjectFile() {
@@ -45,6 +46,12 @@ export function useProjectFile() {
               });
             }
           });
+          
+          // Migration check for the 'sketches' property
+          if (!data.sketches) {
+            data.sketches = [];
+            needsUpdate = true;
+          }
 
           // If any counts were updated, save the corrected data back to the database.
           if (needsUpdate) {
@@ -141,6 +148,11 @@ export function useProjectFile() {
                 });
             }
         });
+
+        // Migration check for sketches on import
+        if (!data.sketches) {
+          data.sketches = [];
+        }
 
         await saveProject(data);
         setProjectData(data);

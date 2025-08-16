@@ -76,11 +76,10 @@ const Sidebar: React.FC = () => {
                         <PlusIcon className="w-5 h-5" />
                         <span>Create Novel</span>
                     </NavLink>
-                    {/* Placeholder links to match the screenshot */}
-                    <div className={`${placeholderLinkClasses} ${defaultText} hover:${themeClasses.bgTertiary}`}>
+                    <NavLink to="/demos" className={navLinkClasses}>
                         <LightbulbIcon className="w-5 h-5" />
                         <span>Demos</span>
-                    </div>
+                    </NavLink>
                     <div className={`${placeholderLinkClasses} ${defaultText} hover:${themeClasses.bgTertiary}`}>
                         <EyeIcon className="w-5 h-5" />
                         <span>Image to Text</span>

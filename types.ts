@@ -27,11 +27,20 @@ export interface Novel {
   createdAt: string;
 }
 
+export interface Sketch {
+  id: string;
+  title: string;
+  content: string; // HTML content
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ProjectData {
   settings: {
     theme: Theme;
   };
   novels: Novel[];
+  sketches: Sketch[];
 }
 
 export type FileStatus = 'loading' | 'welcome' | 'ready' | 'error';
