@@ -40,6 +40,38 @@
         text-indent: 0;
       }
 
+      /* Heading styles for the editor and reader */
+      .story-content h1 {
+        font-size: 2.25em;
+        font-weight: bold;
+        margin-top: 1.5em;
+        margin-bottom: 0.75em;
+        line-height: 1.2;
+        text-indent: 0;
+      }
+
+      .story-content h2 {
+        font-size: 1.75em;
+        font-weight: bold;
+        margin-top: 1.25em;
+        margin-bottom: 0.6em;
+        line-height: 1.3;
+        text-indent: 0;
+      }
+
+      /* Remove top margin for the very first element in the editor to avoid excess space */
+      .story-content > *:first-child {
+        margin-top: 0;
+      }
+
+      /* Add a subtle outline on hover to any block-level element in the editor,
+         giving the user a visual cue of the block they are about to edit. */
+      .story-content h1:hover,
+      .story-content h2:hover,
+      .story-content p:hover {
+        outline: 1px solid rgba(128, 128, 128, 0.25);
+      }
+
       /* Styles for Find & Replace highlighting */
       .search-highlight {
         background-color: rgba(255, 220, 0, 0.5); /* Semi-transparent yellow */
