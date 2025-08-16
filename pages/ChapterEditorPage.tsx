@@ -87,44 +87,176 @@ const fontOptions = [
 ];
 
 // --- Find & Replace Modal Component ---
-interface FindReplaceModalProps {
+const FindReplaceModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
-  onReplaceAll: (find: string, replace: string, scope: 'current' | 'all') => void;
-}
-
-const FindReplaceModal: React.FC<FindReplaceModalProps> = ({ isOpen, onClose, onReplaceAll }) => {
+  editorRef: React.RefObject<HTMLDivElement>;
+  onReplaceAllInNovel: (find: string, replace: string) => void;
+}> = ({ isOpen, onClose, editorRef, onReplaceAllInNovel }) => {
   const { themeClasses } = useContext(ProjectContext);
   const [findText, setFindText] = useState('');
   const [replaceText, setReplaceText] = useState('');
   const [scope, setScope] = useState<'current' | 'all'>('current');
+  const [matches, setMatches] = useState<HTMLElement[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(-1);
+  const debounceTimeout = useRef<number | null>(null);
+
+  const clearHighlights = useCallback(() => {
+    if (!editorRef.current) return;
+    const highlights = Array.from(editorRef.current.querySelectorAll('.search-highlight'));
+    highlights.forEach(node => {
+        const parent = node.parentNode;
+        if (parent) {
+            const text = document.createTextNode(node.textContent || '');
+            parent.replaceChild(text, node);
+        }
+    });
+    // Normalizing after all unwraps is more efficient
+    editorRef.current.normalize();
+  }, [editorRef]);
+
+  const handleClose = useCallback(() => {
+    clearHighlights();
+    setFindText('');
+    setReplaceText('');
+    setMatches([]);
+    setCurrentIndex(-1);
+    onClose();
+  }, [clearHighlights, onClose]);
+
+  const highlightMatches = useCallback(() => {
+    clearHighlights();
+    if (!findText || !editorRef.current) {
+        setMatches([]);
+        setCurrentIndex(-1);
+        return;
+    }
+
+    const newMatches: HTMLElement[] = [];
+    const walker = document.createTreeWalker(editorRef.current, NodeFilter.SHOW_TEXT);
+    const textNodes: Text[] = [];
+    while (walker.nextNode()) textNodes.push(walker.currentNode as Text);
+
+    const regex = new RegExp(findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+
+    textNodes.forEach(node => {
+        if (!node.textContent || node.parentElement?.closest('.search-highlight')) return;
+
+        const matchesInNode = [...node.textContent.matchAll(regex)];
+        if (matchesInNode.length > 0) {
+            let lastIndex = 0;
+            const fragment = document.createDocumentFragment();
+            matchesInNode.forEach(match => {
+                const index = match.index!;
+                if (index > lastIndex) {
+                    fragment.appendChild(document.createTextNode(node.textContent!.slice(lastIndex, index)));
+                }
+                const span = document.createElement('span');
+                span.className = 'search-highlight';
+                span.textContent = match[0];
+                fragment.appendChild(span);
+                newMatches.push(span);
+                lastIndex = index + match[0].length;
+            });
+            if (lastIndex < node.textContent.length) {
+                fragment.appendChild(document.createTextNode(node.textContent.slice(lastIndex)));
+            }
+            node.parentNode?.replaceChild(fragment, node);
+        }
+    });
+
+    setMatches(newMatches);
+    setCurrentIndex(newMatches.length > 0 ? 0 : -1);
+  }, [findText, editorRef, clearHighlights]);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
+      debounceTimeout.current = window.setTimeout(highlightMatches, 300);
+    }
+    return () => {
+      if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
+    };
+  }, [findText, isOpen, highlightMatches]);
+
+  useEffect(() => {
+    matches.forEach((match, index) => {
+      if (index === currentIndex) {
+        match.classList.add('current-match');
+        match.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      } else {
+        match.classList.remove('current-match');
+      }
+    });
+  }, [currentIndex, matches]);
+
+  const handleNavigate = (direction: 'next' | 'prev') => {
+    if (matches.length === 0) return;
+    setCurrentIndex(prev => {
+        const nextIndex = direction === 'next' ? prev + 1 : prev - 1;
+        return (nextIndex + matches.length) % matches.length;
+    });
+  };
+
+  const handleReplace = () => {
+    if (currentIndex === -1 || matches.length === 0) return;
+    const match = matches[currentIndex];
+    match.textContent = replaceText;
+    match.classList.remove('search-highlight', 'current-match');
+    
+    // Defer DOM changes to allow state to update first
+    setTimeout(() => {
+        const newMatches = matches.filter(m => m !== match);
+        setMatches(newMatches);
+        if (newMatches.length > 0) {
+            setCurrentIndex(currentIndex % newMatches.length);
+        } else {
+            setCurrentIndex(-1);
+        }
+        editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+    }, 0);
+  };
+  
+  const handleReplaceAll = () => {
+    if (scope === 'current') {
+      if (!editorRef.current || matches.length === 0) return;
+      matches.forEach(match => {
+        match.textContent = replaceText;
+      });
+      editorRef.current.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+    } else {
+      onReplaceAllInNovel(findText, replaceText);
+    }
+    handleClose();
+  };
 
   if (!isOpen) return null;
-  
-  const handleReplace = () => {
-    if (findText) {
-      onReplaceAll(findText, replaceText, scope);
-    }
-  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 transition-opacity font-sans">
       <div className={`p-6 rounded-lg shadow-2xl w-full max-w-md m-4 ${themeClasses.bgSecondary} ${themeClasses.accentText} border ${themeClasses.border}`}>
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">Find & Replace</h2>
-          <button onClick={onClose} className={`p-1 rounded-full hover:${themeClasses.bgTertiary}`} aria-label="Close">
+          <button onClick={handleClose} className={`p-1 rounded-full hover:${themeClasses.bgTertiary}`} aria-label="Close">
             <CloseIcon className="w-6 h-6" />
           </button>
         </div>
         
         <div className="space-y-4">
-          <input 
-            type="text" 
-            placeholder="Find..." 
-            value={findText} 
-            onChange={(e) => setFindText(e.target.value)} 
-            className={`w-full px-3 py-2 rounded-md ${themeClasses.input} border ${themeClasses.border}`}
-          />
+          <div className="relative">
+            <input 
+              type="text" 
+              placeholder="Find..." 
+              value={findText} 
+              onChange={(e) => setFindText(e.target.value)} 
+              className={`w-full px-3 py-2 rounded-md ${themeClasses.input} border ${themeClasses.border}`}
+            />
+            {findText && (
+                <div className={`absolute right-3 top-1/2 -translate-y-1/2 text-xs ${themeClasses.textSecondary}`}>
+                    {matches.length > 0 ? `${currentIndex + 1} / ${matches.length}` : '0 matches'}
+                </div>
+            )}
+          </div>
           <input 
             type="text" 
             placeholder="Replace with..." 
@@ -132,8 +264,20 @@ const FindReplaceModal: React.FC<FindReplaceModalProps> = ({ isOpen, onClose, on
             onChange={(e) => setReplaceText(e.target.value)} 
             className={`w-full px-3 py-2 rounded-md ${themeClasses.input} border ${themeClasses.border}`}
           />
-          
-          <div>
+        </div>
+
+        <div className="flex justify-between items-center mt-4">
+            <div className="flex items-center space-x-2">
+                <button onClick={() => handleNavigate('prev')} disabled={matches.length === 0} className={`px-3 py-1 rounded-md text-sm font-semibold ${themeClasses.bgTertiary} disabled:opacity-50`}>Previous</button>
+                <button onClick={() => handleNavigate('next')} disabled={matches.length === 0} className={`px-3 py-1 rounded-md text-sm font-semibold ${themeClasses.bgTertiary} disabled:opacity-50`}>Next</button>
+            </div>
+            <div className="flex items-center space-x-2">
+                <button onClick={handleReplace} disabled={currentIndex === -1} className={`px-4 py-2 font-semibold rounded-lg ${themeClasses.bgTertiary} disabled:opacity-50`}>Replace</button>
+                <button onClick={handleReplaceAll} disabled={!findText || matches.length === 0} className={`px-4 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} disabled:opacity-50`}>Replace All</button>
+            </div>
+        </div>
+        
+        <div className="mt-4">
             <label className={`block text-sm font-semibold mb-2 ${themeClasses.textSecondary}`}>Scope</label>
             <div className={`flex rounded-md overflow-hidden border ${themeClasses.border}`}>
               <button 
@@ -149,23 +293,6 @@ const FindReplaceModal: React.FC<FindReplaceModalProps> = ({ isOpen, onClose, on
                 Entire Novel
               </button>
             </div>
-          </div>
-        </div>
-
-        <div className="flex justify-end space-x-4 mt-6">
-          <button
-            onClick={onClose}
-            className={`px-6 py-2 font-semibold rounded-lg ${themeClasses.bgTertiary} hover:opacity-80 transition-opacity`}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleReplace}
-            disabled={!findText}
-            className={`px-6 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed`}
-          >
-            Replace All
-          </button>
         </div>
       </div>
     </div>
@@ -599,6 +726,61 @@ const ChapterEditorPage: React.FC = () => {
         }
     };
 
+    const handleKeyUp = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+        if (e.key !== ' ' || !editorRef.current) return;
+
+        const selection = window.getSelection();
+        if (!selection || !selection.rangeCount) return;
+
+        const range = selection.getRangeAt(0);
+        if (!range.collapsed) return;
+
+        let node = range.startContainer;
+        let blockElement: Node | null = node;
+
+        // Traverse up to find the direct child of the editor
+        while (blockElement && blockElement.parentNode !== editorRef.current) {
+            blockElement = blockElement.parentNode;
+        }
+
+        if (!blockElement || !(blockElement instanceof HTMLElement)) return;
+
+        const text = blockElement.textContent || '';
+        let format: 'h1' | 'h2' | null = null;
+        let markdownLength = 0;
+
+        if (text.startsWith('# ')) {
+            format = 'h1';
+            markdownLength = 2;
+        } else if (text.startsWith('## ')) {
+            format = 'h2';
+            markdownLength = 3;
+        }
+        
+        if (format) {
+            const textNode = blockElement.firstChild;
+            if (textNode && textNode.nodeType === Node.TEXT_NODE && (textNode.textContent?.length ?? 0) >= markdownLength) {
+                // To preserve undo history, we perform operations with execCommand
+                
+                // 1. Select the markdown characters
+                const markdownRange = document.createRange();
+                markdownRange.setStart(textNode, 0);
+                markdownRange.setEnd(textNode, markdownLength);
+                selection.removeAllRanges();
+                selection.addRange(markdownRange);
+                
+                // 2. Delete them
+                document.execCommand('delete', false);
+                
+                // 3. Apply the heading format to the now-empty block
+                document.execCommand('formatBlock', false, format);
+                
+                // 4. Trigger the input event so changes are saved
+                editorRef.current.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+            }
+        }
+    }, []);
+
     // --- Effects ---
     useEffect(() => {
         if (editorRef.current && chapter) {
@@ -663,9 +845,8 @@ const ChapterEditorPage: React.FC = () => {
         };
     }, [isFormatPanelOpen]);
     
-    const handleReplaceAll = (find: string, replace: string, scope: 'current' | 'all') => {
+    const handleReplaceAllInNovel = (find: string, replace: string) => {
       if (!projectData || !novel || novelIndex === -1 || !find) {
-        setIsFindReplaceOpen(false);
         return;
       }
 
@@ -685,17 +866,15 @@ const ChapterEditorPage: React.FC = () => {
       let changesMade = false;
 
       const updatedChapters = currentNovel.chapters.map(chap => {
-        if ((scope === 'current' && chap.id === chapterId) || scope === 'all') {
-          const newContent = chap.content.replace(findRegex, replace);
-          if (newContent !== chap.content) {
-            changesMade = true;
-            return { 
-              ...chap, 
-              content: newContent, 
-              wordCount: getWordCount(newContent),
-              updatedAt: new Date().toISOString() 
-            };
-          }
+        const newContent = chap.content.replace(findRegex, replace);
+        if (newContent !== chap.content) {
+          changesMade = true;
+          return { 
+            ...chap, 
+            content: newContent, 
+            wordCount: getWordCount(newContent),
+            updatedAt: new Date().toISOString() 
+          };
         }
         return chap;
       });
@@ -705,8 +884,6 @@ const ChapterEditorPage: React.FC = () => {
         updatedNovels[novelIndex] = currentNovel;
         setProjectData({ ...projectData, novels: updatedNovels });
       }
-
-      setIsFindReplaceOpen(false);
     };
 
     if (!projectData || !novel || !chapter || !chapterId) {
@@ -751,6 +928,7 @@ const ChapterEditorPage: React.FC = () => {
                             suppressContentEditableWarning
                             onInput={(e) => updateChapterField('content', e.currentTarget.innerHTML)}
                             onKeyDown={handleKeyDown}
+                            onKeyUp={handleKeyUp}
                             className="w-full text-lg leading-relaxed outline-none story-content"
                             style={editorStyle}
                         />
@@ -869,7 +1047,8 @@ const ChapterEditorPage: React.FC = () => {
             <FindReplaceModal 
                 isOpen={isFindReplaceOpen}
                 onClose={() => setIsFindReplaceOpen(false)}
-                onReplaceAll={handleReplaceAll}
+                editorRef={editorRef}
+                onReplaceAllInNovel={handleReplaceAllInNovel}
             />
             
             <ChapterListModal
