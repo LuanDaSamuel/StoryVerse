@@ -507,6 +507,7 @@ const ChapterEditorPage: React.FC = () => {
             const selection = window.getSelection();
             if (!selection?.rangeCount) return;
 
+            // For a cursor without selection, insert a styled span to start typing with the new size.
             if (selection.isCollapsed) {
                 const range = selection.getRangeAt(0);
                 const span = document.createElement('span');
@@ -518,41 +519,65 @@ const ChapterEditorPage: React.FC = () => {
                 range.collapse(false);
                 selection.removeAllRanges();
                 selection.addRange(range);
-            } else {
-                // Use a unique background color to mark the selection, as it's more reliable than `fontSize`.
-                const DUMMY_COLOR_RGB = 'rgb(1, 2, 3)';
-                document.execCommand('styleWithCSS', false, 'true');
-                document.execCommand('hiliteColor', false, DUMMY_COLOR_RGB);
+                return;
+            }
 
-                // Find all the temporary spans we just created.
-                const tempSpans = Array.from(editorRef.current.querySelectorAll<HTMLElement>(`span[style*="background-color: ${DUMMY_COLOR_RGB}"]`));
+            // For a text selection, use a temporary highlight. This is a robust way to wrap content
+            // that might cross multiple existing HTML tags. The browser handles splitting nodes correctly.
+            const DUMMY_COLOR_RGB = 'rgb(1, 2, 3)';
+            document.execCommand('styleWithCSS', false, 'true');
+            document.execCommand('hiliteColor', false, DUMMY_COLOR_RGB);
 
-                tempSpans.forEach(span => {
-                    const parent = span.parentElement;
+            // Find all the elements that were just highlighted.
+            const tempSpans = Array.from(editorRef.current.querySelectorAll<HTMLElement>(`span[style*="background-color: ${DUMMY_COLOR_RGB}"]`));
+            
+            const parentsToClean = new Set<Node>();
 
-                    // Case 1: The selection was already inside a font-size span, and we selected all of its text.
-                    // This creates a nested span. We need to merge them to prevent incorrect styling.
-                    if (
-                        parent &&
-                        parent.tagName === 'SPAN' &&
-                        parent.style.fontSize &&
-                        parent.textContent === span.textContent
-                    ) {
-                        // Modify the parent's font size directly.
-                        parent.style.fontSize = size;
-                        // Then, unwrap the temporary inner span by moving its children out.
+            tempSpans.forEach(span => {
+                if (span.parentElement) {
+                    parentsToClean.add(span.parentElement);
+                }
+
+                // Replace the temporary background color with the desired font size.
+                span.style.backgroundColor = '';
+                span.style.fontSize = size;
+                
+                // If the span has no style attribute left, it's an empty wrapper and can be removed.
+                if (!span.getAttribute('style')?.trim()) {
+                    const parent = span.parentNode;
+                    if (parent) {
                         while (span.firstChild) {
                             parent.insertBefore(span.firstChild, span);
                         }
                         parent.removeChild(span);
-                    } else {
-                        // Case 2: A simple selection, or a partial selection within another span.
-                        // Just replace the background color with the font size.
-                        span.style.backgroundColor = '';
-                        span.style.fontSize = size;
                     }
-                });
-            }
+                }
+            });
+
+            // After styling, perform a cleanup pass on the affected areas of the DOM.
+            // This merges adjacent `<span>` elements if they have the exact same style,
+            // preventing the editor's HTML from becoming a mess of redundant tags.
+            parentsToClean.forEach(parent => {
+                let child = parent.firstChild;
+                while (child) {
+                    const next = child.nextSibling;
+                    if (
+                        next &&
+                        child instanceof HTMLSpanElement &&
+                        next instanceof HTMLSpanElement &&
+                        child.style.cssText === next.style.cssText
+                    ) {
+                        while (next.firstChild) {
+                            child.appendChild(next.firstChild);
+                        }
+                        parent.removeChild(next);
+                        // Do not advance child, check again against the new next sibling
+                    } else {
+                        child = next; // Advance only if no merge happened
+                    }
+                }
+                parent.normalize(); // Also merge adjacent text nodes.
+            });
         });
     };
     
