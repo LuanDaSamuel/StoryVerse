@@ -604,6 +604,37 @@ const ChapterEditorPage: React.FC = () => {
         }
 
         const range = selection.getRangeAt(0);
+        
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            document.execCommand('insertText', false, '    ');
+            return;
+        }
+
+        if (e.key === 'Backspace' || e.key === 'Delete') {
+            if (range.collapsed && range.startContainer.nodeType === Node.TEXT_NODE) {
+                const textNode = range.startContainer as Text;
+                const offset = range.startOffset;
+                const text = textNode.textContent || '';
+                
+                if (e.key === 'Backspace' && offset >= 4 && text.substring(offset - 4, offset) === '    ') {
+                    e.preventDefault();
+                    range.setStart(textNode, offset - 4);
+                    range.deleteContents();
+                    editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+                    return;
+                }
+                
+                if (e.key === 'Delete' && text.length - offset >= 4 && text.substring(offset, offset + 4) === '    ') {
+                    e.preventDefault();
+                    range.setEnd(textNode, offset + 4);
+                    range.deleteContents();
+                    editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+                    return;
+                }
+            }
+        }
+
 
         if (e.key === '"' || e.key === "'") {
             e.preventDefault();
