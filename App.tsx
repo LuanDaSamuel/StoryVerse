@@ -1,3 +1,4 @@
+
 import React, { useMemo, useContext, useEffect, useRef } from 'react';
 import { HashRouter, Routes, Route, Navigate, useParams, useMatch, useNavigate } from 'react-router-dom';
 import { useProjectFile } from './hooks/useProjectFile';
@@ -79,7 +80,8 @@ const AppContent = () => {
 
     const onEditPage = useMatch('/novel/:novelId/edit/:chapterId');
     const onReadPage = useMatch('/novel/:novelId/read/:chapterId?');
-    const isSidebarHiddenPage = !!onEditPage || !!onReadPage;
+    const onDemosPage = useMatch('/demos');
+    const isSidebarHiddenPage = !!onEditPage || !!onReadPage || !!onDemosPage;
 
     const renderContent = () => {
         switch (status) {
