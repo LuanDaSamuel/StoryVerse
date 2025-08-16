@@ -230,19 +230,57 @@ const DemosPage: React.FC = () => {
 
         try {
             const arrayBuffer = await file.arrayBuffer();
-            const { value: html } = await mammoth.convertToHtml({ arrayBuffer });
-
-            const newSketch: Sketch = {
-                id: crypto.randomUUID(),
-                title: file.name.replace(/\.docx$/, ''),
-                content: html,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-            };
             
-            const updatedSketches = [newSketch, ...sketches];
-            setProjectData({ ...projectData, sketches: updatedSketches });
-            setSelectedSketchId(newSketch.id);
+            // Map Word's "Title" and "Heading 1" styles to HTML <h1> tags.
+            // This provides a consistent way to identify sections.
+            const styleMap = [
+                "p[style-name='Title'] => h1:fresh",
+                "p[style-name='Heading 1'] => h1:fresh",
+            ];
+            
+            const { value: html } = await mammoth.convertToHtml({ arrayBuffer }, { styleMap });
+
+            const newSketches: Sketch[] = [];
+            const tempDiv = document.createElement('div');
+            const now = new Date().toISOString();
+
+            // Split the HTML content by <h1> tags. The regex includes the tag in the result.
+            const parts = html.split(/(<h1[^>]*>.*?<\/h1>)/i);
+
+            if (parts.length <= 1) {
+                // No headings found, import the whole document as a single sketch.
+                newSketches.push({
+                    id: crypto.randomUUID(),
+                    title: file.name.replace(/\.docx$/, ''),
+                    content: html,
+                    createdAt: now,
+                    updatedAt: now,
+                });
+            } else {
+                // Headings were found. Iterate through the parts to create sketches.
+                for (let i = 1; i < parts.length; i += 2) {
+                    const titleHtml = parts[i];
+                    const contentHtml = parts[i + 1] || '';
+
+                    tempDiv.innerHTML = titleHtml;
+                    const title = tempDiv.textContent?.trim() || 'Untitled Sketch';
+
+                    newSketches.push({
+                        id: crypto.randomUUID(),
+                        title: title,
+                        content: contentHtml.trim(),
+                        createdAt: now,
+                        updatedAt: now,
+                    });
+                }
+            }
+            
+            if (newSketches.length > 0) {
+                const updatedSketches = [...newSketches.reverse(), ...sketches];
+                setProjectData({ ...projectData, sketches: updatedSketches });
+                setSelectedSketchId(newSketches[0].id);
+            }
+
         } catch (error) {
             console.error(`Error processing file ${file.name}:`, error);
             alert(`Failed to process ${file.name}. It might be corrupted or not a valid .docx file.`);
