@@ -201,6 +201,7 @@ const DemosPage: React.FC = () => {
     const editorRef = useRef<HTMLDivElement>(null);
     const toolbarRef = useRef<HTMLDivElement>(null);
     const docxInputRef = useRef<HTMLInputElement>(null);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
     
     const [isFormatPanelOpen, setIsFormatPanelOpen] = useState(false);
     const [activeFormats, setActiveFormats] = useState({ isBold: false, isItalic: false });
@@ -552,6 +553,72 @@ const DemosPage: React.FC = () => {
                 }
             }
         }
+        
+        if (e.key === 'Enter') {
+            setTimeout(() => {
+                const newSelection = window.getSelection();
+                if (!newSelection?.rangeCount || !editorRef.current) return;
+                const newRange = newSelection.getRangeAt(0);
+                
+                // --- 1. Fix Font Size Inheritance ---
+                let currentBlock = newRange.startContainer;
+                while (currentBlock && currentBlock.parentNode !== editorRef.current) {
+                    currentBlock = currentBlock.parentNode;
+                }
+                
+                if (currentBlock instanceof HTMLElement) {
+                    const isNewBlockEmpty = (currentBlock.textContent?.trim() === '' && currentBlock.children.length === 0) || currentBlock.innerHTML === '<br>';
+                    
+                    if (isNewBlockEmpty) {
+                        const previousBlock = currentBlock.previousElementSibling;
+                        if (previousBlock instanceof HTMLElement) {
+                            let styleSource: Element = previousBlock;
+                            while (styleSource.lastElementChild) {
+                                styleSource = styleSource.lastElementChild;
+                            }
+                            
+                            const computedStyle = window.getComputedStyle(styleSource);
+                            const fontSize = computedStyle.fontSize;
+                            const defaultFontSize = window.getComputedStyle(editorRef.current).fontSize;
+                            
+                            if (fontSize && fontSize !== defaultFontSize) {
+                                currentBlock.innerHTML = ''; // Clear the default <br>
+                                const styleCarrier = document.createElement('span');
+                                styleCarrier.style.fontSize = fontSize;
+                                styleCarrier.innerHTML = '&#8203;'; // Use a zero-width space as a placeholder for the cursor.
+                                currentBlock.appendChild(styleCarrier);
+                                
+                                newRange.setStart(styleCarrier.firstChild!, 1);
+                                newRange.collapse(true);
+                                newSelection.removeAllRanges();
+                                newSelection.addRange(newRange);
+                            }
+                        }
+                    }
+                }
+
+                // --- 2. Adjust Scroll Position ---
+                let element = newRange.startContainer;
+                if (element.nodeType === Node.TEXT_NODE) {
+                    element = element.parentElement!;
+                }
+                
+                if (!(element instanceof HTMLElement)) return;
+
+                const toolbarEl = toolbarRef.current;
+                const scrollContainerEl = scrollContainerRef.current;
+                if (!toolbarEl || !scrollContainerEl) return;
+                
+                const elementRect = element.getBoundingClientRect();
+                const toolbarRect = toolbarEl.getBoundingClientRect();
+                const buffer = 20; 
+
+                if (elementRect.bottom > toolbarRect.top - buffer) {
+                    const scrollAmount = elementRect.bottom - (toolbarRect.top - buffer);
+                    scrollContainerEl.scrollBy({ top: scrollAmount, behavior: 'smooth' });
+                }
+            }, 0);
+        }
     };
 
     const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
@@ -628,7 +695,7 @@ const DemosPage: React.FC = () => {
             />
 
             {/* Editor Content */}
-            <div className="flex-1 h-full overflow-y-auto">
+            <div ref={scrollContainerRef} className="flex-1 h-full overflow-y-auto">
                 <div className="p-8 md:p-12 font-serif min-h-full">
                     {selectedSketch ? (
                         <div>
