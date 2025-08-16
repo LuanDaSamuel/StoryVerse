@@ -839,6 +839,22 @@ const ChapterEditorPage: React.FC = () => {
         }
     }, []);
 
+    const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        
+        const text = e.clipboardData.getData('text/plain');
+        if (!text) return;
+
+        // Sanitize pasted text into clean paragraphs.
+        // Each line becomes a new <p> tag, preserving paragraph breaks from the source.
+        const htmlToInsert = text
+            .split(/\r?\n/)
+            .map(line => `<p>${line.trim() === '' ? '<br>' : enhancePlainText(line)}</p>`)
+            .join('');
+
+        document.execCommand('insertHTML', false, htmlToInsert);
+    };
+
     // --- Effects ---
     useEffect(() => {
         if (editorRef.current && chapter) {
@@ -987,6 +1003,7 @@ const ChapterEditorPage: React.FC = () => {
                             onInput={(e) => updateChapterField('content', e.currentTarget.innerHTML)}
                             onKeyDown={handleKeyDown}
                             onKeyUp={handleKeyUp}
+                            onPaste={handlePaste}
                             className="w-full text-lg leading-relaxed outline-none story-content"
                             style={editorStyle}
                         />

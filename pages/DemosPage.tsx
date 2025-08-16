@@ -1,7 +1,8 @@
 import React, { useState, useContext, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { Sketch } from '../types';
-import { UploadIcon, PlusIcon, TrashIcon, LightbulbIcon, ChevronDownIcon, TextIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, Bars3Icon, CloseIcon, ListBulletIcon } from '../components/Icons';
+import { UploadIcon, PlusIcon, TrashIcon, LightbulbIcon, ChevronDownIcon, TextIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, Bars3Icon, CloseIcon, ListBulletIcon, HomeIcon } from '../components/Icons';
 import { enhanceHtml, enhancePlainText } from '../constants';
 import { THEME_CONFIG } from '../constants';
 import * as mammoth from 'mammoth';
@@ -192,6 +193,7 @@ const fontOptions = [
 
 const DemosPage: React.FC = () => {
     const { projectData, setProjectData, theme, themeClasses } = useContext(ProjectContext);
+    const navigate = useNavigate();
     const [selectedSketchId, setSelectedSketchId] = useState<string | null>(null);
     const [isOutlineModalOpen, setIsOutlineModalOpen] = useState(false);
     const [isDocumentOutlineOpen, setIsDocumentOutlineOpen] = useState(false);
@@ -551,6 +553,22 @@ const DemosPage: React.FC = () => {
             }
         }
     };
+
+    const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        
+        const text = e.clipboardData.getData('text/plain');
+        if (!text) return;
+
+        // Sanitize pasted text into clean paragraphs.
+        // Each line becomes a new <p> tag, preserving paragraph breaks from the source.
+        const htmlToInsert = text
+            .split(/\r?\n/)
+            .map(line => `<p>${line.trim() === '' ? '<br>' : enhancePlainText(line)}</p>`)
+            .join('');
+
+        document.execCommand('insertHTML', false, htmlToInsert);
+    };
     
     useEffect(() => {
         const editorEl = editorRef.current;
@@ -582,6 +600,14 @@ const DemosPage: React.FC = () => {
 
     return (
         <div className={`flex h-screen ${themeClasses.bg} font-sans relative`}>
+            <button 
+                onClick={() => navigate('/')} 
+                className={`fixed top-4 left-4 z-30 flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-semibold ${themeClasses.bgSecondary} ${themeClasses.accentText} hover:opacity-80 shadow-lg border ${themeClasses.border}`}
+                aria-label="Back to Home"
+            >
+                <HomeIcon className="w-5 h-5" />
+                <span>Home</span>
+            </button>
             <input
                 type="file"
                 ref={docxInputRef}
@@ -620,6 +646,7 @@ const DemosPage: React.FC = () => {
                                 suppressContentEditableWarning
                                 onInput={(e) => handleUpdateSketch('content', e.currentTarget.innerHTML)}
                                 onKeyDown={handleKeyDown}
+                                onPaste={handlePaste}
                                 className={`w-full text-lg leading-relaxed outline-none story-content ${themeClasses.text}`}
                                 style={editorStyle}
                             />
