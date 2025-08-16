@@ -1,9 +1,8 @@
 import React, { useState, useContext } from 'react';
 import { NavLink } from 'react-router-dom';
-import { AppLogoIcon, HomeIcon, LightbulbIcon, CheckCircleIcon, LoadingIcon, FolderIcon, ChevronDownIcon } from './Icons';
-import ProjectSwitcherModal from './ProjectSwitcherModal';
+import { AppLogoIcon, HomeIcon, PlusIcon, SettingsIcon, LightbulbIcon, EyeIcon, CheckCircleIcon, LoadingIcon } from './Icons';
+import SettingsModal from './SettingsModal';
 import { ProjectContext } from '../contexts/ProjectContext';
-import { enhancePlainText } from '../constants';
 
 const SaveStatusIndicator: React.FC = () => {
     const { saveStatus, themeClasses } = useContext(ProjectContext);
@@ -39,16 +38,15 @@ const SaveStatusIndicator: React.FC = () => {
 
 
 const Sidebar: React.FC = () => {
-    const [isProjectSwitcherOpen, setIsProjectSwitcherOpen] = useState(false);
-    const { theme, themeClasses, projects, activeProjectId } = useContext(ProjectContext);
-    
-    const activeProject = projects.find(p => p.id === activeProjectId);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const { theme, themeClasses } = useContext(ProjectContext);
 
     const navLinkClasses = ({ isActive }: { isActive: boolean }): string => {
         const baseClasses = `flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors`;
         const defaultText = theme === 'book' ? themeClasses.accentText : themeClasses.text;
 
         if (isActive) {
+            // Special case for the 'book' theme to match the screenshot's active style
             if (theme === 'book') {
                 return `${baseClasses} ${themeClasses.bg} ${themeClasses.text}`;
             }
@@ -57,7 +55,10 @@ const Sidebar: React.FC = () => {
         return `${baseClasses} ${defaultText} hover:${themeClasses.bgTertiary}`;
     };
     
+    // For the book theme, the text on the light sidebar should be dark.
     const sidebarTextColor = theme === 'book' ? themeClasses.accentText : themeClasses.text;
+    const placeholderLinkClasses = `flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors`;
+    const defaultText = theme === 'book' ? themeClasses.accentText : themeClasses.text;
 
     return (
         <>
@@ -67,38 +68,37 @@ const Sidebar: React.FC = () => {
                     <span className="text-xl font-bold">StoryVerse</span>
                 </div>
                 <nav className="flex-1 p-4 space-y-2">
-                     <button 
-                        onClick={() => setIsProjectSwitcherOpen(true)} 
-                        className={`w-full flex items-center justify-between p-3 rounded-lg text-left font-semibold transition-colors ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-90 mb-4`}
-                     >
-                        <div className="flex items-center space-x-2 truncate">
-                           <FolderIcon className="w-5 h-5 flex-shrink-0" />
-                           <span className="truncate">{activeProject ? enhancePlainText(activeProject.name) : 'No Project'}</span>
-                        </div>
-                         <ChevronDownIcon className="w-4 h-4 flex-shrink-0" />
-                     </button>
                     <NavLink to="/" className={navLinkClasses}>
                         <HomeIcon className="w-5 h-5" />
                         <span>Home page</span>
+                    </NavLink>
+                    <NavLink to="/create-novel" className={navLinkClasses}>
+                        <PlusIcon className="w-5 h-5" />
+                        <span>Create Novel</span>
                     </NavLink>
                     <NavLink to="/demos" className={navLinkClasses}>
                         <LightbulbIcon className="w-5 h-5" />
                         <span>Demos</span>
                     </NavLink>
+                    <div className={`${placeholderLinkClasses} ${defaultText} hover:${themeClasses.bgTertiary}`}>
+                        <EyeIcon className="w-5 h-5" />
+                        <span>Image to Text</span>
+                    </div>
                 </nav>
                 <div className="p-4 border-t border-inherit">
-                    <div className="text-center">
+                    <button onClick={() => setIsSettingsOpen(true)} className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${sidebarTextColor} hover:${themeClasses.bgTertiary}`}>
+                        <SettingsIcon className="w-5 h-5" />
+                        <span>Settings</span>
+                    </button>
+                    <div className="mt-4 text-center">
                       <SaveStatusIndicator />
                     </div>
-                    <p className={`mt-4 text-xs text-center ${themeClasses.textSecondary}`}>
+                    <p className={`mt-2 text-xs text-center ${themeClasses.textSecondary}`}>
                         &copy; {new Date().getFullYear()} StoryVerse
                     </p>
                 </div>
             </div>
-            <ProjectSwitcherModal 
-                isOpen={isProjectSwitcherOpen} 
-                onClose={() => setIsProjectSwitcherOpen(false)} 
-            />
+            <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
         </>
     );
 };

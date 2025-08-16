@@ -8,6 +8,78 @@ import { enhanceHtml, enhancePlainText } from '../constants';
 import { THEME_CONFIG } from '../constants';
 import * as mammoth from 'mammoth';
 
+const getPlainText = (html: string) => {
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+    return temp.textContent || '';
+};
+
+const SketchesOutlineModal: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    sketches: Sketch[];
+    selectedSketchId: string | null;
+    onSelect: (id: string) => void;
+    onCreate: () => void;
+    onImportClick: () => void;
+    onDelete: (e: React.MouseEvent, id: string) => void;
+    themeClasses: any;
+}> = ({ isOpen, onClose, sketches, selectedSketchId, onSelect, onCreate, onImportClick, onDelete, themeClasses }) => {
+    if (!isOpen) return null;
+
+    return (
+        <div 
+            className="fixed inset-0 bg-black bg-opacity-60 z-[60] flex items-center justify-center p-4 font-sans"
+            onClick={onClose}
+            role="dialog"
+            aria-modal="true"
+        >
+            <div 
+                className={`w-full max-w-md p-6 rounded-lg shadow-2xl ${themeClasses.bgSecondary} ${themeClasses.accentText} border ${themeClasses.border}`}
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold">Sketches</h2>
+                    <button onClick={onClose} className={`p-1 rounded-full hover:${themeClasses.bgTertiary}`}>
+                        <CloseIcon className="w-6 h-6" />
+                    </button>
+                </div>
+
+                <div className="flex space-x-2 mb-4">
+                    <button onClick={onCreate} className={`flex-1 flex items-center justify-center space-x-2 px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${themeClasses.bgTertiary} hover:opacity-80`}>
+                        <PlusIcon className="w-5 h-5" />
+                        <span>Create New</span>
+                    </button>
+                    <button onClick={onImportClick} className={`flex-1 flex items-center justify-center space-x-2 px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${themeClasses.bgTertiary} hover:opacity-80`}>
+                        <UploadIcon className="w-5 h-5" />
+                        <span>Import from DOCX</span>
+                    </button>
+                </div>
+
+                <div className="max-h-[60vh] overflow-y-auto -mr-2 pr-2">
+                    {sketches.map(sketch => (
+                        <div 
+                            key={sketch.id} 
+                            onClick={() => onSelect(sketch.id)}
+                            className={`group relative p-4 cursor-pointer border-b ${themeClasses.border} ${selectedSketchId === sketch.id ? `${themeClasses.bgTertiary}` : `hover:${themeClasses.bgTertiary}`}`}
+                        >
+                            <h3 className={`font-semibold truncate pr-8 ${themeClasses.accentText}`}>{enhancePlainText(sketch.title) || 'Untitled Sketch'}</h3>
+                            <p className={`text-sm truncate mt-1 ${themeClasses.textSecondary}`}>{getPlainText(sketch.content) || 'No content'}</p>
+                            <button 
+                                onClick={(e) => onDelete(e, sketch.id)} 
+                                className={`absolute top-1/2 -translate-y-1/2 right-2 p-2 rounded-full text-red-500 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/10`}
+                                aria-label={`Delete sketch ${sketch.title}`}
+                            >
+                                <TrashIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const ToolbarDropdown: React.FC<{
     label: string;
     value: string;
@@ -26,76 +98,6 @@ const ToolbarDropdown: React.FC<{
                     {children}
                 </select>
                 <ChevronDownIcon className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-white/70" />
-            </div>
-        </div>
-    );
-};
-
-const SketchesOutlineModal: React.FC<{
-    isOpen: boolean;
-    onClose: () => void;
-    sketches: Sketch[];
-    selectedSketchId: string | null;
-    onSelectSketch: (id: string) => void;
-    onCreateSketch: () => void;
-    onDeleteSketch: (id: string) => void;
-    onImportClick: () => void;
-    themeClasses: any;
-}> = ({ isOpen, onClose, sketches, selectedSketchId, onSelectSketch, onCreateSketch, onDeleteSketch, onImportClick, themeClasses }) => {
-    if (!isOpen) return null;
-
-    return (
-        <div 
-            className="fixed inset-0 bg-black bg-opacity-60 z-[60] flex items-center justify-center p-4 font-sans"
-            onClick={onClose}
-            role="dialog"
-            aria-modal="true"
-        >
-            <div 
-                className={`w-full max-w-md p-6 rounded-lg shadow-2xl ${themeClasses.bgSecondary} ${themeClasses.accentText} border ${themeClasses.border} flex flex-col max-h-[80vh]`}
-                onClick={(e) => e.stopPropagation()}
-            >
-                <div className="flex justify-between items-center mb-4 flex-shrink-0">
-                    <h2 className="text-xl font-bold">Sketches</h2>
-                    <button onClick={onClose} className={`p-1 rounded-full hover:${themeClasses.bgTertiary}`}>
-                        <CloseIcon className="w-6 h-6" />
-                    </button>
-                </div>
-
-                <div className={`mb-4 flex space-x-2 border-b pb-4 ${themeClasses.border}`}>
-                    <button onClick={onCreateSketch} className={`w-full flex items-center justify-center space-x-2 px-4 py-2 text-sm font-semibold rounded-lg ${themeClasses.bgTertiary} hover:opacity-80`}>
-                        <PlusIcon className="w-5 h-5" />
-                        <span>Create New</span>
-                    </button>
-                    <button onClick={onImportClick} className={`w-full flex items-center justify-center space-x-2 px-4 py-2 text-sm font-semibold rounded-lg ${themeClasses.bgTertiary} hover:opacity-80`}>
-                        <UploadIcon className="w-5 h-5" />
-                        <span>Import</span>
-                    </button>
-                </div>
-                
-                <div className="flex-grow overflow-y-auto -mr-2 pr-2">
-                    <ul className="space-y-1">
-                        {sketches.map(sketch => (
-                            <li key={sketch.id}>
-                                <div className={`group relative flex items-center justify-between rounded-md ${selectedSketchId === sketch.id ? `${themeClasses.bgTertiary}` : `hover:${themeClasses.bgTertiary}`}`}>
-                                    <button
-                                        onClick={() => onSelectSketch(sketch.id)}
-                                        className={`block w-full text-left px-3 py-2 transition-colors truncate`}
-                                    >
-                                        {enhancePlainText(sketch.title || 'Untitled Sketch')}
-                                    </button>
-                                    <button 
-                                        onClick={() => onDeleteSketch(sketch.id)} 
-                                        className={`flex-shrink-0 p-2 rounded-full text-red-500 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/10`}
-                                        aria-label={`Delete sketch ${sketch.title}`}
-                                    >
-                                        <TrashIcon className="w-5 h-5" />
-                                    </button>
-                                </div>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
             </div>
         </div>
     );
@@ -182,8 +184,14 @@ const DemosPage: React.FC = () => {
         setSelectedSketchId(newSketch.id);
         setIsOutlineModalOpen(false);
     };
+    
+    const handleSelectSketch = (id: string) => {
+        setSelectedSketchId(id);
+        setIsOutlineModalOpen(false);
+    };
 
-    const handleDeleteSketch = (sketchId: string) => {
+    const handleDeleteSketch = (e: React.MouseEvent, sketchId: string) => {
+        e.stopPropagation();
         if (!projectData) return;
         const updatedSketches = sketches.filter(s => s.id !== sketchId);
         
@@ -217,32 +225,24 @@ const DemosPage: React.FC = () => {
             e.target.value = '';
             return;
         }
+        
+        setIsOutlineModalOpen(false);
 
         try {
             const arrayBuffer = await file.arrayBuffer();
-            const styleMap = [
-                "p[style-name='Title'] => h1:fresh",
-                "p[style-name='Heading 1'] => h1:fresh",
-                "p[style-name='Heading 2'] => h2:fresh",
-                "p[style-name='Heading 3'] => h3:fresh",
-            ];
-            const { value: html } = await mammoth.convertToHtml({ arrayBuffer }, { styleMap });
+            const { value: html } = await mammoth.convertToHtml({ arrayBuffer });
 
-            const now = new Date().toISOString();
             const newSketch: Sketch = {
                 id: crypto.randomUUID(),
                 title: file.name.replace(/\.docx$/, ''),
                 content: html,
-                createdAt: now,
-                updatedAt: now,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
             };
             
             const updatedSketches = [newSketch, ...sketches];
             setProjectData({ ...projectData, sketches: updatedSketches });
-            
             setSelectedSketchId(newSketch.id);
-            setIsOutlineModalOpen(false);
-
         } catch (error) {
             console.error(`Error processing file ${file.name}:`, error);
             alert(`Failed to process ${file.name}. It might be corrupted or not a valid .docx file.`);
@@ -250,6 +250,8 @@ const DemosPage: React.FC = () => {
         
         e.target.value = '';
     };
+
+    // --- Formatting Logic ---
 
     const updateActiveFormats = useCallback(() => {
         setActiveFormats({
@@ -266,7 +268,10 @@ const DemosPage: React.FC = () => {
         }
 
         let element = selection.anchorNode;
-        if (element.nodeType === 3) element = element.parentNode!;
+        if (element.nodeType === 3) {
+            element = element.parentNode!;
+        }
+
         if (!(element instanceof HTMLElement)) return;
 
         let detectedParagraphStyle = 'p';
@@ -295,6 +300,7 @@ const DemosPage: React.FC = () => {
 
         const inlineStyles = window.getComputedStyle(element);
         const detectedSize = inlineStyles.fontSize;
+        
         const family = inlineStyles.fontFamily;
         const matchedFont = fontOptions.find(f => family.includes(f.name))?.value || fontOptions[0].value;
 
@@ -320,13 +326,19 @@ const DemosPage: React.FC = () => {
         handleSelectionChange();
     }, [handleSelectionChange]);
 
-    const applyFormat = (command: 'bold' | 'italic' | 'undo' | 'redo') => applyAndSaveFormat(() => document.execCommand(command, false));
+    const applyFormat = (command: 'bold' | 'italic' | 'undo' | 'redo') => {
+        applyAndSaveFormat(() => document.execCommand(command, false));
+    };
+    
     const applyParagraphStyle = (style: string) => applyAndSaveFormat(() => document.execCommand('formatBlock', false, style));
+    
     const applyFont = (fontValue: string) => {
         const fontName = fontOptions.find(f => f.value === fontValue)?.name || 'serif';
         applyAndSaveFormat(() => document.execCommand('fontName', false, fontName));
     };
+
     const applyColor = (color: string) => applyAndSaveFormat(() => document.execCommand('foreColor', false, color));
+    
     const applyFontSize = (size: string) => {
         applyAndSaveFormat(() => {
             if (!editorRef.current) return;
@@ -340,6 +352,7 @@ const DemosPage: React.FC = () => {
                 span.style.fontSize = size;
                 span.textContent = '\u200B';
                 range.insertNode(span);
+                
                 range.selectNodeContents(span);
                 range.collapse(false);
                 selection.removeAllRanges();
@@ -350,17 +363,24 @@ const DemosPage: React.FC = () => {
             const DUMMY_COLOR_RGB = 'rgb(1, 2, 3)';
             document.execCommand('styleWithCSS', false, 'true');
             document.execCommand('hiliteColor', false, DUMMY_COLOR_RGB);
+
             const tempSpans = Array.from(editorRef.current.querySelectorAll<HTMLElement>(`span[style*="background-color: ${DUMMY_COLOR_RGB}"]`));
+            
             const parentsToClean = new Set<Node>();
 
             tempSpans.forEach(span => {
-                if (span.parentElement) parentsToClean.add(span.parentElement);
+                if (span.parentElement) {
+                    parentsToClean.add(span.parentElement);
+                }
                 span.style.backgroundColor = '';
                 span.style.fontSize = size;
+                
                 if (!span.getAttribute('style')?.trim()) {
                     const parent = span.parentNode;
                     if (parent) {
-                        while (span.firstChild) parent.insertBefore(span.firstChild, span);
+                        while (span.firstChild) {
+                            parent.insertBefore(span.firstChild, span);
+                        }
                         parent.removeChild(span);
                     }
                 }
@@ -370,8 +390,15 @@ const DemosPage: React.FC = () => {
                 let child = parent.firstChild;
                 while (child) {
                     const next = child.nextSibling;
-                    if (next && child instanceof HTMLSpanElement && next instanceof HTMLSpanElement && child.style.cssText === next.style.cssText) {
-                        while (next.firstChild) child.appendChild(next.firstChild);
+                    if (
+                        next &&
+                        child instanceof HTMLSpanElement &&
+                        next instanceof HTMLSpanElement &&
+                        child.style.cssText === next.style.cssText
+                    ) {
+                        while (next.firstChild) {
+                            child.appendChild(next.firstChild);
+                        }
                         parent.removeChild(next);
                     } else {
                         child = next;
@@ -427,7 +454,7 @@ const DemosPage: React.FC = () => {
     }, [isFormatPanelOpen]);
 
     return (
-        <div className={`flex h-screen ${themeClasses.bg} font-sans`}>
+        <div className={`flex h-screen ${themeClasses.bg} font-sans relative`}>
             <input
                 type="file"
                 ref={docxInputRef}
@@ -435,11 +462,23 @@ const DemosPage: React.FC = () => {
                 className="hidden"
                 accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             />
+             <SketchesOutlineModal
+                isOpen={isOutlineModalOpen}
+                onClose={() => setIsOutlineModalOpen(false)}
+                sketches={sketches}
+                selectedSketchId={selectedSketchId}
+                onSelect={handleSelectSketch}
+                onCreate={handleCreateSketch}
+                onImportClick={() => docxInputRef.current?.click()}
+                onDelete={handleDeleteSketch}
+                themeClasses={themeClasses}
+            />
 
-            <div className="flex-1 h-full overflow-y-auto relative">
-                <div className="p-8 md:p-12 font-serif min-h-full flex flex-col">
+            {/* Editor Content */}
+            <div className="flex-1 h-full overflow-y-auto">
+                <div className="p-8 md:p-12 font-serif min-h-full">
                     {selectedSketch ? (
-                        <div className="flex-grow flex flex-col">
+                        <div>
                             <input
                                 key={`${selectedSketch.id}-title`}
                                 defaultValue={selectedSketch.title}
@@ -453,23 +492,24 @@ const DemosPage: React.FC = () => {
                                 contentEditable
                                 suppressContentEditableWarning
                                 onInput={(e) => handleUpdateSketch('content', e.currentTarget.innerHTML)}
-                                className={`flex-grow w-full text-lg leading-relaxed outline-none story-content ${themeClasses.text}`}
+                                className={`w-full text-lg leading-relaxed outline-none story-content ${themeClasses.text}`}
                                 style={editorStyle}
                             />
                         </div>
                     ) : (
-                        <div className="flex flex-col items-center justify-center flex-grow text-center">
+                        <div className="flex flex-col items-center justify-center h-full text-center mt-[-4rem]">
                             <LightbulbIcon className={`w-16 h-16 mb-4 ${themeClasses.textSecondary}`} />
                             <h2 className={`text-2xl font-bold ${themeClasses.accentText}`}>Welcome to Demos</h2>
                             <p className={`mt-2 max-w-md ${themeClasses.textSecondary}`}>
-                                This is your space for ideas, notes, and short stories. Open the sketches list to get started.
+                                This is your space for ideas, notes, and short stories. Create a new sketch to get started.
                             </p>
                         </div>
                     )}
                 </div>
             </div>
             
-            <div className="absolute bottom-0 left-0 w-full flex justify-center pb-4 z-20 pointer-events-none">
+            {/* Floating Toolbar */}
+             <div className="absolute bottom-0 left-0 w-full flex justify-center pb-4 z-20 pointer-events-none">
                 <div ref={toolbarRef} className="relative pointer-events-auto">
                     {isFormatPanelOpen && (
                         <div className="absolute bottom-full mb-2 p-4 rounded-lg shadow-lg bg-stone-900/80 border border-white/10 backdrop-blur-sm w-[320px]">
@@ -508,7 +548,9 @@ const DemosPage: React.FC = () => {
                         </div>
                     )}
                     <div className="flex items-center space-x-1 p-1 rounded-full shadow-lg bg-stone-900/70 border border-white/10 backdrop-blur-sm" onMouseDown={(e) => e.preventDefault()}>
-                        <button onClick={() => setIsOutlineModalOpen(true)} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors`}><Bars3Icon className="w-5 h-5"/></button>
+                        <button onClick={() => setIsOutlineModalOpen(true)} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors`}>
+                            <Bars3Icon className="w-5 h-5"/>
+                        </button>
                         <div className="w-px h-5 bg-white/20 mx-1"></div>
                         <button onClick={() => setIsFormatPanelOpen(p => !p)} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors ${isFormatPanelOpen ? 'bg-white/20' : ''}`}><TextIcon className="w-5 h-5"/></button>
                         <div className="w-px h-5 bg-white/20 mx-1"></div>
@@ -520,24 +562,7 @@ const DemosPage: React.FC = () => {
                     </div>
                 </div>
             </div>
-            
-            <SketchesOutlineModal
-                isOpen={isOutlineModalOpen}
-                onClose={() => setIsOutlineModalOpen(false)}
-                sketches={sketches}
-                selectedSketchId={selectedSketchId}
-                onSelectSketch={(id) => {
-                    setSelectedSketchId(id);
-                    setIsOutlineModalOpen(false);
-                }}
-                onCreateSketch={handleCreateSketch}
-                onDeleteSketch={handleDeleteSketch}
-                onImportClick={() => {
-                    setIsOutlineModalOpen(false);
-                    docxInputRef.current?.click();
-                }}
-                themeClasses={themeClasses}
-            />
+
         </div>
     );
 };

@@ -43,13 +43,6 @@ export interface ProjectData {
   sketches: Sketch[];
 }
 
-export interface Project {
-    id: string;
-    name: string;
-    data: ProjectData;
-}
-
-
 export type FileStatus = 'loading' | 'welcome' | 'ready' | 'error';
 
 export interface ThemeConfig {

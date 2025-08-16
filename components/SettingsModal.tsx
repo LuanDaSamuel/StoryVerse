@@ -19,7 +19,7 @@ const themeOptions: { name: Theme; label: string; colors: string[] }[] = [
 ];
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
-  const { theme, setProjectData, projectData, downloadCopy, deleteProject, themeClasses, activeProjectId } = useContext(ProjectContext);
+  const { theme, setProjectData, projectData, downloadCopy, unlinkFile, themeClasses } = useContext(ProjectContext);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
   if (!isOpen || !projectData) return null;
@@ -31,10 +31,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
     });
   };
 
-  const handleDeleteProject = () => {
-    if (!activeProjectId) return;
+  const handleUnlinkProject = () => {
     onClose();
-    deleteProject(activeProjectId);
+    unlinkFile();
   };
 
   // Logic to handle the 'book' theme's inverted text color on light backgrounds
@@ -86,7 +85,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
           <div>
             <h3 className={`text-lg mb-2 ${subHeadingStyle}`}>Project Data</h3>
             <p className={`${descriptionColor} mb-4`}>
-              Your project is saved in this browser. You can download a backup copy or delete it.
+              Your project is saved in this browser. You can download a backup copy or unlink it to start fresh.
             </p>
             <div className="flex space-x-4">
               <button
@@ -97,9 +96,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
               </button>
               <button
                 onClick={() => setIsConfirmOpen(true)}
-                className="px-6 py-2 font-semibold rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors"
+                className={`px-6 py-2 font-semibold rounded-lg ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-80 transition-opacity`}
               >
-                Delete Project
+                Unlink File
               </button>
             </div>
           </div>
@@ -108,9 +107,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
       <ConfirmModal
         isOpen={isConfirmOpen}
         onClose={() => setIsConfirmOpen(false)}
-        onConfirm={handleDeleteProject}
-        title="Delete Project?"
-        message="Are you sure you want to delete this project? This will permanently remove it and all its content from the browser. This action cannot be undone."
+        onConfirm={handleUnlinkProject}
+        title="Unlink Project?"
+        message="Are you sure you want to unlink this project? This will remove it from the browser and return you to the welcome screen. Your downloaded backup files will not be affected."
+        confirmButtonClass={`px-6 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90 transition-opacity`}
       />
     </>
   );

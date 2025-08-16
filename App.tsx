@@ -1,8 +1,7 @@
 
-
 import React, { useMemo, useContext, useEffect, useRef } from 'react';
 import { HashRouter, Routes, Route, Navigate, useParams, useMatch, useNavigate } from 'react-router-dom';
-import { useMultiProjectManager } from './hooks/useProjectFile';
+import { useProjectFile } from './hooks/useProjectFile';
 import { ProjectContext } from './contexts/ProjectContext';
 import WelcomeScreen from './components/WelcomeScreen';
 import Sidebar from './components/Sidebar';
@@ -50,11 +49,7 @@ const AppContent = () => {
         downloadCopy,
         deleteProject,
         saveProject,
-        projects,
-        switchProject,
-        renameProject,
-        activeProjectId
-    } = useMultiProjectManager();
+    } = useProjectFile();
     
     const navigate = useNavigate();
     const initialLoadHandled = useRef(false);
@@ -81,19 +76,7 @@ const AppContent = () => {
         theme: projectData?.settings?.theme || 'book',
         themeClasses,
         saveStatus,
-        // For multi-project management
-        projects,
-        createProject,
-        importProject,
-        switchProject,
-        deleteProject,
-        renameProject,
-        activeProjectId,
-    }), [
-        projectData, setProjectData, downloadCopy, deleteProject, saveProject, 
-        themeClasses, saveStatus, projects, createProject, importProject, 
-        switchProject, renameProject, activeProjectId
-    ]);
+    }), [projectData, setProjectData, downloadCopy, deleteProject, saveProject, themeClasses, saveStatus]);
 
     const onEditPage = useMatch('/novel/:novelId/edit/:chapterId');
     const onReadPage = useMatch('/novel/:novelId/read/:chapterId?');
@@ -111,7 +94,7 @@ const AppContent = () => {
             case 'welcome':
                 return (
                     <div className={`${themeClasses.bg} ${themeClasses.text}`}>
-                        <WelcomeScreen onCreate={() => createProject('My First Project')} onOpen={(content) => importProject(content, 'Imported Project')} />
+                        <WelcomeScreen onCreate={createProject} onOpen={importProject} />
                     </div>
                 );
             case 'ready':
