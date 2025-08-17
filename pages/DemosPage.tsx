@@ -393,6 +393,13 @@ const DemosPage: React.FC = () => {
         setIsExportMenuOpen(false);
     };
 
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            document.execCommand('insertText', false, '    ');
+        }
+    };
+
     // --- Formatting Logic ---
 
     const updateActiveFormats = useCallback(() => {
@@ -503,7 +510,7 @@ const DemosPage: React.FC = () => {
             <main className="flex-1 overflow-y-auto" ref={scrollContainerRef}>
                 <div className={`p-8 md:p-12 font-serif min-h-full max-w-4xl mx-auto ${isDistractionFree ? 'pt-24' : ''}`}>
                     {selectedSketch ? (
-                        <div ref={editorRef} key={`${selectedSketch.id}-content`} contentEditable suppressContentEditableWarning onInput={(e) => handleUpdateSketch('content', e.currentTarget.innerHTML)} className={`w-full text-lg leading-relaxed outline-none story-content ${themeClasses.text}`} style={editorStyle} />
+                        <div ref={editorRef} key={`${selectedSketch.id}-content`} contentEditable suppressContentEditableWarning onInput={(e) => handleUpdateSketch('content', e.currentTarget.innerHTML)} onKeyDown={handleKeyDown} className={`w-full text-lg leading-relaxed outline-none story-content ${themeClasses.text}`} style={editorStyle} />
                     ) : (
                         <div className="flex flex-col items-center justify-center h-full text-center mt-[-4rem]"><LightbulbIcon className={`w-16 h-16 mb-4 ${themeClasses.textSecondary}`} /><h2 className={`text-2xl font-bold ${themeClasses.accentText}`}>Welcome to Demos</h2><p className={`mt-2 max-w-md ${themeClasses.textSecondary}`}>This is your space for ideas and notes. Create a new sketch to get started.</p><button onClick={handleCreateSketch} className={`mt-8 flex items-center justify-center space-x-2 px-6 py-3 text-lg font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}><PlusIcon className="w-6 h-6" /><span>Create First Sketch</span></button></div>
                     )}
