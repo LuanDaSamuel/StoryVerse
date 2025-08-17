@@ -1,8 +1,10 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ProjectData, FileStatus, SaveStatus } from '../types';
 import { get, set, del } from 'idb-keyval';
 
 const PROJECT_DATA_KEY = 'storyverse-project-data';
+const FILE_HANDLE_KEY = 'storyverse-file-handle';
 
 const defaultProjectData: ProjectData = {
   settings: {
@@ -12,8 +14,20 @@ const defaultProjectData: ProjectData = {
   sketches: [],
 };
 
+const verifyPermission = async (handle: FileSystemFileHandle): Promise<boolean> => {
+    const options = { mode: 'readwrite' as const };
+    if ((await handle.queryPermission(options)) === 'granted') {
+        return true;
+    }
+    if ((await handle.requestPermission(options)) === 'granted') {
+        return true;
+    }
+    return false;
+};
+
 export function useProjectFile() {
   const [projectData, setProjectData] = useState<ProjectData | null>(null);
+  const [fileHandle, setFileHandle] = useState<FileSystemFileHandle | null>(null);
   const [status, setStatus] = useState<FileStatus>('loading');
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
   
@@ -23,52 +37,30 @@ export function useProjectFile() {
   const lastSavedVersion = useRef(0);
   
   const projectDataRef = useRef(projectData);
-  useEffect(() => {
-    projectDataRef.current = projectData;
-  }, [projectData]);
 
 
   useEffect(() => {
     const init = async () => {
       try {
-        const data: ProjectData | undefined = await get(PROJECT_DATA_KEY);
-        if (data) {
-          let needsUpdate = false;
-          const tempDiv = document.createElement('div');
-
-          data.novels.forEach(novel => {
-            if (novel.chapters && Array.isArray(novel.chapters)) {
-              novel.chapters.forEach(chapter => {
-                const oldWordCount = chapter.wordCount || 0;
+        const handle: FileSystemFileHandle | undefined = await get(FILE_HANDLE_KEY);
+        if (handle) {
+            const hasPermission = await verifyPermission(handle);
+            if (hasPermission) {
+                const file = await handle.getFile();
+                const fileContent = await file.text();
+                const data = JSON.parse(fileContent);
                 
-                tempDiv.innerHTML = chapter.content || '';
-                const text = tempDiv.textContent || "";
-                const newWordCount = text.trim().split(/\s+/).filter(Boolean).length;
-
-                if (oldWordCount !== newWordCount) {
-                  chapter.wordCount = newWordCount;
-                  needsUpdate = true;
-                }
-              });
+                projectDataRef.current = data;
+                setProjectData(data);
+                setFileHandle(handle);
+                setStatus('ready');
+                return;
             }
-          });
-          
-          if (!data.sketches) {
-            data.sketches = [];
-            needsUpdate = true;
-          }
-
-          if (needsUpdate) {
-            await set(PROJECT_DATA_KEY, data);
-          }
-
-          setProjectData(data);
-          setStatus('ready');
-        } else {
-          setStatus('welcome');
         }
+        setStatus('welcome');
       } catch (error) {
-        console.error('Error loading project from DB:', error);
+        console.error('Error initializing project:', error);
+        await del(FILE_HANDLE_KEY);
         setStatus('welcome');
       }
     };
@@ -94,21 +86,25 @@ export function useProjectFile() {
   const saveProject = useCallback(async (data: ProjectData, version: number) => {
     setSaveStatus('saving');
     try {
-      await set(PROJECT_DATA_KEY, data);
+      await set(PROJECT_DATA_KEY, data); // Always save backup to IndexedDB
+
+      if (fileHandle) {
+          const writable = await fileHandle.createWritable();
+          await writable.write(JSON.stringify(data, null, 2));
+          await writable.close();
+      }
+
       lastSavedVersion.current = version;
       
-      // Only mark as 'saved' if the version we just saved is still the latest version.
-      // If they don't match, it means a new edit occurred while we were saving,
-      // and another save has already been scheduled.
       if (dataVersion.current === lastSavedVersion.current) {
         hasUnsavedChanges.current = false;
         setSaveStatus('saved');
       }
     } catch (error) {
-      console.error('Error saving project to DB:', error);
+      console.error('Error saving project:', error);
       setSaveStatus('unsaved');
     }
-  }, []);
+  }, [fileHandle]);
   
   const forceSave = useCallback(async () => {
     if (saveTimeout.current) {
@@ -139,8 +135,6 @@ export function useProjectFile() {
       
       const versionToSave = dataVersion.current;
       saveTimeout.current = window.setTimeout(() => {
-        // Use the ref for data to ensure we save the absolute latest version,
-        // even if another update happened since this effect ran.
         if (projectDataRef.current) {
             saveProject(projectDataRef.current, versionToSave);
         }
@@ -155,94 +149,141 @@ export function useProjectFile() {
     dataVersion.current++;
     hasUnsavedChanges.current = true;
     setSaveStatus('unsaved');
+
+    const newData = typeof updater === 'function'
+        ? (updater as (prevState: ProjectData | null) => ProjectData | null)(projectDataRef.current)
+        : updater;
+    projectDataRef.current = newData;
     setProjectData(updater);
   };
 
   const createProject = useCallback(async () => {
-    const theme = projectData?.settings?.theme || 'book';
-    const newProjectData = { ...defaultProjectData, settings: { theme } };
-    
-    dataVersion.current++;
-    lastSavedVersion.current = dataVersion.current;
-    
-    await set(PROJECT_DATA_KEY, newProjectData);
-    
-    setProjectData(newProjectData);
-    setStatus('ready');
-    setSaveStatus('saved');
-    hasUnsavedChanges.current = false;
-  }, [projectData?.settings?.theme]);
-
-  const importProject = useCallback(async (fileContent: string) => {
     try {
-      const data: ProjectData = JSON.parse(fileContent);
-      if (data && data.settings && Array.isArray(data.novels)) {
-        
-        const tempDiv = document.createElement('div');
-        data.novels.forEach(novel => {
-            if (novel.chapters && Array.isArray(novel.chapters)) {
-                novel.chapters.forEach(chapter => {
-                    if (typeof chapter.content === 'string') {
-                        tempDiv.innerHTML = chapter.content;
-                        const text = tempDiv.textContent || "";
-                        chapter.wordCount = text.trim().split(/\s+/).filter(Boolean).length;
-                    } else {
-                        chapter.wordCount = 0;
-                    }
-                });
-            }
+        const handle = await window.showSaveFilePicker({
+            suggestedName: 'StoryVerse-Project.json',
+            types: [{
+                description: 'StoryVerse Project Files',
+                accept: { 'application/json': ['.json'] },
+            }],
         });
 
-        if (!data.sketches) {
-          data.sketches = [];
-        }
+        const theme = projectData?.settings?.theme || 'book';
+        const newProjectData = { ...defaultProjectData, settings: { theme } };
 
-        dataVersion.current++;
-        lastSavedVersion.current = dataVersion.current;
-        await set(PROJECT_DATA_KEY, data);
+        const writable = await handle.createWritable();
+        await writable.write(JSON.stringify(newProjectData, null, 2));
+        await writable.close();
 
-        setProjectData(data);
+        await set(FILE_HANDLE_KEY, handle);
+        await set(PROJECT_DATA_KEY, newProjectData);
+
+        projectDataRef.current = newProjectData;
+        setProjectData(newProjectData);
+        setFileHandle(handle);
         setStatus('ready');
         setSaveStatus('saved');
         hasUnsavedChanges.current = false;
-      } else {
-        throw new Error('Invalid project file format.');
-      }
     } catch (error) {
-      console.error('Error importing project file:', error);
-      alert('Failed to import file. It may be corrupted or not a valid StoryVerse project file.');
+        if (error instanceof DOMException && error.name === 'AbortError') {
+            console.log('User cancelled the save file picker.');
+        } else {
+            console.error('Error creating project file:', error);
+            alert('Could not create project file.');
+        }
+    }
+  }, [projectData?.settings?.theme]);
+
+  const openProject = useCallback(async () => {
+    try {
+        const [handle] = await window.showOpenFilePicker({
+            types: [{
+                description: 'StoryVerse Project Files',
+                accept: { 'application/json': ['.json'] },
+            }],
+            multiple: false,
+        });
+
+        const file = await handle.getFile();
+        let fileContent = await file.text();
+        let data: ProjectData;
+        
+        if (!fileContent.trim()) {
+            data = { ...defaultProjectData };
+            const writable = await handle.createWritable();
+            await writable.write(JSON.stringify(data, null, 2));
+            await writable.close();
+        } else {
+            data = JSON.parse(fileContent);
+        }
+
+        if (data && data.settings && Array.isArray(data.novels)) {
+            await set(FILE_HANDLE_KEY, handle);
+            await set(PROJECT_DATA_KEY, data);
+
+            projectDataRef.current = data;
+            setProjectData(data);
+            setFileHandle(handle);
+            setStatus('ready');
+            setSaveStatus('saved');
+            hasUnsavedChanges.current = false;
+        } else {
+            throw new Error('Invalid project file format.');
+        }
+    } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+            console.log('User cancelled the open file picker.');
+        } else {
+            console.error('Error opening project file:', error);
+            alert('Failed to open file. It may be corrupted or not a valid StoryVerse project file.');
+        }
     }
   }, []);
 
-  const exportProject = useCallback(async () => {
+  const saveProjectAs = useCallback(async () => {
     await forceSave();
-    const dataToDownload = projectDataRef.current;
-    if (!dataToDownload) return;
+    const dataToSave = projectDataRef.current;
+    if (!dataToSave) return;
 
     try {
-      const blob = new Blob([JSON.stringify(dataToDownload, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'StoryVerse-Project.json';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Failed to export project file', error);
-      alert('Failed to export project file.');
-    }
-  }, [forceSave]);
+        const handle = await window.showSaveFilePicker({
+            suggestedName: fileHandle?.name || 'StoryVerse-Project.json',
+            types: [{
+                description: 'StoryVerse Project Files',
+                accept: { 'application/json': ['.json'] },
+            }],
+        });
 
-  const deleteProject = useCallback(async () => {
-    await forceSave();
-    
+        const writable = await handle.createWritable();
+        await writable.write(JSON.stringify(dataToSave, null, 2));
+        await writable.close();
+
+        await set(FILE_HANDLE_KEY, handle);
+        setFileHandle(handle);
+        
+        hasUnsavedChanges.current = false;
+        setSaveStatus('saved');
+    } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+            console.log('User cancelled the save file picker.');
+        } else {
+            console.error('Failed to save project file', error);
+            alert('Failed to save project file.');
+        }
+    }
+  }, [forceSave, fileHandle]);
+
+  const unlinkFile = useCallback(async () => {
+    if (saveTimeout.current) clearTimeout(saveTimeout.current);
     hasUnsavedChanges.current = false;
-    setProjectData(null);
+    
+    await del(FILE_HANDLE_KEY);
     await del(PROJECT_DATA_KEY);
+    
+    projectDataRef.current = null;
+    setProjectData(null);
+    setFileHandle(null);
     setStatus('welcome');
-  }, [forceSave]);
+  }, []);
 
   return { 
     projectData, 
@@ -250,9 +291,9 @@ export function useProjectFile() {
     status, 
     saveStatus,
     createProject, 
-    importProject, 
-    exportProject, 
-    deleteProject,
+    openProject, 
+    saveProjectAs, 
+    unlinkFile,
     saveProject 
   };
 }

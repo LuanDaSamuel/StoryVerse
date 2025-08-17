@@ -1,3 +1,4 @@
+
 import React, { useContext, useState } from 'react';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { Theme } from '../types';
@@ -19,7 +20,7 @@ const themeOptions: { name: Theme; label: string; colors: string[] }[] = [
 ];
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
-  const { theme, setProjectData, exportProject, unlinkFile, themeClasses } = useContext(ProjectContext);
+  const { theme, setProjectData, saveProjectAs, unlinkFile, themeClasses } = useContext(ProjectContext);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
   if (!isOpen) return null;
@@ -88,15 +89,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
           <div>
             <h3 className={`text-lg mb-2 ${subHeadingStyle}`}>Project Data</h3>
             <p className={`${descriptionColor} mb-4`}>
-              Your project is saved in this browser. You can download a backup copy or unlink it to start fresh.
+              Your project is saved directly to a file on your computer. You can save a copy to a different location.
             </p>
             <div className="flex space-x-4">
               <button
-                onClick={exportProject}
+                onClick={saveProjectAs}
                 className={`flex items-center space-x-2 px-4 py-2 font-semibold rounded-lg ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-80 transition-opacity`}
               >
                 <DownloadIcon className="w-5 h-5" />
-                <span>Export Project File</span>
+                <span>Save As...</span>
               </button>
               <button
                 onClick={() => setIsConfirmOpen(true)}

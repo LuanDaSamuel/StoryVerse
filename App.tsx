@@ -45,9 +45,9 @@ const AppContent = () => {
         status,
         saveStatus,
         createProject,
-        importProject,
-        exportProject,
-        deleteProject,
+        openProject,
+        saveProjectAs,
+        unlinkFile,
         saveProject,
     } = useProjectFile();
     
@@ -70,13 +70,13 @@ const AppContent = () => {
     const contextValue = useMemo(() => ({
         projectData,
         setProjectData,
-        exportProject,
-        unlinkFile: deleteProject,
+        saveProjectAs,
+        unlinkFile,
         saveProject,
         theme: projectData?.settings?.theme || 'book',
         themeClasses,
         saveStatus,
-    }), [projectData, setProjectData, exportProject, deleteProject, saveProject, themeClasses, saveStatus]);
+    }), [projectData, setProjectData, saveProjectAs, unlinkFile, saveProject, themeClasses, saveStatus]);
 
     const onEditPage = useMatch('/novel/:novelId/edit/:chapterId');
     const onReadPage = useMatch('/novel/:novelId/read/:chapterId?');
@@ -94,7 +94,7 @@ const AppContent = () => {
             case 'welcome':
                 return (
                     <div className={`${themeClasses.bg} ${themeClasses.text}`}>
-                        <WelcomeScreen onCreate={createProject} onOpen={importProject} />
+                        <WelcomeScreen onCreate={createProject} onOpen={openProject} />
                     </div>
                 );
             case 'ready':
