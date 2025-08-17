@@ -2,7 +2,7 @@ import React, { useState, useContext, useEffect, useMemo, useRef, useCallback } 
 import { useNavigate } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { Sketch } from '../types';
-import { UploadIcon, PlusIcon, TrashIcon, LightbulbIcon, ChevronDownIcon, TextIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, Bars3Icon, CloseIcon, ListBulletIcon, HomeIcon, SearchIcon, DownloadIcon, ChartBarIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon, BlockquoteIcon, OrderedListIcon } from '../components/Icons';
+import { UploadIcon, PlusIcon, TrashIcon, LightbulbIcon, ChevronDownIcon, TextIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, Bars3Icon, CloseIcon, ListBulletIcon, HomeIcon, SearchIcon, DownloadIcon, ChartBarIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon, BlockquoteIcon, OrderedListIcon, ChevronLeftIcon } from '../components/Icons';
 import { enhanceHtml, enhancePlainText } from '../constants';
 import { THEME_CONFIG } from '../constants';
 import * as mammoth from 'mammoth';
@@ -63,49 +63,6 @@ const SketchesOutlineModal: React.FC<{
                         </div>
                     ))}
                 </div>
-            </div>
-        </div>
-    );
-};
-
-const DocumentOutlineModal: React.FC<{
-    isOpen: boolean;
-    onClose: () => void;
-    editorRef: React.RefObject<HTMLDivElement>;
-    themeClasses: any;
-}> = ({ isOpen, onClose, editorRef, themeClasses }) => {
-    const [headings, setHeadings] = useState<Heading[]>([]);
-
-    useEffect(() => {
-        if (isOpen && editorRef.current) {
-            const headingElements = Array.from(editorRef.current.querySelectorAll('h1, h2, h3'));
-            const newHeadings = headingElements.map((el, index) => {
-                const htmlEl = el as HTMLElement;
-                if (!htmlEl.id) htmlEl.id = `temp-heading-id-${index}`;
-                return { id: htmlEl.id, text: htmlEl.textContent || 'Untitled Heading', level: parseInt(htmlEl.tagName.substring(1), 10) };
-            });
-            setHeadings(newHeadings);
-        }
-    }, [isOpen, editorRef]);
-
-    const handleHeadingClick = (id: string) => {
-        document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        onClose();
-    };
-
-    if (!isOpen) return null;
-
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 z-[60] flex items-center justify-center p-4 font-sans" onClick={onClose} role="dialog">
-            <div className={`w-full max-w-md p-6 rounded-lg shadow-2xl ${themeClasses.bgSecondary} ${themeClasses.accentText} border ${themeClasses.border}`} onClick={(e) => e.stopPropagation()}>
-                <div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold">Document Outline</h2><button onClick={onClose} className={`p-1 rounded-full hover:${themeClasses.bgTertiary}`}><CloseIcon className="w-6 h-6" /></button></div>
-                {headings.length > 0 ? (
-                    <nav className="max-h-[60vh] overflow-y-auto -mr-2 pr-2">
-                        <ul className="space-y-1">
-                            {headings.map(h => <li key={h.id}><button onClick={() => handleHeadingClick(h.id)} className={`w-full text-left px-3 py-2 rounded-md transition-colors hover:${themeClasses.bgTertiary} ${h.level === 2 ? 'pl-8' : ''} ${h.level === 3 ? 'pl-12' : ''}`}>{enhancePlainText(h.text)}</button></li>)}
-                        </ul>
-                    </nav>
-                ) : <p className={themeClasses.textSecondary}>No headings (H1, H2, H3) found.</p>}
             </div>
         </div>
     );
@@ -249,12 +206,13 @@ const DemosPage: React.FC = () => {
     const navigate = useNavigate();
     const [selectedSketchId, setSelectedSketchId] = useState<string | null>(null);
     const [isOutlineModalOpen, setIsOutlineModalOpen] = useState(false);
-    const [isDocumentOutlineOpen, setIsDocumentOutlineOpen] = useState(false);
+    const [isOutlineSidebarOpen, setIsOutlineSidebarOpen] = useState(false);
+    const [headings, setHeadings] = useState<Heading[]>([]);
     const [isFindReplaceOpen, setIsFindReplaceOpen] = useState(false);
     const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
     const [isStatsOpen, setIsStatsOpen] = useState(false);
     const [isDistractionFree, setIsDistractionFree] = useState(false);
-    const [stats, setStats] = useState({ wordCount: 0, charCount: 0, readingTime: 0 });
+    const [stats, setStats] = useState({ wordCount: 0, charCount: 0 });
 
     const editorRef = useRef<HTMLDivElement>(null);
     const toolbarRef = useRef<HTMLDivElement>(null);
@@ -290,7 +248,7 @@ const DemosPage: React.FC = () => {
             if (!editorRef.current) return;
             const text = editorRef.current.innerText;
             const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
-            setStats({ wordCount, charCount: text.length, readingTime: Math.ceil(wordCount / 200) });
+            setStats({ wordCount, charCount: text.length });
         };
         const debouncedCalc = setTimeout(calculateStats, 300);
         return () => clearTimeout(debouncedCalc);
@@ -303,6 +261,48 @@ const DemosPage: React.FC = () => {
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [isDistractionFree]);
+    
+    useEffect(() => {
+        const editorEl = editorRef.current;
+        if (!editorEl || !selectedSketchId) {
+            setHeadings([]);
+            return;
+        };
+
+        let debounceTimeout: number;
+        const updateHeadings = () => {
+            clearTimeout(debounceTimeout);
+            debounceTimeout = window.setTimeout(() => {
+                if (!editorRef.current) return;
+                const headingElements = Array.from(editorRef.current.querySelectorAll('h1, h2, h3'));
+                const newHeadings: Heading[] = headingElements.map((el, index) => {
+                    const htmlEl = el as HTMLElement;
+                    if (!htmlEl.id) htmlEl.id = `heading-outline-${index}-${Date.now()}`;
+                    return {
+                        id: htmlEl.id,
+                        text: htmlEl.textContent || 'Untitled Heading',
+                        level: parseInt(htmlEl.tagName.substring(1), 10),
+                    };
+                });
+                setHeadings(currentHeadings => {
+                    if (JSON.stringify(currentHeadings.map(h => ({text: h.text, level: h.level}))) === JSON.stringify(newHeadings.map(h => ({text: h.text, level: h.level})))) {
+                        return currentHeadings;
+                    }
+                    return newHeadings;
+                });
+            }, 300);
+        };
+
+        updateHeadings();
+
+        const observer = new MutationObserver(updateHeadings);
+        observer.observe(editorEl, { childList: true, subtree: true, characterData: true });
+
+        return () => {
+            clearTimeout(debounceTimeout);
+            observer.disconnect();
+        };
+    }, [selectedSketchId]);
 
     // --- Handlers for sketch data operations ---
 
@@ -487,6 +487,43 @@ const DemosPage: React.FC = () => {
 
     return (
         <div className={`flex flex-col h-screen ${themeClasses.bg} font-sans transition-all duration-300 ${isDistractionFree ? 'is-distraction-free' : ''}`}>
+             <div className={`fixed top-0 left-0 h-full z-40 flex items-start transition-transform duration-300 ease-in-out ${isOutlineSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+                <div className={`w-64 h-full bg-stone-900/80 border-r border-white/10 backdrop-blur-sm flex flex-col ${isDistractionFree ? 'pt-4' : 'pt-16'}`}>
+                    <div className="p-4 border-b border-white/10 flex justify-between items-center flex-shrink-0">
+                        <h3 className="font-bold text-white">Document Outline</h3>
+                        <button
+                            onClick={() => setIsOutlineSidebarOpen(false)}
+                            className="p-1 rounded-full text-white/70 hover:bg-white/10"
+                            aria-label="Close outline"
+                        >
+                            <ChevronLeftIcon className="w-5 h-5"/>
+                        </button>
+                    </div>
+                    <nav className="flex-1 overflow-y-auto p-2">
+                        {headings.length > 0 ? (
+                            <ul className="space-y-1">
+                                {headings.map(h => (
+                                    <li key={h.id}>
+                                        <button
+                                            onClick={() => {
+                                                const el = document.getElementById(h.id);
+                                                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                            }}
+                                            className={`w-full text-left px-2 py-1 rounded text-sm text-white/80 hover:bg-white/10 truncate ${h.level === 2 ? 'pl-6' : ''} ${h.level === 3 ? 'pl-10' : ''}`}
+                                            title={h.text}
+                                        >
+                                            {enhancePlainText(h.text)}
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="p-4 text-sm text-white/50">No headings in document.</p>
+                        )}
+                    </nav>
+                </div>
+            </div>
+
             {/* Header */}
             <header className={`flex-shrink-0 flex items-center justify-between p-3 border-b ${themeClasses.border} ${isDistractionFree ? 'hidden' : ''}`}>
                 <div className="flex items-center space-x-2">
@@ -519,16 +556,15 @@ const DemosPage: React.FC = () => {
 
             {/* Modals & Dialogs */}
             <SketchesOutlineModal isOpen={isOutlineModalOpen} onClose={() => setIsOutlineModalOpen(false)} sketches={sketches} selectedSketchId={selectedSketchId} onSelect={handleSelectSketch} onCreate={handleCreateSketch} onImportClick={() => docxInputRef.current?.click()} onDelete={handleDeleteSketch} themeClasses={themeClasses} />
-            <DocumentOutlineModal isOpen={isDocumentOutlineOpen} onClose={() => setIsDocumentOutlineOpen(false)} editorRef={editorRef} themeClasses={themeClasses} />
             <FindReplaceDialog isOpen={isFindReplaceOpen} onClose={() => setIsFindReplaceOpen(false)} editorRef={editorRef} />
-            {isStatsOpen && <div className={`fixed top-20 right-8 p-4 rounded-lg shadow-2xl w-full max-w-xs ${themeClasses.bgSecondary} ${themeClasses.accentText} border ${themeClasses.border} z-50`}><div className="flex justify-between items-center mb-2"><h2 className="text-lg font-bold">Statistics</h2><button onClick={() => setIsStatsOpen(false)} className={`p-1 rounded-full hover:${themeClasses.bgTertiary}`}><CloseIcon className="w-5 h-5" /></button></div><div className="space-y-2 text-sm"><div><strong>Word Count:</strong> {stats.wordCount.toLocaleString()}</div><div><strong>Character Count:</strong> {stats.charCount.toLocaleString()}</div><div><strong>Reading Time:</strong> ~{stats.readingTime} min</div></div></div>}
+            {isStatsOpen && <div className={`fixed top-20 right-8 p-4 rounded-lg shadow-2xl w-full max-w-xs ${themeClasses.bgSecondary} ${themeClasses.accentText} border ${themeClasses.border} z-50`}><div className="flex justify-between items-center mb-2"><h2 className="text-lg font-bold">Statistics</h2><button onClick={() => setIsStatsOpen(false)} className={`p-1 rounded-full hover:${themeClasses.bgTertiary}`}><CloseIcon className="w-5 h-5" /></button></div><div className="space-y-2 text-sm"><div><strong>Word Count:</strong> {stats.wordCount.toLocaleString()}</div><div><strong>Character Count:</strong> {stats.charCount.toLocaleString()}</div></div></div>}
             
             {/* Floating Toolbar */}
             <div className={`absolute bottom-0 left-0 w-full flex justify-center pb-4 z-20 pointer-events-none transition-opacity duration-300 ${isDistractionFree ? 'opacity-0' : 'opacity-100'}`}>
                 <div ref={toolbarRef} className="relative pointer-events-auto">
                     {isFormatPanelOpen && (<div className="absolute bottom-full mb-2 p-4 rounded-lg shadow-lg bg-stone-900/80 border border-white/10 backdrop-blur-sm w-[320px]"><div className="space-y-4"><ToolbarDropdown label="Paragraph Style" value={currentFormat.paragraphStyle} onChange={(e) => applyParagraphStyle(e.target.value)}><option value="p">Paragraph</option><option value="h1">Heading 1</option><option value="h2">Heading 2</option><option value="h3">Heading 3</option><option value="blockquote">Blockquote</option></ToolbarDropdown><ToolbarDropdown label="Font" value={currentFormat.font} onChange={(e) => applyFont(e.target.value)}>{fontOptions.map(f => <option key={f.name} value={f.value}>{f.name}</option>)}</ToolbarDropdown><div className="grid grid-cols-2 gap-4"><ToolbarDropdown label="Size" value={currentFormat.size} onChange={(e) => console.log('Size change not implemented yet')}><option value="14px">14</option><option value="16px">16</option><option value="18px">18</option><option value="20px">20</option><option value="24px">24</option></ToolbarDropdown><ToolbarDropdown label="Paragraph Spacing" value={currentFormat.paragraphSpacing} onChange={(e) => applyParagraphSpacing(e.target.value)}><option value="0.5em">0.5</option><option value="1em">1.0</option><option value="1.5em">1.5</option><option value="2em">2.0</option></ToolbarDropdown></div><div><label className="block text-xs font-semibold mb-2 text-white/70">Color</label><div className="flex space-x-2">{colorPalette.map(c => (<button key={c} onClick={() => applyColor(c)} className="w-6 h-6 rounded-full border border-gray-400" style={{backgroundColor: c}}></button>))}</div></div></div></div>)}
                     <div className="flex items-center space-x-1 p-1 rounded-full shadow-lg bg-stone-900/70 border border-white/10 backdrop-blur-sm" onMouseDown={(e) => e.preventDefault()}>
-                        <button onClick={() => setIsDocumentOutlineOpen(true)} className="p-2 rounded-full text-white/90 hover:bg-white/10" disabled={!selectedSketchId}><ListBulletIcon className="w-5 h-5"/></button>
+                        <button onClick={() => setIsOutlineSidebarOpen(p => !p)} className="p-2 rounded-full text-white/90 hover:bg-white/10" disabled={!selectedSketchId}><ListBulletIcon className="w-5 h-5"/></button>
                         <div className="w-px h-5 bg-white/20 mx-1"></div>
                         <button onClick={() => setIsFormatPanelOpen(p => !p)} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${isFormatPanelOpen ? 'bg-white/20' : ''}`}><TextIcon className="w-5 h-5"/></button>
                         <button onClick={() => applyCommand('bold')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.isBold ? 'bg-white/20' : ''}`}><BoldIcon className="w-5 h-5"/></button>
