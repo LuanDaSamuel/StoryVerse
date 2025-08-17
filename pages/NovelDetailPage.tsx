@@ -109,16 +109,19 @@ const NovelDetailPage: React.FC = () => {
             try {
                 const arrayBuffer = await file.arrayBuffer();
                 const { value: html } = await mammoth.convertToHtml({ arrayBuffer }, { styleMap });
+                
+                // Clean the HTML by removing empty paragraphs which can mess with styling.
+                const cleanedHtml = html.replace(/<p>\s*(<br\s*\/?>)?\s*<\/p>/gi, '');
 
                 const headingRegex = /<h[23][^>]*>.*?<\/h[23]>/g;
-                const matches = [...html.matchAll(headingRegex)];
+                const matches = [...cleanedHtml.matchAll(headingRegex)];
 
                 if (matches.length === 0) {
                     const now = new Date().toISOString();
                     newChapters.push({
                         id: crypto.randomUUID(),
                         title: file.name.replace(/\.docx$/, ''),
-                        content: html,
+                        content: cleanedHtml,
                         wordCount: 0,
                         createdAt: now,
                         updatedAt: now,
@@ -131,8 +134,8 @@ const NovelDetailPage: React.FC = () => {
                         const chapterTitle = tempDiv.textContent?.trim() || `Chapter ${newChapters.length + 1}`;
                         
                         const startIndex = (match.index || 0) + match[0].length;
-                        const endIndex = (i + 1 < matches.length) ? (matches[i + 1].index || html.length) : html.length;
-                        const content = html.substring(startIndex, endIndex);
+                        const endIndex = (i + 1 < matches.length) ? (matches[i + 1].index || cleanedHtml.length) : cleanedHtml.length;
+                        const content = cleanedHtml.substring(startIndex, endIndex);
 
                         const now = new Date().toISOString();
                         newChapters.push({

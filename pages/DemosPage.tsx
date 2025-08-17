@@ -334,13 +334,16 @@ const DemosPage: React.FC = () => {
             ];
             
             const { value: html } = await mammoth.convertToHtml({ arrayBuffer }, { styleMap });
+            
+            // Clean the HTML by removing empty paragraphs which can mess with styling.
+            const cleanedHtml = html.replace(/<p>\s*(<br\s*\/?>)?\s*<\/p>/gi, '');
 
             const now = new Date().toISOString();
             
             const newSketch: Sketch = {
                 id: crypto.randomUUID(),
                 title: file.name.replace(/\.docx$/, ''),
-                content: html,
+                content: cleanedHtml,
                 createdAt: now,
                 updatedAt: now,
             };
