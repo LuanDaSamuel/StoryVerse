@@ -250,7 +250,12 @@ const DemosPage: React.FC = () => {
                 editorRef.current.innerHTML = editorContent;
             }
         }
-    }, [selectedSketch]);
+    // This effect loads content when the selected sketch changes. It should only run
+    // when selectedSketchId changes. `selectedSketch` is omitted from dependencies to
+    // prevent this from running on every keystroke. This is safe because `selectedSketch`
+    // will be up-to-date from the component's render scope.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedSketchId]);
 
     const handleCreateSketch = () => {
         const now = new Date().toISOString();

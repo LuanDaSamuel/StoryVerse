@@ -867,7 +867,6 @@ const ChapterEditorPage: React.FC = () => {
     // --- Effects ---
     useEffect(() => {
         if (editorRef.current && chapter) {
-            const editorHadFocus = document.activeElement === editorRef.current;
             const initialContent = chapter.content || '<p><br></p>';
             const enhancedContent = enhanceHtml(initialContent);
 
@@ -875,20 +874,25 @@ const ChapterEditorPage: React.FC = () => {
                 editorRef.current.innerHTML = enhancedContent;
             }
 
-            if (editorHadFocus) {
-                editorRef.current.focus();
-                const selection = window.getSelection();
-                if (selection) {
-                    const range = document.createRange();
-                    range.selectNodeContents(editorRef.current);
-                    range.collapse(false); // Go to end
-                    selection.removeAllRanges();
-                    selection.addRange(range);
-                }
+            // After loading a new chapter, focus the editor and move cursor to the end.
+            // This is reasonable behavior for chapter navigation.
+            editorRef.current.focus();
+            const selection = window.getSelection();
+            if (selection) {
+                const range = document.createRange();
+                range.selectNodeContents(editorRef.current);
+                range.collapse(false); // Go to end
+                selection.removeAllRanges();
+                selection.addRange(range);
             }
         }
         handleSelectionChange();
-    }, [chapterId, chapter, handleSelectionChange]);
+    // This effect is for loading content when the chapter is switched. It should only run
+    // when chapterId changes. Disabling the lint rule is safe because `chapter` and
+    // `handleSelectionChange` will be up-to-date from the component's render scope
+    // whenever this effect is triggered.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [chapterId]);
 
 
     useEffect(() => {

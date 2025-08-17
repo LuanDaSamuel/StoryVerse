@@ -70,9 +70,12 @@ export function useProjectFile() {
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       if (hasUnsavedChanges.current) {
+        // This message is often ignored by modern browsers, which show a generic prompt instead.
+        // However, it's required for compatibility.
+        const message = 'Changes you made may not be saved.';
         event.preventDefault();
-        event.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
-        return event.returnValue;
+        event.returnValue = message;
+        return message;
       }
     };
 
@@ -89,6 +92,14 @@ export function useProjectFile() {
       await set(PROJECT_DATA_KEY, data); // Always save backup to IndexedDB
 
       if (fileHandle) {
+          const hasPermission = await verifyPermission(fileHandle);
+          if (!hasPermission) {
+              // If permission was revoked, we can't save to the file.
+              // The user will see 'unsaved' status and can use 'Save As...' to re-establish a file handle.
+              console.warn('File system permission denied. Saving to local backup only.');
+              setSaveStatus('unsaved');
+              return;
+          }
           const writable = await fileHandle.createWritable();
           await writable.write(JSON.stringify(data, null, 2));
           await writable.close();
@@ -96,6 +107,7 @@ export function useProjectFile() {
 
       lastSavedVersion.current = version;
       
+      // Only mark as saved if this was the most recent version to be queued.
       if (dataVersion.current === lastSavedVersion.current) {
         hasUnsavedChanges.current = false;
         setSaveStatus('saved');
@@ -118,6 +130,8 @@ export function useProjectFile() {
   
   useEffect(() => {
       const handlePageHide = () => {
+          // This is a best-effort attempt to save on page exit.
+          // It's not guaranteed to complete.
           if (hasUnsavedChanges.current && projectDataRef.current) {
               saveProject(projectDataRef.current, dataVersion.current);
           }
@@ -138,7 +152,7 @@ export function useProjectFile() {
         if (projectDataRef.current) {
             saveProject(projectDataRef.current, versionToSave);
         }
-      }, 1500);
+      }, 1000); // Auto-save after 1 second of inactivity
     }
     return () => {
       if (saveTimeout.current) clearTimeout(saveTimeout.current);
