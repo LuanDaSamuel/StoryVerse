@@ -27,70 +27,18 @@
       /* 
         These styles create a classic book-like paragraph format for both the editor and the reader.
         - The first line of each paragraph is indented.
+        - Vertical space is added between paragraphs for better readability.
         - The first paragraph after a heading is not indented, for better typographic flow.
       */
       .story-content p {
         text-indent: 2em;
-        margin-bottom: 0;
+        margin-bottom: 1em;
       }
       .story-content h1 + p,
       .story-content h2 + p,
       .story-content h3 + p {
         text-indent: 0;
       }
-
-      /* Heading styles for the editor and reader */
-      .story-content h1 {
-        font-size: 2.25em;
-        font-weight: bold;
-        margin-top: 1.5em;
-        margin-bottom: 0.75em;
-        line-height: 1.2;
-        text-indent: 0;
-      }
-
-      .story-content h2 {
-        font-size: 1.75em;
-        font-weight: bold;
-        margin-top: 1.25em;
-        margin-bottom: 0.6em;
-        line-height: 1.3;
-        text-indent: 0;
-      }
-
-      /* Remove top margin for the very first element in the editor to avoid excess space */
-      .story-content > *:first-child {
-        margin-top: 0;
-      }
-
-      /* Add a subtle outline on hover to any block-level element in the editor,
-         giving the user a visual cue of the block they are about to edit. */
-      .story-content h1:hover,
-      .story-content h2:hover,
-      .story-content p:hover,
-      .story-content blockquote:hover {
-        outline: 1px solid rgba(128, 128, 128, 0.25);
-      }
-
-      /*
-        Custom styling for blockquotes to provide a clean, modern look
-        that avoids the "square" background and provides clear visual distinction.
-      */
-      .story-content blockquote {
-        font-style: italic;
-        color: inherit;
-        opacity: 0.9;
-        border-left: 3px solid rgba(128, 128, 128, 0.35);
-        padding-left: 1.5em;
-        margin: 1.5em 0;
-      }
-
-      /* When a paragraph is inside a blockquote, remove its default indentation
-         to prevent a "double indent" effect. */
-      .story-content blockquote p {
-        text-indent: 0;
-      }
-
 
       /* Styles for Find & Replace highlighting */
       .search-highlight {

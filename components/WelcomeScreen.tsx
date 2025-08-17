@@ -1,17 +1,38 @@
 
-import React, { useContext } from 'react';
+import React, { useContext, useRef } from 'react';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { AppLogoIcon, DocumentPlusIcon, FolderIcon } from './Icons';
 
 interface WelcomeScreenProps {
   onCreate: () => void;
-  onOpen: () => void;
+  onOpen: (fileContent: string) => void;
 }
 
 const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreate, onOpen }) => {
   const { theme, themeClasses } = useContext(ProjectContext);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const openButtonBg = 'bg-[#8b7b71]';
+
+  const handleOpenClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result;
+      if (typeof text === 'string') {
+        onOpen(text);
+      }
+    };
+    reader.readAsText(file);
+    // Reset file input to allow opening the same file again
+    event.target.value = '';
+  };
 
   return (
     <div className={`flex flex-col items-center justify-center h-screen w-full p-4 ${themeClasses.bg} ${themeClasses.text}`}>
@@ -40,12 +61,19 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreate, onOpen }) => {
               Create New Project
             </button>
             <button
-              onClick={onOpen}
+              onClick={handleOpenClick}
               className={`flex items-center justify-center w-full px-6 py-3 text-lg font-semibold rounded-lg ${openButtonBg} ${themeClasses.text} hover:opacity-90 transition-opacity`}
             >
               <FolderIcon className="w-6 h-6 mr-3" />
               Import Project File
             </button>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleFileSelect} 
+              className="hidden"
+              accept=".json,application/json"
+            />
         </div>
       </div>
     </div>
