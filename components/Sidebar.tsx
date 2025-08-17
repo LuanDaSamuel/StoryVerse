@@ -1,36 +1,8 @@
 import React, { useState, useContext } from 'react';
 import { NavLink } from 'react-router-dom';
-import { AppLogoIcon, HomeIcon, PlusIcon, SettingsIcon, LightbulbIcon, EyeIcon, CheckCircleIcon, LoadingIcon } from './Icons';
+import { AppLogoIcon, HomeIcon, PlusIcon, SettingsIcon, LightbulbIcon, EyeIcon } from './Icons';
 import SettingsModal from './SettingsModal';
 import { ProjectContext } from '../contexts/ProjectContext';
-
-const SaveStatusIndicator: React.FC = () => {
-    const { saveStatus, themeClasses } = useContext(ProjectContext);
-
-    const baseClasses = `flex items-center justify-center space-x-2 text-xs ${themeClasses.textSecondary}`;
-
-    if (saveStatus === 'saved') {
-        return null;
-    }
-
-    if (saveStatus === 'saving') {
-        return (
-            <div className={baseClasses}>
-                <LoadingIcon className="w-4 h-4 animate-spin" />
-                <span>Saving...</span>
-            </div>
-        );
-    }
-    
-    // 'unsaved'
-    return (
-        <div className={baseClasses}>
-            <span className="w-4 h-4 text-center">●</span>
-            <span>Unsaved changes</span>
-        </div>
-    );
-};
-
 
 const Sidebar: React.FC = () => {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -85,10 +57,7 @@ const Sidebar: React.FC = () => {
                         <SettingsIcon className="w-5 h-5" />
                         <span>Settings</span>
                     </button>
-                    <div className="mt-4 h-4">
-                      <SaveStatusIndicator />
-                    </div>
-                    <p className={`mt-2 text-xs text-center ${themeClasses.textSecondary}`}>
+                    <p className={`mt-6 text-xs text-center ${themeClasses.textSecondary}`}>
                         &copy; {new Date().getFullYear()} StoryVerse
                     </p>
                 </div>

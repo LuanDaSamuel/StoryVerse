@@ -67,25 +67,6 @@ export function useProjectFile() {
     };
     init();
   }, []);
-  
-  useEffect(() => {
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (hasUnsavedChanges.current) {
-        // This message is often ignored by modern browsers, which show a generic prompt instead.
-        // However, it's required for compatibility.
-        const message = 'Changes you made may not be saved.';
-        event.preventDefault();
-        event.returnValue = message;
-        return message;
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, []);
 
   const saveProject = useCallback(async (data: ProjectData, version: number) => {
     setSaveStatus('saving');
