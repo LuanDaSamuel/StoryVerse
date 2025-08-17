@@ -10,7 +10,7 @@ import { UploadIcon, BackIcon } from '../components/Icons';
 const DRAFT_KEY = 'storyverse-novel-draft';
 
 const CreateNovelPage: React.FC = () => {
-    const { projectData, setProjectData, themeClasses } = useContext(ProjectContext);
+    const { setProjectData, themeClasses } = useContext(ProjectContext);
     const navigate = useNavigate();
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
@@ -72,7 +72,7 @@ const CreateNovelPage: React.FC = () => {
     };
 
     const handleSubmit = () => {
-        if (!title || !projectData) return;
+        if (!title) return;
         const newChapterId = crypto.randomUUID();
         const now = new Date().toISOString();
         const newNovel: Novel = {
@@ -93,9 +93,12 @@ const CreateNovelPage: React.FC = () => {
             ...(coverImage && { coverImage }),
         };
 
-        setProjectData({
-            ...projectData,
-            novels: [...projectData.novels, newNovel],
+        setProjectData(currentData => {
+            if (!currentData) return null; // Should not happen if we are on this page
+            return {
+                ...currentData,
+                novels: [...currentData.novels, newNovel],
+            };
         });
         
         // Clear the draft from session storage after successful submission

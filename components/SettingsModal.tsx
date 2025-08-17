@@ -19,15 +19,18 @@ const themeOptions: { name: Theme; label: string; colors: string[] }[] = [
 ];
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
-  const { theme, setProjectData, projectData, downloadCopy, unlinkFile, themeClasses } = useContext(ProjectContext);
+  const { theme, setProjectData, downloadCopy, unlinkFile, themeClasses } = useContext(ProjectContext);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
-  if (!isOpen || !projectData) return null;
+  if (!isOpen) return null;
 
   const handleThemeChange = (newTheme: Theme) => {
-    setProjectData({
-      ...projectData,
-      settings: { ...projectData.settings, theme: newTheme },
+    setProjectData(currentData => {
+        if (!currentData) return null;
+        return {
+            ...currentData,
+            settings: { ...currentData.settings, theme: newTheme },
+        };
     });
   };
 

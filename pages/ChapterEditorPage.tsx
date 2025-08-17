@@ -321,7 +321,7 @@ const ChapterEditorPage: React.FC = () => {
         paragraphStyle: 'p',
         font: fontOptions[0].value,
         size: '18px',
-        lineHeight: '1.5',
+        paragraphSpacing: '1em',
     });
 
     const editorStyle = useMemo(() => {
@@ -366,12 +366,19 @@ const ChapterEditorPage: React.FC = () => {
     }, [projectData, novelId, chapterId]);
 
     const updateChapterField = useCallback((field: 'title' | 'content', value: string) => {
-        if (projectData && novelIndex !== -1 && chapterIndex !== -1) {
-            const updatedProjectData = { ...projectData };
+        if (novelIndex === -1 || chapterIndex === -1) return;
+
+        setProjectData(currentProjectData => {
+            if (!currentProjectData) return null;
+
+            const updatedProjectData = { ...currentProjectData };
             const updatedNovels = [...updatedProjectData.novels];
+            if (novelIndex >= updatedNovels.length) return currentProjectData;
+
             const updatedChapters = [...updatedNovels[novelIndex].chapters];
-            const originalChapter = updatedChapters[chapterIndex];
+            if (chapterIndex >= updatedChapters.length) return currentProjectData;
             
+            const originalChapter = updatedChapters[chapterIndex];
             let updatedChapter = { ...originalChapter };
             const now = new Date();
 
@@ -401,9 +408,9 @@ const ChapterEditorPage: React.FC = () => {
             updatedChapters[chapterIndex] = updatedChapter;
             updatedNovels[novelIndex] = { ...updatedNovels[novelIndex], chapters: updatedChapters };
             updatedProjectData.novels = updatedNovels;
-            setProjectData(updatedProjectData);
-        }
-    }, [projectData, novelIndex, chapterIndex, setProjectData]);
+            return updatedProjectData;
+        });
+    }, [novelIndex, chapterIndex, setProjectData]);
     
     const updateActiveFormats = useCallback(() => {
         setActiveFormats({
@@ -427,7 +434,7 @@ const ChapterEditorPage: React.FC = () => {
         if (!(element instanceof HTMLElement)) return;
 
         let detectedParagraphStyle = 'p';
-        let detectedLineHeight = '1.5';
+        let detectedParagraphSpacing = '1em';
         
         let blockElement: HTMLElement | null = element;
         while (blockElement && blockElement !== editorRef.current) {
@@ -435,14 +442,16 @@ const ChapterEditorPage: React.FC = () => {
             if (['p', 'h1', 'h2'].includes(tagName)) {
                 detectedParagraphStyle = tagName;
                 const styles = window.getComputedStyle(blockElement);
-                if (styles.lineHeight && styles.lineHeight !== 'normal') {
-                    const lh = parseFloat(styles.lineHeight);
-                    const fs = parseFloat(styles.fontSize);
-                    if (fs > 0) {
-                        const calculatedLh = Math.round((lh / fs) * 10) / 10;
-                         if ([1, 1.5, 2].includes(calculatedLh)) {
-                            detectedLineHeight = String(calculatedLh);
-                        }
+
+                if (styles.marginBottom) {
+                    const mbPx = parseFloat(styles.marginBottom);
+                    const fontPx = parseFloat(styles.fontSize);
+                    if (fontPx > 0) {
+                        const mbEm = mbPx / fontPx;
+                        if (mbEm < 0.75) detectedParagraphSpacing = '0.5em';
+                        else if (mbEm < 1.25) detectedParagraphSpacing = '1em';
+                        else if (mbEm < 1.75) detectedParagraphSpacing = '1.5em';
+                        else detectedParagraphSpacing = '2em';
                     }
                 }
                 break;
@@ -460,7 +469,7 @@ const ChapterEditorPage: React.FC = () => {
             paragraphStyle: detectedParagraphStyle,
             font: matchedFont,
             size: detectedSize,
-            lineHeight: detectedLineHeight,
+            paragraphSpacing: detectedParagraphSpacing,
         });
     }, []);
 
@@ -581,7 +590,7 @@ const ChapterEditorPage: React.FC = () => {
         });
     };
     
-    const applyLineHeight = (height: string) => {
+    const applyParagraphSpacing = (spacing: string) => {
         applyAndSaveFormat(() => {
             const selection = window.getSelection();
             if (!selection || selection.rangeCount === 0) return;
@@ -589,7 +598,7 @@ const ChapterEditorPage: React.FC = () => {
             if (node.nodeType === 3) node = node.parentNode!;
             while(node && node !== editorRef.current) {
                 if(node instanceof HTMLElement && ['P', 'H1', 'H2', 'DIV'].includes(node.tagName)) {
-                    node.style.lineHeight = height;
+                    node.style.marginBottom = spacing;
                     return;
                 }
                 node = node.parentNode!;
@@ -879,7 +888,7 @@ const ChapterEditorPage: React.FC = () => {
             }
         }
         handleSelectionChange();
-    }, [chapterId]);
+    }, [chapterId, chapter, handleSelectionChange]);
 
 
     useEffect(() => {
@@ -920,44 +929,50 @@ const ChapterEditorPage: React.FC = () => {
     }, [isFormatPanelOpen]);
     
     const handleReplaceAllInNovel = (find: string, replace: string) => {
-      if (!projectData || !novel || novelIndex === -1 || !find) {
-        return;
-      }
+        if (!find || novelIndex === -1) return;
 
-      const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const findRegex = new RegExp(escapeRegExp(find), 'gi');
-      const tempDiv = document.createElement('div');
+        setProjectData(currentData => {
+            if (!currentData) return null;
 
-      const getWordCount = (html: string) => {
-        if (!html) return 0;
-        tempDiv.innerHTML = html;
-        const text = tempDiv.textContent || "";
-        return text.trim().split(/\s+/).filter(Boolean).length;
-      };
+            const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const findRegex = new RegExp(escapeRegExp(find), 'gi');
+            const tempDiv = document.createElement('div');
 
-      const updatedNovels = [...projectData.novels];
-      let currentNovel = updatedNovels[novelIndex];
-      let changesMade = false;
+            const getWordCount = (html: string) => {
+                if (!html) return 0;
+                tempDiv.innerHTML = html;
+                const text = tempDiv.textContent || "";
+                return text.trim().split(/\s+/).filter(Boolean).length;
+            };
 
-      const updatedChapters = currentNovel.chapters.map(chap => {
-        const newContent = chap.content.replace(findRegex, replace);
-        if (newContent !== chap.content) {
-          changesMade = true;
-          return { 
-            ...chap, 
-            content: newContent, 
-            wordCount: getWordCount(newContent),
-            updatedAt: new Date().toISOString() 
-          };
-        }
-        return chap;
-      });
+            const updatedNovels = [...currentData.novels];
+            if (novelIndex >= updatedNovels.length) return currentData;
+            
+            let currentNovel = { ...updatedNovels[novelIndex] };
+            let changesMade = false;
 
-      if (changesMade) {
-        currentNovel = { ...currentNovel, chapters: updatedChapters };
-        updatedNovels[novelIndex] = currentNovel;
-        setProjectData({ ...projectData, novels: updatedNovels });
-      }
+            const updatedChapters = currentNovel.chapters.map(chap => {
+                const newContent = chap.content.replace(findRegex, replace);
+                if (newContent !== chap.content) {
+                    changesMade = true;
+                    return { 
+                        ...chap, 
+                        content: newContent, 
+                        wordCount: getWordCount(newContent),
+                        updatedAt: new Date().toISOString() 
+                    };
+                }
+                return chap;
+            });
+
+            if (changesMade) {
+                currentNovel = { ...currentNovel, chapters: updatedChapters };
+                updatedNovels[novelIndex] = currentNovel;
+                return { ...currentData, novels: updatedNovels };
+            }
+
+            return currentData;
+        });
     };
 
     if (!projectData || !novel || !chapter || !chapterId) {
@@ -1092,10 +1107,11 @@ const ChapterEditorPage: React.FC = () => {
                                             <option value="20px">20</option>
                                             <option value="24px">24</option>
                                         </ToolbarDropdown>
-                                        <ToolbarDropdown label="Line Spacing" value={currentFormat.lineHeight} onChange={(e) => applyLineHeight(e.target.value)}>
-                                            <option value="1">Single</option>
-                                            <option value="1.5">1.5</option>
-                                            <option value="2">Double</option>
+                                        <ToolbarDropdown label="Paragraph Spacing" value={currentFormat.paragraphSpacing} onChange={(e) => applyParagraphSpacing(e.target.value)}>
+                                            <option value="0.5em">0.5</option>
+                                            <option value="1em">1.0</option>
+                                            <option value="1.5em">1.5</option>
+                                            <option value="2em">2.0</option>
                                         </ToolbarDropdown>
                                     </div>
                                     <div>

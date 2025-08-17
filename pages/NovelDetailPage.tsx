@@ -47,31 +47,38 @@ const NovelDetailPage: React.FC = () => {
     }, [novel?.description]);
     
     useEffect(() => {
-        if (!projectData || !novel || novelIndex === -1) return;
+        if (novelIndex === -1) return;
 
         let needsUpdate = false;
         const tempDiv = document.createElement('div');
 
-        const updatedChapters = novel.chapters.map(chapter => {
-            if (chapter.content && (!chapter.wordCount || chapter.wordCount === 0)) {
-                tempDiv.innerHTML = chapter.content;
-                const text = tempDiv.textContent || "";
-                const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
-                if (wordCount > 0) {
-                    needsUpdate = true;
-                    return { ...chapter, wordCount };
-                }
-            }
-            return chapter;
-        });
+        setProjectData(currentData => {
+            if (!currentData) return null;
+            const currentNovel = currentData.novels[novelIndex];
+            if (!currentNovel) return currentData;
 
-        if (needsUpdate) {
-            const updatedProjectData = { ...projectData };
-            const updatedNovels = [...updatedProjectData.novels];
-            updatedNovels[novelIndex] = { ...novel, chapters: updatedChapters };
-            setProjectData(updatedProjectData);
-        }
-    }, [novel, novelIndex, projectData, setProjectData]);
+            const updatedChapters = currentNovel.chapters.map(chapter => {
+                if (chapter.content && (!chapter.wordCount || chapter.wordCount === 0)) {
+                    tempDiv.innerHTML = chapter.content;
+                    const text = tempDiv.textContent || "";
+                    const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+                    if (wordCount > 0) {
+                        needsUpdate = true;
+                        return { ...chapter, wordCount };
+                    }
+                }
+                return chapter;
+            });
+
+            if (needsUpdate) {
+                const updatedNovels = [...currentData.novels];
+                updatedNovels[novelIndex] = { ...currentNovel, chapters: updatedChapters };
+                return { ...currentData, novels: updatedNovels };
+            }
+
+            return currentData;
+        });
+    }, [novelIndex, setProjectData]);
 
     const handleFileSelectForDocx = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
@@ -83,7 +90,7 @@ const NovelDetailPage: React.FC = () => {
     };
 
     const handleDocxImport = async () => {
-        if (!projectData || !novel || novelIndex === -1 || !pendingFiles) return;
+        if (!pendingFiles || novelIndex === -1) return;
         setIsDocxConfirmOpen(false);
 
         const sortedFiles = Array.from(pendingFiles).sort((a, b) =>
@@ -153,9 +160,13 @@ const NovelDetailPage: React.FC = () => {
                 chapter.wordCount = text.trim().split(/\s+/).filter(Boolean).length;
             });
 
-            const updatedNovels = [...projectData.novels];
-            updatedNovels[novelIndex] = { ...novel, chapters: newChapters };
-            setProjectData({ ...projectData, novels: updatedNovels });
+            setProjectData(currentData => {
+                if (!currentData) return null;
+                const updatedNovels = [...currentData.novels];
+                if (novelIndex >= updatedNovels.length) return currentData;
+                updatedNovels[novelIndex] = { ...updatedNovels[novelIndex], chapters: newChapters };
+                return { ...currentData, novels: updatedNovels };
+            });
         }
 
         setPendingFiles(null);
@@ -171,52 +182,74 @@ const NovelDetailPage: React.FC = () => {
     
     const handleCoverImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (file) {
+        if (file && novelIndex !== -1) {
             const reader = new FileReader();
             reader.onloadend = () => {
-                const updatedNovels = [...projectData.novels];
-                updatedNovels[novelIndex].coverImage = reader.result as string;
-                setProjectData({ ...projectData, novels: updatedNovels });
+                setProjectData(currentData => {
+                    if (!currentData) return null;
+                    const updatedNovels = [...currentData.novels];
+                    if (novelIndex >= updatedNovels.length) return currentData;
+                    updatedNovels[novelIndex].coverImage = reader.result as string;
+                    return { ...currentData, novels: updatedNovels };
+                });
             };
             reader.readAsDataURL(file);
         }
     };
 
     const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        if (!projectData) return;
+        if (novelIndex === -1) return;
         
         e.target.style.height = 'auto';
         e.target.style.height = `${e.target.scrollHeight}px`;
         
-        const updatedNovels = [...projectData.novels];
-        updatedNovels[novelIndex].description = e.target.value;
-        setProjectData({ ...projectData, novels: updatedNovels });
+        const newDescription = e.target.value;
+        setProjectData(currentData => {
+            if (!currentData) return null;
+            const updatedNovels = [...currentData.novels];
+            if (novelIndex >= updatedNovels.length) return currentData;
+            updatedNovels[novelIndex].description = newDescription;
+            return { ...currentData, novels: updatedNovels };
+        });
     };
 
     const handleTagClick = (tag: string) => {
-        const currentTags = novel.tags;
-        let newTags;
-        if (currentTags.includes(tag)) {
-            newTags = currentTags.filter(t => t !== tag);
-        } else {
-            if (currentTags.length < 6) {
+        if (novelIndex === -1) return;
+        
+        setProjectData(currentData => {
+            if (!currentData) return null;
+            const updatedNovels = [...currentData.novels];
+            if (novelIndex >= updatedNovels.length) return currentData;
+            
+            const currentNovel = updatedNovels[novelIndex];
+            const currentTags = currentNovel.tags;
+            let newTags;
+
+            if (currentTags.includes(tag)) {
+                newTags = currentTags.filter(t => t !== tag);
+            } else if (currentTags.length < 6) {
                 newTags = [...currentTags, tag];
             } else {
-                return;
+                return currentData; // No change
             }
-        }
-        const updatedNovels = [...projectData.novels];
-        updatedNovels[novelIndex].tags = newTags;
-        setProjectData({ ...projectData, novels: updatedNovels });
+            
+            updatedNovels[novelIndex] = { ...currentNovel, tags: newTags };
+            return { ...currentData, novels: updatedNovels };
+        });
     };
 
     const confirmDeleteNovel = () => {
-        const updatedNovels = projectData.novels.filter(n => n.id !== novelId);
-        setProjectData({ ...projectData, novels: updatedNovels });
+        setProjectData(currentData => {
+            if (!currentData) return null;
+            const updatedNovels = currentData.novels.filter(n => n.id !== novelId);
+            return { ...currentData, novels: updatedNovels };
+        });
         navigate('/');
     };
 
     const handleAddChapter = () => {
+        if (novelIndex === -1) return;
+        
         const newChapterId = crypto.randomUUID();
         const now = new Date().toISOString();
         const newChapter: Chapter = {
@@ -228,18 +261,31 @@ const NovelDetailPage: React.FC = () => {
             updatedAt: now,
             history: [],
         };
-        const updatedNovels = [...projectData.novels];
-        updatedNovels[novelIndex].chapters.push(newChapter);
-        setProjectData({ ...projectData, novels: updatedNovels });
+
+        setProjectData(currentData => {
+            if (!currentData) return null;
+            const updatedNovels = [...currentData.novels];
+            if (novelIndex >= updatedNovels.length) return currentData;
+            updatedNovels[novelIndex].chapters.push(newChapter);
+            return { ...currentData, novels: updatedNovels };
+        });
+        
         navigate(`/novel/${novelId}/edit/${newChapterId}`);
     };
 
     const handleDeleteChapter = () => {
-        if (!projectData || !novel || !chapterToDelete) return;
-        const updatedChapters = novel.chapters.filter(c => c.id !== chapterToDelete.id);
-        const updatedNovels = [...projectData.novels];
-        updatedNovels[novelIndex] = { ...novel, chapters: updatedChapters };
-        setProjectData({ ...projectData, novels: updatedNovels });
+        if (!chapterToDelete || novelIndex === -1) return;
+        
+        setProjectData(currentData => {
+            if (!currentData) return null;
+            const updatedNovels = [...currentData.novels];
+            if (novelIndex >= updatedNovels.length) return currentData;
+            const currentNovel = updatedNovels[novelIndex];
+            const updatedChapters = currentNovel.chapters.filter(c => c.id !== chapterToDelete.id);
+            updatedNovels[novelIndex] = { ...currentNovel, chapters: updatedChapters };
+            return { ...currentData, novels: updatedNovels };
+        });
+
         setChapterToDelete(null);
     };
 

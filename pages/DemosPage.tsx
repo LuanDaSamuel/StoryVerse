@@ -209,7 +209,7 @@ const DemosPage: React.FC = () => {
         paragraphStyle: 'p',
         font: fontOptions[0].value,
         size: '18px',
-        lineHeight: '1.5',
+        paragraphSpacing: '1em',
     });
 
     const sketches = useMemo(() => projectData?.sketches || [], [projectData?.sketches]);
@@ -253,7 +253,6 @@ const DemosPage: React.FC = () => {
     }, [selectedSketch]);
 
     const handleCreateSketch = () => {
-        if (!projectData) return;
         const now = new Date().toISOString();
         const newSketch: Sketch = {
             id: crypto.randomUUID(),
@@ -263,8 +262,12 @@ const DemosPage: React.FC = () => {
             updatedAt: now,
         };
         
-        const updatedSketches = [newSketch, ...sketches];
-        setProjectData({ ...projectData, sketches: updatedSketches });
+        setProjectData(currentData => {
+            if (!currentData) return null;
+            const updatedSketches = [newSketch, ...(currentData.sketches || [])];
+            return { ...currentData, sketches: updatedSketches };
+        });
+
         setSelectedSketchId(newSketch.id);
         setIsOutlineModalOpen(false);
     };
@@ -276,36 +279,40 @@ const DemosPage: React.FC = () => {
 
     const handleDeleteSketch = (e: React.MouseEvent, sketchId: string) => {
         e.stopPropagation();
-        if (!projectData) return;
-        const updatedSketches = sketches.filter(s => s.id !== sketchId);
-        
-        if (selectedSketchId === sketchId) {
-            setSelectedSketchId(updatedSketches.length > 0 ? updatedSketches[0].id : null);
-        }
-        
-        setProjectData({ ...projectData, sketches: updatedSketches });
+        setProjectData(currentData => {
+            if (!currentData) return null;
+            const updatedSketches = (currentData.sketches || []).filter(s => s.id !== sketchId);
+            
+            if (selectedSketchId === sketchId) {
+                setSelectedSketchId(updatedSketches.length > 0 ? updatedSketches[0].id : null);
+            }
+            return { ...currentData, sketches: updatedSketches };
+        });
     };
 
     const handleUpdateSketch = (field: 'title' | 'content', value: string) => {
-        if (!projectData || !selectedSketchId) return;
+        if (!selectedSketchId) return;
 
-        const sketchIndex = sketches.findIndex(s => s.id === selectedSketchId);
-        if (sketchIndex === -1) return;
-        
-        const updatedSketches = [...sketches];
-        const updatedSketch = {
-            ...updatedSketches[sketchIndex],
-            [field]: value,
-            updatedAt: new Date().toISOString(),
-        };
+        setProjectData(currentData => {
+            if (!currentData) return null;
+            
+            const sketchIndex = (currentData.sketches || []).findIndex(s => s.id === selectedSketchId);
+            if (sketchIndex === -1) return currentData;
+            
+            const updatedSketches = [...currentData.sketches];
+            updatedSketches[sketchIndex] = {
+                ...updatedSketches[sketchIndex],
+                [field]: value,
+                updatedAt: new Date().toISOString(),
+            };
 
-        updatedSketches[sketchIndex] = updatedSketch;
-        setProjectData({ ...projectData, sketches: updatedSketches });
+            return { ...currentData, sketches: updatedSketches };
+        });
     };
 
     const handleDocxImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (!file || !projectData) {
+        if (!file) {
             e.target.value = '';
             return;
         }
@@ -333,9 +340,12 @@ const DemosPage: React.FC = () => {
                 updatedAt: now,
             };
             
-            const updatedSketches = [newSketch, ...sketches];
-            setProjectData({ ...projectData, sketches: updatedSketches });
-            setSelectedSketchId(newSketch.id);
+            setProjectData(currentData => {
+                if (!currentData) return null;
+                const updatedSketches = [newSketch, ...(currentData.sketches || [])];
+                setSelectedSketchId(newSketch.id);
+                return { ...currentData, sketches: updatedSketches };
+            });
 
         } catch (error) {
             console.error(`Error processing file ${file.name}:`, error);
@@ -369,7 +379,7 @@ const DemosPage: React.FC = () => {
         if (!(element instanceof HTMLElement)) return;
 
         let detectedParagraphStyle = 'p';
-        let detectedLineHeight = '1.5';
+        let detectedParagraphSpacing = '1em';
         
         let blockElement: HTMLElement | null = element;
         while (blockElement && blockElement !== editorRef.current) {
@@ -377,14 +387,15 @@ const DemosPage: React.FC = () => {
             if (['p', 'h1', 'h2'].includes(tagName)) {
                 detectedParagraphStyle = tagName;
                 const styles = window.getComputedStyle(blockElement);
-                if (styles.lineHeight && styles.lineHeight !== 'normal') {
-                    const lh = parseFloat(styles.lineHeight);
-                    const fs = parseFloat(styles.fontSize);
-                    if (fs > 0) {
-                        const calculatedLh = Math.round((lh / fs) * 10) / 10;
-                         if ([1, 1.5, 2].includes(calculatedLh)) {
-                            detectedLineHeight = String(calculatedLh);
-                        }
+                if (styles.marginBottom) {
+                    const mbPx = parseFloat(styles.marginBottom);
+                    const fontPx = parseFloat(styles.fontSize);
+                    if (fontPx > 0) {
+                        const mbEm = mbPx / fontPx;
+                        if (mbEm < 0.75) detectedParagraphSpacing = '0.5em';
+                        else if (mbEm < 1.25) detectedParagraphSpacing = '1em';
+                        else if (mbEm < 1.75) detectedParagraphSpacing = '1.5em';
+                        else detectedParagraphSpacing = '2em';
                     }
                 }
                 break;
@@ -402,7 +413,7 @@ const DemosPage: React.FC = () => {
             paragraphStyle: detectedParagraphStyle,
             font: matchedFont,
             size: detectedSize,
-            lineHeight: detectedLineHeight,
+            paragraphSpacing: detectedParagraphSpacing,
         });
     }, []);
 
@@ -503,7 +514,7 @@ const DemosPage: React.FC = () => {
         });
     };
     
-    const applyLineHeight = (height: string) => {
+    const applyParagraphSpacing = (spacing: string) => {
         applyAndSaveFormat(() => {
             const selection = window.getSelection();
             if (!selection || selection.rangeCount === 0) return;
@@ -511,7 +522,7 @@ const DemosPage: React.FC = () => {
             if (node.nodeType === 3) node = node.parentNode!;
             while(node && node !== editorRef.current) {
                 if(node instanceof HTMLElement && ['P', 'H1', 'H2', 'DIV'].includes(node.tagName)) {
-                    node.style.lineHeight = height;
+                    node.style.marginBottom = spacing;
                     return;
                 }
                 node = node.parentNode!;
@@ -759,10 +770,11 @@ const DemosPage: React.FC = () => {
                                         <option value="20px">20</option>
                                         <option value="24px">24</option>
                                     </ToolbarDropdown>
-                                    <ToolbarDropdown label="Line Spacing" value={currentFormat.lineHeight} onChange={(e) => applyLineHeight(e.target.value)}>
-                                        <option value="1">Single</option>
-                                        <option value="1.5">1.5</option>
-                                        <option value="2">Double</option>
+                                    <ToolbarDropdown label="Paragraph Spacing" value={currentFormat.paragraphSpacing} onChange={(e) => applyParagraphSpacing(e.target.value)}>
+                                        <option value="0.5em">0.5</option>
+                                        <option value="1em">1.0</option>
+                                        <option value="1.5em">1.5</option>
+                                        <option value="2em">2.0</option>
                                     </ToolbarDropdown>
                                 </div>
                                 <div>

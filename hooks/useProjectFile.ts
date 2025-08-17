@@ -18,6 +18,14 @@ export function useProjectFile() {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
   const hasUnsavedChanges = useRef(false);
   const saveTimeout = useRef<number | null>(null);
+  
+  // Use a ref to hold the latest project data for access in callbacks
+  // without needing to add projectData to dependency arrays.
+  const projectDataRef = useRef(projectData);
+  useEffect(() => {
+    projectDataRef.current = projectData;
+  }, [projectData]);
+
 
   useEffect(() => {
     const init = async () => {
@@ -89,7 +97,6 @@ export function useProjectFile() {
     };
   }, []);
 
-
   const saveProject = useCallback(async (data: ProjectData) => {
     setSaveStatus('saving');
     try {
@@ -101,6 +108,33 @@ export function useProjectFile() {
       setSaveStatus('unsaved');
     }
   }, []);
+  
+  // This function forces a save if there are pending changes.
+  // It's used before critical operations like unlinking or downloading.
+  const forceSave = useCallback(async () => {
+    if (saveTimeout.current) {
+        clearTimeout(saveTimeout.current);
+        saveTimeout.current = null;
+    }
+    if (hasUnsavedChanges.current && projectDataRef.current) {
+        await saveProject(projectDataRef.current);
+    }
+  }, [saveProject]);
+  
+  // Best-effort save when the user navigates away or closes the tab.
+  useEffect(() => {
+      const handlePageHide = () => {
+          if (hasUnsavedChanges.current && projectDataRef.current) {
+              // This is a fire-and-forget call. We can't `await` in this event handler.
+              saveProject(projectDataRef.current);
+          }
+      };
+      window.addEventListener('pagehide', handlePageHide);
+      return () => {
+          window.removeEventListener('pagehide', handlePageHide);
+      };
+  }, [saveProject]);
+
 
   useEffect(() => {
     if (status === 'ready' && projectData && hasUnsavedChanges.current) {
@@ -121,12 +155,14 @@ export function useProjectFile() {
   };
 
   const createProject = useCallback(async () => {
-    const theme = projectData?.settings?.theme || 'book';
-    const newProjectData = { ...defaultProjectData, settings: { theme } };
-    await saveProject(newProjectData);
-    setProjectData(newProjectData);
-    setStatus('ready');
-  }, [projectData, saveProject]);
+    setProjectData(currentData => {
+        const theme = currentData?.settings?.theme || 'book';
+        const newProjectData = { ...defaultProjectData, settings: { theme } };
+        saveProject(newProjectData);
+        setStatus('ready');
+        return newProjectData;
+    });
+  }, [saveProject]);
 
   const importProject = useCallback(async (fileContent: string) => {
     try {
@@ -166,10 +202,13 @@ export function useProjectFile() {
     }
   }, [saveProject]);
 
-  const downloadCopy = useCallback(() => {
-    if (!projectData) return;
+  const downloadCopy = useCallback(async () => {
+    await forceSave();
+    const dataToDownload = projectDataRef.current;
+    if (!dataToDownload) return;
+
     try {
-      const blob = new Blob([JSON.stringify(projectData, null, 2)], { type: 'application/json' });
+      const blob = new Blob([JSON.stringify(dataToDownload, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -182,13 +221,18 @@ export function useProjectFile() {
       console.error('Failed to download a copy', error);
       alert('Failed to download project copy.');
     }
-  }, [projectData]);
+  }, [forceSave]);
 
   const deleteProject = useCallback(async () => {
+    // To prevent data loss as reported by user, we ensure any final changes
+    // are saved before the project is unlinked and deleted from the browser.
+    await forceSave();
+    
+    hasUnsavedChanges.current = false;
     setProjectData(null);
     await del(PROJECT_DATA_KEY);
     setStatus('welcome');
-  }, []);
+  }, [forceSave]);
 
   return { 
     projectData, 
