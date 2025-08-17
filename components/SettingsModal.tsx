@@ -2,7 +2,7 @@ import React, { useContext, useState } from 'react';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { Theme } from '../types';
 import { THEME_CONFIG } from '../constants';
-import { CloseIcon } from './Icons';
+import { CloseIcon, DownloadIcon, TrashIcon } from './Icons';
 import ConfirmModal from './ConfirmModal';
 
 interface SettingsModalProps {
@@ -19,7 +19,7 @@ const themeOptions: { name: Theme; label: string; colors: string[] }[] = [
 ];
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
-  const { theme, setProjectData, downloadCopy, unlinkFile, themeClasses } = useContext(ProjectContext);
+  const { theme, setProjectData, exportProject, unlinkFile, themeClasses } = useContext(ProjectContext);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
   if (!isOpen) return null;
@@ -92,16 +92,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
             </p>
             <div className="flex space-x-4">
               <button
-                onClick={downloadCopy}
-                className={`px-6 py-2 font-semibold rounded-lg ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-80 transition-opacity`}
+                onClick={exportProject}
+                className={`flex items-center space-x-2 px-4 py-2 font-semibold rounded-lg ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-80 transition-opacity`}
               >
-                Download a Copy
+                <DownloadIcon className="w-5 h-5" />
+                <span>Export Project File</span>
               </button>
               <button
                 onClick={() => setIsConfirmOpen(true)}
-                className={`px-6 py-2 font-semibold rounded-lg ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-80 transition-opacity`}
+                className={`flex items-center space-x-2 px-4 py-2 font-semibold rounded-lg ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-80 transition-opacity`}
               >
-                Unlink File
+                <TrashIcon className="w-5 h-5" />
+                <span>Unlink File</span>
               </button>
             </div>
           </div>

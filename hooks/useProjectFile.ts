@@ -16,11 +16,12 @@ export function useProjectFile() {
   const [projectData, setProjectData] = useState<ProjectData | null>(null);
   const [status, setStatus] = useState<FileStatus>('loading');
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
+  
   const hasUnsavedChanges = useRef(false);
   const saveTimeout = useRef<number | null>(null);
+  const dataVersion = useRef(0);
+  const lastSavedVersion = useRef(0);
   
-  // Use a ref to hold the latest project data for access in callbacks
-  // without needing to add projectData to dependency arrays.
   const projectDataRef = useRef(projectData);
   useEffect(() => {
     projectDataRef.current = projectData;
@@ -35,18 +36,15 @@ export function useProjectFile() {
           let needsUpdate = false;
           const tempDiv = document.createElement('div');
 
-          // Iterate through all novels and chapters to ensure word counts are accurate.
           data.novels.forEach(novel => {
             if (novel.chapters && Array.isArray(novel.chapters)) {
               novel.chapters.forEach(chapter => {
                 const oldWordCount = chapter.wordCount || 0;
                 
-                // Use a temporary element to strip HTML and get plain text
                 tempDiv.innerHTML = chapter.content || '';
                 const text = tempDiv.textContent || "";
                 const newWordCount = text.trim().split(/\s+/).filter(Boolean).length;
 
-                // If the count is different, update it.
                 if (oldWordCount !== newWordCount) {
                   chapter.wordCount = newWordCount;
                   needsUpdate = true;
@@ -55,13 +53,11 @@ export function useProjectFile() {
             }
           });
           
-          // Migration check for the 'sketches' property
           if (!data.sketches) {
             data.sketches = [];
             needsUpdate = true;
           }
 
-          // If any counts were updated, save the corrected data back to the database.
           if (needsUpdate) {
             await set(PROJECT_DATA_KEY, data);
           }
@@ -79,12 +75,10 @@ export function useProjectFile() {
     init();
   }, []);
   
-  // Effect to warn user before leaving with unsaved changes.
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       if (hasUnsavedChanges.current) {
         event.preventDefault();
-        // Modern browsers show a generic message, but setting returnValue is required.
         event.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
         return event.returnValue;
       }
@@ -97,36 +91,39 @@ export function useProjectFile() {
     };
   }, []);
 
-  const saveProject = useCallback(async (data: ProjectData) => {
+  const saveProject = useCallback(async (data: ProjectData, version: number) => {
     setSaveStatus('saving');
     try {
       await set(PROJECT_DATA_KEY, data);
-      hasUnsavedChanges.current = false;
-      setSaveStatus('saved');
+      lastSavedVersion.current = version;
+      
+      // Only mark as 'saved' if the version we just saved is still the latest version.
+      // If they don't match, it means a new edit occurred while we were saving,
+      // and another save has already been scheduled.
+      if (dataVersion.current === lastSavedVersion.current) {
+        hasUnsavedChanges.current = false;
+        setSaveStatus('saved');
+      }
     } catch (error) {
       console.error('Error saving project to DB:', error);
       setSaveStatus('unsaved');
     }
   }, []);
   
-  // This function forces a save if there are pending changes.
-  // It's used before critical operations like unlinking or downloading.
   const forceSave = useCallback(async () => {
     if (saveTimeout.current) {
         clearTimeout(saveTimeout.current);
         saveTimeout.current = null;
     }
     if (hasUnsavedChanges.current && projectDataRef.current) {
-        await saveProject(projectDataRef.current);
+        await saveProject(projectDataRef.current, dataVersion.current);
     }
   }, [saveProject]);
   
-  // Best-effort save when the user navigates away or closes the tab.
   useEffect(() => {
       const handlePageHide = () => {
           if (hasUnsavedChanges.current && projectDataRef.current) {
-              // This is a fire-and-forget call. We can't `await` in this event handler.
-              saveProject(projectDataRef.current);
+              saveProject(projectDataRef.current, dataVersion.current);
           }
       };
       window.addEventListener('pagehide', handlePageHide);
@@ -139,9 +136,15 @@ export function useProjectFile() {
   useEffect(() => {
     if (status === 'ready' && projectData && hasUnsavedChanges.current) {
       if (saveTimeout.current) clearTimeout(saveTimeout.current);
+      
+      const versionToSave = dataVersion.current;
       saveTimeout.current = window.setTimeout(() => {
-        saveProject(projectData);
-      }, 1500); // Debounce save
+        // Use the ref for data to ensure we save the absolute latest version,
+        // even if another update happened since this effect ran.
+        if (projectDataRef.current) {
+            saveProject(projectDataRef.current, versionToSave);
+        }
+      }, 1500);
     }
     return () => {
       if (saveTimeout.current) clearTimeout(saveTimeout.current);
@@ -149,27 +152,32 @@ export function useProjectFile() {
   }, [projectData, status, saveProject]);
 
   const setProjectDataWithSave = (updater: React.SetStateAction<ProjectData | null>) => {
+    dataVersion.current++;
     hasUnsavedChanges.current = true;
     setSaveStatus('unsaved');
     setProjectData(updater);
   };
 
   const createProject = useCallback(async () => {
-    setProjectData(currentData => {
-        const theme = currentData?.settings?.theme || 'book';
-        const newProjectData = { ...defaultProjectData, settings: { theme } };
-        saveProject(newProjectData);
-        setStatus('ready');
-        return newProjectData;
-    });
-  }, [saveProject]);
+    const theme = projectData?.settings?.theme || 'book';
+    const newProjectData = { ...defaultProjectData, settings: { theme } };
+    
+    dataVersion.current++;
+    lastSavedVersion.current = dataVersion.current;
+    
+    await set(PROJECT_DATA_KEY, newProjectData);
+    
+    setProjectData(newProjectData);
+    setStatus('ready');
+    setSaveStatus('saved');
+    hasUnsavedChanges.current = false;
+  }, [projectData?.settings?.theme]);
 
   const importProject = useCallback(async (fileContent: string) => {
     try {
       const data: ProjectData = JSON.parse(fileContent);
       if (data && data.settings && Array.isArray(data.novels)) {
         
-        // Recalculate word counts for all chapters on import
         const tempDiv = document.createElement('div');
         data.novels.forEach(novel => {
             if (novel.chapters && Array.isArray(novel.chapters)) {
@@ -185,14 +193,18 @@ export function useProjectFile() {
             }
         });
 
-        // Migration check for sketches on import
         if (!data.sketches) {
           data.sketches = [];
         }
 
-        await saveProject(data);
+        dataVersion.current++;
+        lastSavedVersion.current = dataVersion.current;
+        await set(PROJECT_DATA_KEY, data);
+
         setProjectData(data);
         setStatus('ready');
+        setSaveStatus('saved');
+        hasUnsavedChanges.current = false;
       } else {
         throw new Error('Invalid project file format.');
       }
@@ -200,9 +212,9 @@ export function useProjectFile() {
       console.error('Error importing project file:', error);
       alert('Failed to import file. It may be corrupted or not a valid StoryVerse project file.');
     }
-  }, [saveProject]);
+  }, []);
 
-  const downloadCopy = useCallback(async () => {
+  const exportProject = useCallback(async () => {
     await forceSave();
     const dataToDownload = projectDataRef.current;
     if (!dataToDownload) return;
@@ -218,14 +230,12 @@ export function useProjectFile() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Failed to download a copy', error);
-      alert('Failed to download project copy.');
+      console.error('Failed to export project file', error);
+      alert('Failed to export project file.');
     }
   }, [forceSave]);
 
   const deleteProject = useCallback(async () => {
-    // To prevent data loss as reported by user, we ensure any final changes
-    // are saved before the project is unlinked and deleted from the browser.
     await forceSave();
     
     hasUnsavedChanges.current = false;
@@ -241,7 +251,7 @@ export function useProjectFile() {
     saveStatus,
     createProject, 
     importProject, 
-    downloadCopy, 
+    exportProject, 
     deleteProject,
     saveProject 
   };

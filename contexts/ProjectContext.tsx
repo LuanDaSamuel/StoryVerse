@@ -4,9 +4,9 @@ import { ProjectData, Theme, ThemeConfig, SaveStatus } from '../types';
 interface ProjectContextType {
   projectData: ProjectData | null;
   setProjectData: React.Dispatch<React.SetStateAction<ProjectData | null>>;
-  downloadCopy: () => void;
+  exportProject: () => void;
   unlinkFile: () => void; // This will be mapped to deleteProject for compatibility
-  saveProject: (data: ProjectData) => Promise<void>;
+  saveProject: (data: ProjectData, version: number) => Promise<void>;
   theme: Theme;
   themeClasses: ThemeConfig;
   saveStatus: SaveStatus;
@@ -15,7 +15,7 @@ interface ProjectContextType {
 export const ProjectContext = createContext<ProjectContextType>({
   projectData: null,
   setProjectData: () => {},
-  downloadCopy: () => {},
+  exportProject: () => {},
   unlinkFile: () => {},
   saveProject: async () => {},
   theme: 'dark',
