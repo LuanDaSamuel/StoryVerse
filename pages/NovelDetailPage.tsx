@@ -111,7 +111,7 @@ const NovelDetailPage: React.FC = () => {
                 const { value: html } = await mammoth.convertToHtml({ arrayBuffer }, { styleMap });
                 
                 // Clean the HTML by removing empty paragraphs which can mess with styling.
-                const cleanedHtml = html.replace(/<p>\s*(<br\s*\/?>)?\s*<\/p>/gi, '');
+                const cleanedHtml = html.replace(/<p>(\s|&nbsp;|<br\s*\/?>)*<\/p>/gi, '');
 
                 const headingRegex = /<h[23][^>]*>.*?<\/h[23]>/g;
                 const matches = [...cleanedHtml.matchAll(headingRegex)];
