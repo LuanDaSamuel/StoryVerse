@@ -1,4 +1,5 @@
 
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ProjectData, FileStatus, SaveStatus } from '../types';
 import { get, set, del } from 'idb-keyval';
@@ -128,21 +129,6 @@ export function useProjectFile() {
     }
   }, [saveProject]);
   
-  useEffect(() => {
-      const handlePageHide = () => {
-          // This is a best-effort attempt to save on page exit.
-          // It's not guaranteed to complete.
-          if (hasUnsavedChanges.current && projectDataRef.current) {
-              saveProject(projectDataRef.current, dataVersion.current);
-          }
-      };
-      window.addEventListener('pagehide', handlePageHide);
-      return () => {
-          window.removeEventListener('pagehide', handlePageHide);
-      };
-  }, [saveProject]);
-
-
   useEffect(() => {
     if (status === 'ready' && projectData && hasUnsavedChanges.current) {
       if (saveTimeout.current) clearTimeout(saveTimeout.current);

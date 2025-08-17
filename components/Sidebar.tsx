@@ -7,15 +7,10 @@ import { ProjectContext } from '../contexts/ProjectContext';
 const SaveStatusIndicator: React.FC = () => {
     const { saveStatus, themeClasses } = useContext(ProjectContext);
 
-    const baseClasses = `flex items-center space-x-2 text-xs ${themeClasses.textSecondary}`;
+    const baseClasses = `flex items-center justify-center space-x-2 text-xs ${themeClasses.textSecondary}`;
 
     if (saveStatus === 'saved') {
-        return (
-            <div className={`${baseClasses} text-green-500`}>
-                <CheckCircleIcon className="w-4 h-4" />
-                <span>All changes saved</span>
-            </div>
-        );
+        return null;
     }
 
     if (saveStatus === 'saving') {
@@ -90,7 +85,7 @@ const Sidebar: React.FC = () => {
                         <SettingsIcon className="w-5 h-5" />
                         <span>Settings</span>
                     </button>
-                    <div className="mt-4 text-center">
+                    <div className="mt-4 h-4">
                       <SaveStatusIndicator />
                     </div>
                     <p className={`mt-2 text-xs text-center ${themeClasses.textSecondary}`}>
