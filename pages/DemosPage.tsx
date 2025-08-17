@@ -2,7 +2,7 @@ import React, { useState, useContext, useEffect, useMemo, useRef, useCallback } 
 import { useNavigate } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { Sketch } from '../types';
-import { UploadIcon, PlusIcon, TrashIcon, LightbulbIcon, ChevronDownIcon, TextIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, Bars3Icon, CloseIcon, ListBulletIcon, HomeIcon, SearchIcon, DownloadIcon, ChartBarIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon, BlockquoteIcon, OrderedListIcon, ChevronLeftIcon } from '../components/Icons';
+import { UploadIcon, PlusIcon, TrashIcon, LightbulbIcon, ChevronDownIcon, TextIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, Bars3Icon, CloseIcon, ListBulletIcon, HomeIcon, SearchIcon, DownloadIcon, ChartBarIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon, BlockquoteIcon, OrderedListIcon, ChevronLeftIcon, ChevronRightIcon } from '../components/Icons';
 import { enhanceHtml, enhancePlainText } from '../constants';
 import { THEME_CONFIG } from '../constants';
 import * as mammoth from 'mammoth';
@@ -487,6 +487,19 @@ const DemosPage: React.FC = () => {
 
     return (
         <div className={`flex flex-col h-screen ${themeClasses.bg} font-sans transition-all duration-300 ${isDistractionFree ? 'is-distraction-free' : ''}`}>
+            {!isOutlineSidebarOpen && (
+                <div className="fixed top-0 left-0 h-full z-40 flex items-center">
+                    <button
+                        onClick={() => setIsOutlineSidebarOpen(true)}
+                        className={`pl-2 pr-1 py-3 bg-stone-900/70 backdrop-blur-sm border-y border-r border-white/10 rounded-r-lg text-white/70 hover:bg-stone-800/70 transition-colors ${!selectedSketchId ? 'hidden' : ''}`}
+                        aria-label="Show document outline"
+                        disabled={!selectedSketchId}
+                    >
+                        <ChevronRightIcon className="w-5 h-5" />
+                    </button>
+                </div>
+            )}
+            
              <div className={`fixed top-0 left-0 h-full z-40 flex items-start transition-transform duration-300 ease-in-out ${isOutlineSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
                 <div className={`w-64 h-full bg-stone-900/80 border-r border-white/10 backdrop-blur-sm flex flex-col ${isDistractionFree ? 'pt-4' : 'pt-16'}`}>
                     <div className="p-4 border-b border-white/10 flex justify-between items-center flex-shrink-0">
@@ -564,8 +577,6 @@ const DemosPage: React.FC = () => {
                 <div ref={toolbarRef} className="relative pointer-events-auto">
                     {isFormatPanelOpen && (<div className="absolute bottom-full mb-2 p-4 rounded-lg shadow-lg bg-stone-900/80 border border-white/10 backdrop-blur-sm w-[320px]"><div className="space-y-4"><ToolbarDropdown label="Paragraph Style" value={currentFormat.paragraphStyle} onChange={(e) => applyParagraphStyle(e.target.value)}><option value="p">Paragraph</option><option value="h1">Heading 1</option><option value="h2">Heading 2</option><option value="h3">Heading 3</option><option value="blockquote">Blockquote</option></ToolbarDropdown><ToolbarDropdown label="Font" value={currentFormat.font} onChange={(e) => applyFont(e.target.value)}>{fontOptions.map(f => <option key={f.name} value={f.value}>{f.name}</option>)}</ToolbarDropdown><div className="grid grid-cols-2 gap-4"><ToolbarDropdown label="Size" value={currentFormat.size} onChange={(e) => console.log('Size change not implemented yet')}><option value="14px">14</option><option value="16px">16</option><option value="18px">18</option><option value="20px">20</option><option value="24px">24</option></ToolbarDropdown><ToolbarDropdown label="Paragraph Spacing" value={currentFormat.paragraphSpacing} onChange={(e) => applyParagraphSpacing(e.target.value)}><option value="0.5em">0.5</option><option value="1em">1.0</option><option value="1.5em">1.5</option><option value="2em">2.0</option></ToolbarDropdown></div><div><label className="block text-xs font-semibold mb-2 text-white/70">Color</label><div className="flex space-x-2">{colorPalette.map(c => (<button key={c} onClick={() => applyColor(c)} className="w-6 h-6 rounded-full border border-gray-400" style={{backgroundColor: c}}></button>))}</div></div></div></div>)}
                     <div className="flex items-center space-x-1 p-1 rounded-full shadow-lg bg-stone-900/70 border border-white/10 backdrop-blur-sm" onMouseDown={(e) => e.preventDefault()}>
-                        <button onClick={() => setIsOutlineSidebarOpen(p => !p)} className="p-2 rounded-full text-white/90 hover:bg-white/10" disabled={!selectedSketchId}><ListBulletIcon className="w-5 h-5"/></button>
-                        <div className="w-px h-5 bg-white/20 mx-1"></div>
                         <button onClick={() => setIsFormatPanelOpen(p => !p)} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${isFormatPanelOpen ? 'bg-white/20' : ''}`}><TextIcon className="w-5 h-5"/></button>
                         <button onClick={() => applyCommand('bold')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.isBold ? 'bg-white/20' : ''}`}><BoldIcon className="w-5 h-5"/></button>
                         <button onClick={() => applyCommand('italic')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.isItalic ? 'bg-white/20' : ''}`}><ItalicIcon className="w-5 h-5"/></button>
