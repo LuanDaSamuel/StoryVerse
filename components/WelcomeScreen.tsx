@@ -18,7 +18,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreate, onOpen }) => {
         <AppLogoIcon className={`w-16 h-16 mb-4 ${themeClasses.text}`} />
         <h1 className="text-5xl font-bold">StoryVerse</h1>
         <p className={`mt-2 text-lg ${theme === 'book' ? 'text-opacity-80' : themeClasses.textSecondary}`}>
-          Where your stories come to life
+          Where passions come by words
         </p>
       </div>
 
