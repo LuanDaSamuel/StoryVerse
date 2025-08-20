@@ -68,6 +68,19 @@ export function useProjectFile() {
     init();
   }, []);
 
+  const unlinkFile = useCallback(async () => {
+    if (saveTimeout.current) clearTimeout(saveTimeout.current);
+    hasUnsavedChanges.current = false;
+    
+    await del(FILE_HANDLE_KEY);
+    await del(PROJECT_DATA_KEY);
+    
+    projectDataRef.current = null;
+    setProjectData(null);
+    setFileHandle(null);
+    setStatus('welcome');
+  }, []);
+
   const saveProject = useCallback(async (data: ProjectData, version: number) => {
     setSaveStatus('saving');
     try {
@@ -96,9 +109,15 @@ export function useProjectFile() {
       }
     } catch (error) {
       console.error('Error saving project:', error);
-      setSaveStatus('unsaved');
+      if (error instanceof DOMException && error.name === 'NotFoundError') {
+        console.warn('Project file not found. Unlinking and returning to welcome screen.');
+        alert('The project file could not be found. It may have been moved or deleted. The application will now return to the welcome screen.');
+        unlinkFile();
+      } else {
+        setSaveStatus('unsaved');
+      }
     }
-  }, [fileHandle]);
+  }, [fileHandle, unlinkFile]);
   
   const forceSave = useCallback(async () => {
     if (saveTimeout.current) {
@@ -252,19 +271,6 @@ export function useProjectFile() {
         }
     }
   }, [forceSave, fileHandle]);
-
-  const unlinkFile = useCallback(async () => {
-    if (saveTimeout.current) clearTimeout(saveTimeout.current);
-    hasUnsavedChanges.current = false;
-    
-    await del(FILE_HANDLE_KEY);
-    await del(PROJECT_DATA_KEY);
-    
-    projectDataRef.current = null;
-    setProjectData(null);
-    setFileHandle(null);
-    setStatus('welcome');
-  }, []);
 
   return { 
     projectData, 
