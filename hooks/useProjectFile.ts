@@ -15,6 +15,30 @@ const defaultProjectData: ProjectData = {
   sketches: [],
 };
 
+/**
+ * Wraps a promise with a timeout. If the promise does not resolve or reject
+ * within the given timeframe, it will be rejected with a timeout error.
+ * This is crucial for file system operations that might hang if a device is disconnected.
+ */
+const withTimeout = <T>(promise: Promise<T>, ms: number, errorMessage: string): Promise<T> => {
+    return new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+            reject(new Error(errorMessage));
+        }, ms);
+
+        promise.then(
+            (res) => {
+                clearTimeout(timeoutId);
+                resolve(res);
+            },
+            (err) => {
+                clearTimeout(timeoutId);
+                reject(err);
+            }
+        );
+    });
+};
+
 const verifyPermission = async (handle: FileSystemFileHandle): Promise<boolean> => {
     const options = { mode: 'readwrite' as const };
     if ((await handle.queryPermission(options)) === 'granted') {
@@ -45,9 +69,22 @@ export function useProjectFile() {
       try {
         const handle: FileSystemFileHandle | undefined = await get(FILE_HANDLE_KEY);
         if (handle) {
-            const hasPermission = await verifyPermission(handle);
+            // The user may have a file handle for a removable drive that's not currently connected.
+            // These file system operations can hang, so we use a timeout to prevent the app from freezing.
+            const TIMEOUT_MS = 3000; // 3 seconds is a reasonable wait.
+            
+            const hasPermission = await withTimeout(
+                verifyPermission(handle),
+                TIMEOUT_MS,
+                'Permission check timed out. The device may be disconnected.'
+            );
+
             if (hasPermission) {
-                const file = await handle.getFile();
+                const file = await withTimeout(
+                    handle.getFile(),
+                    TIMEOUT_MS,
+                    'File access timed out. The device may be disconnected.'
+                );
                 const fileContent = await file.text();
                 const data = JSON.parse(fileContent);
                 
@@ -58,9 +95,11 @@ export function useProjectFile() {
                 return;
             }
         }
+        // If no handle, or permission is denied or timed out, go to welcome screen.
         setStatus('welcome');
       } catch (error) {
-        console.error('Error initializing project:', error);
+        console.warn('Could not load project from file handle. It might be invalid or disconnected.', error);
+        // If anything fails, the handle is likely invalid. Clear it and go to the welcome screen.
         await del(FILE_HANDLE_KEY);
         setStatus('welcome');
       }
