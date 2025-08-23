@@ -397,6 +397,58 @@ const DemosPage: React.FC = () => {
         if (e.key === 'Tab') {
             e.preventDefault();
             document.execCommand('insertText', false, '    ');
+            return;
+        }
+
+        const selection = window.getSelection();
+        if (!selection || !selection.rangeCount) {
+            return;
+        }
+        const range = selection.getRangeAt(0);
+
+        if (e.key === '"' || e.key === "'") {
+            e.preventDefault();
+            const openQuote = e.key === '"' ? '“' : '‘';
+            const closeQuote = e.key === '"' ? '”' : '’';
+
+            if (!range.collapsed) {
+                // If text is selected, wrap it with smart quotes
+                const selectedContent = range.extractContents();
+                const fragment = document.createDocumentFragment();
+                fragment.appendChild(document.createTextNode(openQuote));
+                fragment.appendChild(selectedContent);
+                fragment.appendChild(document.createTextNode(closeQuote));
+                range.insertNode(fragment);
+                range.collapse(false);
+                selection.removeAllRanges();
+                selection.addRange(range);
+            } else {
+                // If no text is selected, insert a single smart quote based on context
+                let precedingChar = '';
+                if (range.startContainer.nodeType === Node.TEXT_NODE && range.startOffset > 0) {
+                    precedingChar = range.startContainer.textContent?.charAt(range.startOffset - 1) || '';
+                }
+
+                if (e.key === "'") {
+                    // Handle apostrophe vs. opening/closing single quotes
+                    if (/\w/.test(precedingChar)) {
+                        document.execCommand('insertText', false, '’'); // Apostrophe
+                    } else if (precedingChar.trim() === '' || '([{'.includes(precedingChar)) {
+                        document.execCommand('insertText', false, '‘'); // Opening single quote
+                    } else {
+                        document.execCommand('insertText', false, '’'); // Closing single quote
+                    }
+                } else { // key is '"'
+                    // Handle opening/closing double quotes
+                    if (precedingChar.trim() === '' || '([{'.includes(precedingChar)) {
+                        document.execCommand('insertText', false, '“'); // Opening double quote
+                    } else {
+                        document.execCommand('insertText', false, '”'); // Closing double quote
+                    }
+                }
+            }
+            editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+            return;
         }
     };
 
