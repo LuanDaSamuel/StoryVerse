@@ -107,6 +107,81 @@ export function useProjectFile() {
     init();
   }, []);
 
+    useEffect(() => {
+        // This effect manages the auto-detection of a reconnected storage device.
+        if (status !== 'welcome') {
+            return; // Only run when on the welcome screen.
+        }
+
+        let intervalId: number | null = null;
+
+        const checkStorage = async () => {
+            try {
+                const handle: FileSystemFileHandle | undefined = await get(FILE_HANDLE_KEY);
+                if (handle) {
+                    // A short timeout is used for this periodic check to avoid hanging.
+                    const TIMEOUT_MS = 2000;
+                    
+                    const hasPermission = await withTimeout(
+                        verifyPermission(handle),
+                        TIMEOUT_MS,
+                        'Permission check for reconnection timed out.'
+                    ).catch(() => false); // If timeout or any error, treat as no permission.
+
+                    if (hasPermission) {
+                        // If we have permission, the device is connected. Load the project.
+                        const file = await withTimeout(
+                            handle.getFile(),
+                            TIMEOUT_MS,
+                            'File access for reconnection timed out.'
+                        );
+                        const fileContent = await file.text();
+                        const data = JSON.parse(fileContent);
+                        
+                        projectDataRef.current = data;
+                        setProjectData(data);
+                        setFileHandle(handle);
+                        setStatus('ready'); // This state change will cause this effect to clean up.
+                    }
+                }
+            } catch (error) {
+                // Silently ignore errors. This is an opportunistic check and is expected to fail
+                // when the device is not connected or the file is otherwise inaccessible.
+            }
+        };
+
+        const manageInterval = () => {
+            if (document.visibilityState === 'visible') {
+                // Check immediately and then start the interval.
+                checkStorage();
+                if (intervalId === null) {
+                    intervalId = window.setInterval(checkStorage, 3000);
+                }
+            } else {
+                // Clear interval when tab is not visible to save resources.
+                if (intervalId !== null) {
+                    clearInterval(intervalId);
+                    intervalId = null;
+                }
+            }
+        };
+        
+        // Start managing the interval based on current visibility.
+        manageInterval();
+        
+        // Add listener to manage interval on visibility changes.
+        document.addEventListener('visibilitychange', manageInterval);
+
+        // Cleanup function to stop checking when the component unmounts
+        // or when the status is no longer 'welcome'.
+        return () => {
+            if (intervalId !== null) {
+                clearInterval(intervalId);
+            }
+            document.removeEventListener('visibilitychange', manageInterval);
+        };
+    }, [status]); // Rerun this effect if the status changes.
+
   const unlinkFile = useCallback(async () => {
     if (saveTimeout.current) clearTimeout(saveTimeout.current);
     hasUnsavedChanges.current = false;
