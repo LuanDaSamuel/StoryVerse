@@ -1151,13 +1151,13 @@ const ChapterEditorPage: React.FC = () => {
                 <button
                     onClick={() => setIsSidebarOpen(true)}
                     className={`
-                        fixed top-4 right-4 z-30 p-2 rounded-md
+                        fixed top-4 left-4 z-30 p-2 rounded-md
                         ${themeClasses.bgSecondary} ${themeClasses.accentText}
                         hover:opacity-80 shadow-lg border ${themeClasses.border}
                     `}
                     aria-label="Open editor tools"
                 >
-                    <ChevronLeftIcon className="w-5 h-5" />
+                    <ChevronRightIcon className="w-5 h-5" />
                 </button>
             )}
 
