@@ -324,6 +324,27 @@ const ChapterEditorPage: React.FC = () => {
         paragraphSpacing: '1em',
     });
 
+    const cleanupEditor = useCallback(() => {
+        if (!editorRef.current) return;
+        const editor = editorRef.current;
+
+        // Remove empty inline elements that cause deletion issues.
+        // Run multiple passes to handle nested empty elements.
+        for (let i = 0; i < 3; i++) {
+            let changed = false;
+            editor.querySelectorAll('span, strong, em, i, b').forEach(el => {
+                if (!el.hasChildNodes() || el.textContent === '\u200B') {
+                    el.remove();
+                    changed = true;
+                }
+            });
+            if (!changed) break;
+        }
+
+        // Merge adjacent text nodes. This is the key fix for "stuck word" issues.
+        editor.normalize();
+    }, []);
+
     const editorStyle = useMemo(() => {
         // For the book theme, we need to explicitly set the color because
         // contentEditable's default styling can interfere with inheritance on a dark background.
@@ -483,6 +504,8 @@ const ChapterEditorPage: React.FC = () => {
         
         formatAction();
         
+        cleanupEditor();
+
         const event = new Event('input', { bubbles: true, cancelable: true });
         editorRef.current.dispatchEvent(event);
         
@@ -490,7 +513,7 @@ const ChapterEditorPage: React.FC = () => {
         
         handleSelectionChange();
 
-    }, [handleSelectionChange]);
+    }, [handleSelectionChange, cleanupEditor]);
 
     const applyFormat = (command: 'bold' | 'italic' | 'undo' | 'redo') => {
         applyAndSaveFormat(() => document.execCommand(command, false));
@@ -663,26 +686,36 @@ const ChapterEditorPage: React.FC = () => {
                 selection.addRange(range);
             } else {
                 // If no text is selected, insert a single smart quote based on context
-                let precedingChar = '';
-                if (range.startContainer.nodeType === Node.TEXT_NODE && range.startOffset > 0) {
-                    precedingChar = range.startContainer.textContent?.charAt(range.startOffset - 1) || '';
-                }
+                const precedingRange = document.createRange();
+                if (!editorRef.current) return;
+
+                precedingRange.setStart(editorRef.current, 0);
+                precedingRange.setEnd(range.startContainer, range.startOffset);
+                
+                const textBeforeCursor = precedingRange.toString();
+                const lastChar = textBeforeCursor.slice(-1);
+
+                // An opening quote should appear at the start of the text, after whitespace,
+                // or after another opening punctuation/quote mark.
+                const isAfterWhitespace = !lastChar.trim(); // This is true for '', ' ', '\n', etc.
+                const openQuotePreceders = new Set(['(', '[', '{', '“', '‘']);
+                
+                const shouldBeOpening = isAfterWhitespace || openQuotePreceders.has(lastChar);
 
                 if (e.key === "'") {
-                    // Handle apostrophe vs. opening/closing single quotes
-                    if (/\w/.test(precedingChar)) {
-                        document.execCommand('insertText', false, '’'); // Apostrophe
-                    } else if (precedingChar.trim() === '' || '([{'.includes(precedingChar)) {
-                        document.execCommand('insertText', false, '‘'); // Opening single quote
+                    // Apostrophe rule: if immediately preceded by a word character.
+                    if (/\w/.test(lastChar)) {
+                        document.execCommand('insertText', false, '’');
+                    } else if (shouldBeOpening) {
+                        document.execCommand('insertText', false, '‘');
                     } else {
-                        document.execCommand('insertText', false, '’'); // Closing single quote
+                        document.execCommand('insertText', false, '’');
                     }
                 } else { // key is '"'
-                    // Handle opening/closing double quotes
-                    if (precedingChar.trim() === '' || '([{'.includes(precedingChar)) {
-                        document.execCommand('insertText', false, '“'); // Opening double quote
+                    if (shouldBeOpening) {
+                        document.execCommand('insertText', false, '“');
                     } else {
-                        document.execCommand('insertText', false, '”'); // Closing double quote
+                        document.execCommand('insertText', false, '”');
                     }
                 }
             }
@@ -803,6 +836,7 @@ const ChapterEditorPage: React.FC = () => {
                     scrollContainerEl.scrollBy({ top: scrollAmount, behavior: 'smooth' });
                 }
             }, 0);
+            setTimeout(cleanupEditor, 10);
         }
     };
 
@@ -875,6 +909,7 @@ const ChapterEditorPage: React.FC = () => {
             .join('');
 
         document.execCommand('insertHTML', false, htmlToInsert);
+        cleanupEditor();
     };
 
     const handleCopy = useCallback((e: ClipboardEvent) => {
@@ -1052,13 +1087,13 @@ const ChapterEditorPage: React.FC = () => {
                         <div
                             ref={editorRef}
                             contentEditable
-                            // FIX: The 'spellcheck' attribute should be 'spellCheck' in JSX.
                             spellCheck={true}
                             suppressContentEditableWarning
                             onInput={(e) => updateChapterField('content', e.currentTarget.innerHTML)}
                             onKeyDown={handleKeyDown}
                             onKeyUp={handleKeyUp}
                             onPaste={handlePaste}
+                            onBlur={cleanupEditor}
                             className="w-full text-lg leading-relaxed outline-none story-content"
                             style={editorStyle}
                         />

@@ -223,6 +223,27 @@ const DemosPage: React.FC = () => {
     const [activeFormats, setActiveFormats] = useState({ isBold: false, isItalic: false, isUL: false, isOL: false });
     const [currentFormat, setCurrentFormat] = useState({ paragraphStyle: 'p', font: fontOptions[0].value, size: '18px', paragraphSpacing: '1em' });
 
+    const cleanupEditor = useCallback(() => {
+        if (!editorRef.current) return;
+        const editor = editorRef.current;
+
+        // Remove empty inline elements that cause deletion issues.
+        // Run multiple passes to handle nested empty elements.
+        for (let i = 0; i < 3; i++) {
+            let changed = false;
+            editor.querySelectorAll('span, strong, em, i, b').forEach(el => {
+                if (!el.hasChildNodes() || el.textContent === '\u200B') {
+                    el.remove();
+                    changed = true;
+                }
+            });
+            if (!changed) break;
+        }
+
+        // Merge adjacent text nodes. This is the key fix for "stuck word" issues.
+        editor.normalize();
+    }, []);
+
     const sketches = useMemo(() => projectData?.sketches || [], [projectData?.sketches]);
     const selectedSketch = useMemo(() => sketches.find(s => s.id === selectedSketchId) || null, [sketches, selectedSketchId]);
     
@@ -424,26 +445,36 @@ const DemosPage: React.FC = () => {
                 selection.addRange(range);
             } else {
                 // If no text is selected, insert a single smart quote based on context
-                let precedingChar = '';
-                if (range.startContainer.nodeType === Node.TEXT_NODE && range.startOffset > 0) {
-                    precedingChar = range.startContainer.textContent?.charAt(range.startOffset - 1) || '';
-                }
+                const precedingRange = document.createRange();
+                if (!editorRef.current) return;
+
+                precedingRange.setStart(editorRef.current, 0);
+                precedingRange.setEnd(range.startContainer, range.startOffset);
+                
+                const textBeforeCursor = precedingRange.toString();
+                const lastChar = textBeforeCursor.slice(-1);
+
+                // An opening quote should appear at the start of the text, after whitespace,
+                // or after another opening punctuation/quote mark.
+                const isAfterWhitespace = !lastChar.trim(); // This is true for '', ' ', '\n', etc.
+                const openQuotePreceders = new Set(['(', '[', '{', '“', '‘']);
+                
+                const shouldBeOpening = isAfterWhitespace || openQuotePreceders.has(lastChar);
 
                 if (e.key === "'") {
-                    // Handle apostrophe vs. opening/closing single quotes
-                    if (/\w/.test(precedingChar)) {
-                        document.execCommand('insertText', false, '’'); // Apostrophe
-                    } else if (precedingChar.trim() === '' || '([{'.includes(precedingChar)) {
-                        document.execCommand('insertText', false, '‘'); // Opening single quote
+                    // Apostrophe rule: if immediately preceded by a word character.
+                    if (/\w/.test(lastChar)) {
+                        document.execCommand('insertText', false, '’');
+                    } else if (shouldBeOpening) {
+                        document.execCommand('insertText', false, '‘');
                     } else {
-                        document.execCommand('insertText', false, '’'); // Closing single quote
+                        document.execCommand('insertText', false, '’');
                     }
                 } else { // key is '"'
-                    // Handle opening/closing double quotes
-                    if (precedingChar.trim() === '' || '([{'.includes(precedingChar)) {
-                        document.execCommand('insertText', false, '“'); // Opening double quote
+                    if (shouldBeOpening) {
+                        document.execCommand('insertText', false, '“');
                     } else {
-                        document.execCommand('insertText', false, '”'); // Closing double quote
+                        document.execCommand('insertText', false, '”');
                     }
                 }
             }
@@ -495,7 +526,23 @@ const DemosPage: React.FC = () => {
                     }
                 }
             }, 0);
+            setTimeout(cleanupEditor, 10);
         }
+    };
+
+    const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        
+        const text = e.clipboardData.getData('text/plain');
+        if (!text) return;
+
+        const htmlToInsert = text
+            .split(/\r?\n/)
+            .map(line => `<p>${line.trim() === '' ? '<br>' : enhancePlainText(line)}</p>`)
+            .join('');
+
+        document.execCommand('insertHTML', false, htmlToInsert);
+        cleanupEditor();
     };
 
     const handleCopy = useCallback((e: ClipboardEvent) => {
@@ -566,6 +613,7 @@ const DemosPage: React.FC = () => {
         if (!editorRef.current) return;
         document.execCommand(cmd, false, value);
         editorRef.current.dispatchEvent(new Event('input', { bubbles: true }));
+        cleanupEditor();
         editorRef.current.focus();
         handleSelectionChange();
     };
@@ -683,8 +731,19 @@ const DemosPage: React.FC = () => {
             <main className="flex-1 overflow-y-auto" ref={scrollContainerRef}>
                 <div className={`p-8 md:p-12 font-serif min-h-full max-w-4xl mx-auto ${isDistractionFree ? 'pt-24' : ''}`}>
                     {selectedSketch ? (
-                        // FIX: The 'spellcheck' attribute should be 'spellCheck' in JSX.
-                        <div ref={editorRef} key={`${selectedSketch.id}-content`} contentEditable spellCheck={true} suppressContentEditableWarning onInput={(e) => handleUpdateSketch('content', e.currentTarget.innerHTML)} onKeyDown={handleKeyDown} className={`w-full text-lg leading-relaxed outline-none story-content ${themeClasses.text}`} style={editorStyle} />
+                        <div 
+                            ref={editorRef} 
+                            key={`${selectedSketch.id}-content`} 
+                            contentEditable 
+                            spellCheck={true} 
+                            suppressContentEditableWarning 
+                            onInput={(e) => handleUpdateSketch('content', e.currentTarget.innerHTML)} 
+                            onKeyDown={handleKeyDown}
+                            onPaste={handlePaste}
+                            onBlur={cleanupEditor}
+                            className={`w-full text-lg leading-relaxed outline-none story-content ${themeClasses.text}`} 
+                            style={editorStyle} 
+                        />
                     ) : (
                         <div className="flex flex-col items-center justify-center h-full text-center mt-[-4rem]"><LightbulbIcon className={`w-16 h-16 mb-4 ${themeClasses.textSecondary}`} /><h2 className={`text-2xl font-bold ${themeClasses.accentText}`}>Welcome to Demos</h2><p className={`mt-2 max-w-md ${themeClasses.textSecondary}`}>This is your space for ideas and notes. Create a new sketch to get started.</p><button onClick={handleCreateSketch} className={`mt-8 flex items-center justify-center space-x-2 px-6 py-3 text-lg font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}><PlusIcon className="w-6 h-6" /><span>Create First Sketch</span></button></div>
                     )}
