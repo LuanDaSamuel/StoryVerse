@@ -450,7 +450,72 @@ const DemosPage: React.FC = () => {
             editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
             return;
         }
+
+        if (e.key === 'Enter') {
+            setTimeout(() => {
+                const sel = window.getSelection();
+                if (!sel?.rangeCount || !editorRef.current) return;
+        
+                let currentBlock = sel.getRangeAt(0).startContainer;
+                while (currentBlock && currentBlock.parentNode !== editorRef.current) {
+                    currentBlock = currentBlock.parentNode;
+                }
+        
+                if (currentBlock instanceof HTMLElement) {
+                    const isNewBlockEmpty = (currentBlock.textContent?.trim() === '' && currentBlock.children.length === 0) || currentBlock.innerHTML === '<br>';
+                    if (isNewBlockEmpty) {
+                        const previousBlock = currentBlock.previousElementSibling;
+                        if (previousBlock instanceof HTMLElement) {
+                            let styleSource: Element = previousBlock;
+                            let lastNode: Node | null = previousBlock;
+                            while (lastNode && lastNode.lastChild) {
+                                lastNode = lastNode.lastChild;
+                            }
+                            if (lastNode) {
+                                styleSource = lastNode.nodeType === Node.TEXT_NODE ? lastNode.parentElement! : lastNode as Element;
+                            }
+                            
+                            const computedStyle = window.getComputedStyle(styleSource);
+                            const editorStyles = window.getComputedStyle(editorRef.current!);
+                            
+                            if (computedStyle.fontFamily !== editorStyles.fontFamily) {
+                                currentBlock.innerHTML = '';
+                                const styleCarrier = document.createElement('span');
+                                styleCarrier.style.fontFamily = computedStyle.fontFamily;
+                                styleCarrier.innerHTML = '&#8203;';
+                                currentBlock.appendChild(styleCarrier);
+        
+                                const newRange = document.createRange();
+                                newRange.setStart(styleCarrier, 1);
+                                newRange.collapse(true);
+                                sel.removeAllRanges();
+                                sel.addRange(newRange);
+                            }
+                        }
+                    }
+                }
+            }, 0);
+        }
     };
+
+    const handleCopy = useCallback((e: ClipboardEvent) => {
+        const selection = window.getSelection();
+        if (!selection?.rangeCount) return;
+    
+        const selectedText = selection.toString();
+        const cleanedText = selectedText.replace(/(\r\n|\n|\r){2,}/g, '\n\n').trim();
+    
+        if (cleanedText.length < selectedText.length || (selectedText.length > 0 && cleanedText.length === 0)) {
+            e.preventDefault();
+    
+            const selectedHtmlFragment = selection.getRangeAt(0).cloneContents();
+            const tempDiv = document.createElement('div');
+            tempDiv.appendChild(selectedHtmlFragment);
+            
+            e.clipboardData?.setData('text/plain', cleanedText);
+            e.clipboardData?.setData('text/html', tempDiv.innerHTML);
+        }
+    }, []);
 
     // --- Formatting Logic ---
 
@@ -528,12 +593,18 @@ const DemosPage: React.FC = () => {
     useEffect(() => {
         const editorEl = editorRef.current;
         document.addEventListener('selectionchange', handleSelectionChange);
-        if (editorEl) editorEl.addEventListener('keyup', handleSelectionChange);
+        if (editorEl) {
+            editorEl.addEventListener('keyup', handleSelectionChange);
+            editorEl.addEventListener('copy', handleCopy);
+        }
         return () => {
             document.removeEventListener('selectionchange', handleSelectionChange);
-            if (editorEl) editorEl.removeEventListener('keyup', handleSelectionChange);
+            if (editorEl) {
+                editorEl.removeEventListener('keyup', handleSelectionChange);
+                editorEl.removeEventListener('copy', handleCopy);
+            }
         };
-    }, [handleSelectionChange]);
+    }, [handleSelectionChange, handleCopy]);
 
     // --- Render ---
 
@@ -612,7 +683,8 @@ const DemosPage: React.FC = () => {
             <main className="flex-1 overflow-y-auto" ref={scrollContainerRef}>
                 <div className={`p-8 md:p-12 font-serif min-h-full max-w-4xl mx-auto ${isDistractionFree ? 'pt-24' : ''}`}>
                     {selectedSketch ? (
-                        <div ref={editorRef} key={`${selectedSketch.id}-content`} contentEditable suppressContentEditableWarning onInput={(e) => handleUpdateSketch('content', e.currentTarget.innerHTML)} onKeyDown={handleKeyDown} className={`w-full text-lg leading-relaxed outline-none story-content ${themeClasses.text}`} style={editorStyle} />
+                        // FIX: The 'spellcheck' attribute should be 'spellCheck' in JSX.
+                        <div ref={editorRef} key={`${selectedSketch.id}-content`} contentEditable spellCheck={true} suppressContentEditableWarning onInput={(e) => handleUpdateSketch('content', e.currentTarget.innerHTML)} onKeyDown={handleKeyDown} className={`w-full text-lg leading-relaxed outline-none story-content ${themeClasses.text}`} style={editorStyle} />
                     ) : (
                         <div className="flex flex-col items-center justify-center h-full text-center mt-[-4rem]"><LightbulbIcon className={`w-16 h-16 mb-4 ${themeClasses.textSecondary}`} /><h2 className={`text-2xl font-bold ${themeClasses.accentText}`}>Welcome to Demos</h2><p className={`mt-2 max-w-md ${themeClasses.textSecondary}`}>This is your space for ideas and notes. Create a new sketch to get started.</p><button onClick={handleCreateSketch} className={`mt-8 flex items-center justify-center space-x-2 px-6 py-3 text-lg font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}><PlusIcon className="w-6 h-6" /><span>Create First Sketch</span></button></div>
                     )}

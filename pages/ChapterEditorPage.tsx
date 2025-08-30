@@ -722,59 +722,72 @@ const ChapterEditorPage: React.FC = () => {
         }
     
         if (e.key === 'Enter') {
-            // This timeout allows the browser to execute its default 'Enter' behavior (creating a new paragraph)
-            // before we run our logic to fix the styling and scroll position.
             setTimeout(() => {
                 const newSelection = window.getSelection();
                 if (!newSelection?.rangeCount || !editorRef.current) return;
-                const newRange = newSelection.getRangeAt(0);
                 
-                // --- 1. Fix Font Size Inheritance ---
-                let currentBlock = newRange.startContainer;
+                let currentBlock = newSelection.getRangeAt(0).startContainer;
                 while (currentBlock && currentBlock.parentNode !== editorRef.current) {
                     currentBlock = currentBlock.parentNode;
                 }
-                
+        
                 if (currentBlock instanceof HTMLElement) {
                     const isNewBlockEmpty = (currentBlock.textContent?.trim() === '' && currentBlock.children.length === 0) || currentBlock.innerHTML === '<br>';
-                    
                     if (isNewBlockEmpty) {
                         const previousBlock = currentBlock.previousElementSibling;
                         if (previousBlock instanceof HTMLElement) {
-                            // Find the very last element in the previous block to get its style.
                             let styleSource: Element = previousBlock;
-                            while (styleSource.lastElementChild) {
-                                styleSource = styleSource.lastElementChild;
+                            let lastNode: Node | null = previousBlock;
+                            while (lastNode && lastNode.lastChild) {
+                                lastNode = lastNode.lastChild;
+                            }
+                            
+                            if (lastNode) {
+                                styleSource = lastNode.nodeType === Node.TEXT_NODE ? lastNode.parentElement! : lastNode as Element;
                             }
                             
                             const computedStyle = window.getComputedStyle(styleSource);
-                            const fontSize = computedStyle.fontSize;
-                            const defaultFontSize = window.getComputedStyle(editorRef.current).fontSize;
+                            const stylesToCopy = {
+                                fontSize: computedStyle.fontSize,
+                                fontFamily: computedStyle.fontFamily,
+                                color: computedStyle.color,
+                            };
                             
-                            // If the previous line had a custom font size, apply it to the new line.
-                            if (fontSize && fontSize !== defaultFontSize) {
-                                currentBlock.innerHTML = ''; // Clear the default <br>
-                                const styleCarrier = document.createElement('span');
-                                styleCarrier.style.fontSize = fontSize;
-                                styleCarrier.innerHTML = '&#8203;'; // Use a zero-width space as a placeholder for the cursor.
+                            const editorStyles = window.getComputedStyle(editorRef.current!);
+                            const styleCarrier = document.createElement('span');
+                            let styleApplied = false;
+                            
+                            if (stylesToCopy.fontSize !== editorStyles.fontSize) {
+                                styleCarrier.style.fontSize = stylesToCopy.fontSize;
+                                styleApplied = true;
+                            }
+                            if (stylesToCopy.fontFamily !== editorStyles.fontFamily) {
+                                styleCarrier.style.fontFamily = stylesToCopy.fontFamily;
+                                styleApplied = true;
+                            }
+                            if (stylesToCopy.color !== editorStyles.color) {
+                                styleCarrier.style.color = stylesToCopy.color;
+                                styleApplied = true;
+                            }
+                            
+                            if (styleApplied) {
+                                currentBlock.innerHTML = '';
+                                styleCarrier.innerHTML = '&#8203;';
                                 currentBlock.appendChild(styleCarrier);
                                 
-                                // Place the cursor inside our new styled span.
-                                newRange.setStart(styleCarrier.firstChild!, 1);
-                                newRange.collapse(true);
+                                const range = document.createRange();
+                                range.setStart(styleCarrier, 1);
+                                range.collapse(true);
                                 newSelection.removeAllRanges();
-                                newSelection.addRange(newRange);
+                                newSelection.addRange(range);
                             }
                         }
                     }
                 }
-
-                // --- 2. Adjust Scroll Position ---
-                let element = newRange.startContainer;
-                if (element.nodeType === Node.TEXT_NODE) {
-                    element = element.parentElement!;
-                }
-                
+        
+                // Adjust Scroll Position
+                let element = newSelection.getRangeAt(0).startContainer;
+                if (element.nodeType === Node.TEXT_NODE) element = element.parentElement!;
                 if (!(element instanceof HTMLElement)) return;
 
                 const toolbarEl = toolbarRef.current;
@@ -789,7 +802,7 @@ const ChapterEditorPage: React.FC = () => {
                     const scrollAmount = elementRect.bottom - (toolbarRect.top - buffer);
                     scrollContainerEl.scrollBy({ top: scrollAmount, behavior: 'smooth' });
                 }
-            }, 0); // Timeout 0 ensures this runs immediately after the browser's default action.
+            }, 0);
         }
     };
 
@@ -864,6 +877,25 @@ const ChapterEditorPage: React.FC = () => {
         document.execCommand('insertHTML', false, htmlToInsert);
     };
 
+    const handleCopy = useCallback((e: ClipboardEvent) => {
+        const selection = window.getSelection();
+        if (!selection?.rangeCount) return;
+    
+        const selectedText = selection.toString();
+        const cleanedText = selectedText.replace(/(\r\n|\n|\r){2,}/g, '\n\n').trim();
+    
+        if (cleanedText.length < selectedText.length || (selectedText.length > 0 && cleanedText.length === 0)) {
+            e.preventDefault();
+    
+            const selectedHtmlFragment = selection.getRangeAt(0).cloneContents();
+            const tempDiv = document.createElement('div');
+            tempDiv.appendChild(selectedHtmlFragment);
+            
+            e.clipboardData?.setData('text/plain', cleanedText);
+            e.clipboardData?.setData('text/html', tempDiv.innerHTML);
+        }
+    }, []);
+
     // --- Effects ---
     useEffect(() => {
         if (editorRef.current && chapter) {
@@ -902,6 +934,7 @@ const ChapterEditorPage: React.FC = () => {
             editorEl.addEventListener('keyup', handleSelectionChange);
             editorEl.addEventListener('mouseup', handleSelectionChange);
             editorEl.addEventListener('focus', handleSelectionChange);
+            editorEl.addEventListener('copy', handleCopy);
         }
         window.addEventListener('resize', handleSelectionChange);
 
@@ -911,10 +944,11 @@ const ChapterEditorPage: React.FC = () => {
                 editorEl.removeEventListener('keyup', handleSelectionChange);
                 editorEl.removeEventListener('mouseup', handleSelectionChange);
                 editorEl.removeEventListener('focus', handleSelectionChange);
+                editorEl.removeEventListener('copy', handleCopy);
             }
             window.removeEventListener('resize', handleSelectionChange);
         };
-    }, [handleSelectionChange]);
+    }, [handleSelectionChange, handleCopy]);
     
      useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -1018,6 +1052,8 @@ const ChapterEditorPage: React.FC = () => {
                         <div
                             ref={editorRef}
                             contentEditable
+                            // FIX: The 'spellcheck' attribute should be 'spellCheck' in JSX.
+                            spellCheck={true}
                             suppressContentEditableWarning
                             onInput={(e) => updateChapterField('content', e.currentTarget.innerHTML)}
                             onKeyDown={handleKeyDown}
