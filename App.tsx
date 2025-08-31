@@ -67,8 +67,11 @@ const AppContent = () => {
     useEffect(() => {
         const lang = projectData?.settings?.spellcheckLanguage;
         if (lang) {
-            const langCode = lang === 'browser-default' ? '' : lang;
-            document.documentElement.lang = langCode;
+            if (lang === 'browser-default') {
+                document.documentElement.removeAttribute('lang');
+            } else {
+                document.documentElement.lang = lang;
+            }
         }
     }, [projectData?.settings?.spellcheckLanguage]);
 

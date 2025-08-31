@@ -78,6 +78,8 @@ const FindReplaceDialog: React.FC<{
     const [replaceText, setReplaceText] = useState('');
     const [matches, setMatches] = useState<HTMLElement[]>([]);
     const [currentIndex, setCurrentIndex] = useState(-1);
+    const [caseSensitive, setCaseSensitive] = useState(false);
+    const [wholeWord, setWholeWord] = useState(false);
 
     const clearHighlights = useCallback(() => {
         if (!editorRef.current) return;
@@ -99,11 +101,20 @@ const FindReplaceDialog: React.FC<{
     const highlightMatches = useCallback(() => {
         clearHighlights();
         if (!findText || !editorRef.current) { setMatches([]); setCurrentIndex(-1); return; }
+        
         const newMatches: HTMLElement[] = [];
         const walker = document.createTreeWalker(editorRef.current, NodeFilter.SHOW_TEXT);
         const textNodes: Text[] = [];
         while (walker.nextNode()) textNodes.push(walker.currentNode as Text);
-        const regex = new RegExp(findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+        
+        let flags = 'g';
+        if (!caseSensitive) flags += 'i';
+        let pattern = findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        if (wholeWord) {
+          pattern = `\\b${pattern}\\b`;
+        }
+        const regex = new RegExp(pattern, flags);
+
         textNodes.forEach(node => {
             if (!node.textContent) return;
             const matchesInNode = [...node.textContent.matchAll(regex)];
@@ -126,11 +137,11 @@ const FindReplaceDialog: React.FC<{
         });
         setMatches(newMatches);
         setCurrentIndex(newMatches.length > 0 ? 0 : -1);
-    }, [findText, editorRef, clearHighlights]);
+    }, [findText, editorRef, clearHighlights, caseSensitive, wholeWord]);
 
     useEffect(() => {
         if (isOpen) highlightMatches();
-    }, [findText, isOpen, highlightMatches]);
+    }, [findText, isOpen, highlightMatches, caseSensitive, wholeWord]);
 
     useEffect(() => {
         matches.forEach((match, index) => {
@@ -178,6 +189,10 @@ const FindReplaceDialog: React.FC<{
                     <div className="relative"><input type="text" placeholder="Find..." value={findText} onChange={(e) => setFindText(e.target.value)} className={`w-full px-3 py-2 rounded-md text-sm ${themeClasses.input} border ${themeClasses.border}`} />{findText && <div className={`absolute right-3 top-1/2 -translate-y-1/2 text-xs ${themeClasses.textSecondary}`}>{matches.length > 0 ? `${currentIndex + 1}/${matches.length}` : '0/0'}</div>}</div>
                     <input type="text" placeholder="Replace..." value={replaceText} onChange={(e) => setReplaceText(e.target.value)} className={`w-full px-3 py-2 rounded-md text-sm ${themeClasses.input} border ${themeClasses.border}`} />
                 </div>
+                <div className="flex items-center space-x-2 mt-2">
+                    <button onClick={() => setCaseSensitive(p => !p)} className={`px-2 py-1 text-xs rounded-md font-semibold ${caseSensitive ? `${themeClasses.accent} ${themeClasses.accentText}` : themeClasses.bgTertiary}`}>Aa</button>
+                    <button onClick={() => setWholeWord(p => !p)} className={`px-2 py-1 text-xs rounded-md font-semibold ${wholeWord ? `${themeClasses.accent} ${themeClasses.accentText}` : themeClasses.bgTertiary}`}>Whole Word</button>
+                </div>
                 <div className="flex justify-between items-center mt-3"><div className="flex items-center space-x-1"><button onClick={() => handleNavigate('prev')} disabled={matches.length < 2} className={`px-2 py-1 rounded text-xs font-semibold ${themeClasses.bgTertiary} disabled:opacity-50`}>Prev</button><button onClick={() => handleNavigate('next')} disabled={matches.length < 2} className={`px-2 py-1 rounded text-xs font-semibold ${themeClasses.bgTertiary} disabled:opacity-50`}>Next</button></div><div className="flex items-center space-x-1"><button onClick={handleReplace} disabled={currentIndex === -1} className={`px-2 py-1 text-xs rounded font-semibold ${themeClasses.bgTertiary} disabled:opacity-50`}>Replace</button><button onClick={handleReplaceAll} disabled={matches.length === 0} className={`px-2 py-1 text-xs rounded font-semibold ${themeClasses.accent} ${themeClasses.accentText} disabled:opacity-50`}>All</button></div></div>
             </div>
         </div>
@@ -222,6 +237,11 @@ const DemosPage: React.FC = () => {
     const [isFormatPanelOpen, setIsFormatPanelOpen] = useState(false);
     const [activeFormats, setActiveFormats] = useState({ isBold: false, isItalic: false, isUL: false, isOL: false });
     const [currentFormat, setCurrentFormat] = useState({ paragraphStyle: 'p', font: fontOptions[0].value, size: '18px', paragraphSpacing: '1em' });
+
+    const langCode = useMemo(() => {
+        const lang = projectData?.settings?.spellcheckLanguage;
+        return lang === 'browser-default' ? undefined : lang;
+    }, [projectData?.settings?.spellcheckLanguage]);
 
     const handleLanguageChange = (lang: SpellcheckLang) => {
         setProjectData(currentData => {
@@ -752,7 +772,7 @@ const DemosPage: React.FC = () => {
             
             <main className="flex-1 overflow-y-auto" ref={scrollContainerRef}>
                 <div className={`p-8 md:p-12 font-serif min-h-full max-w-4xl mx-auto ${isDistractionFree ? 'pt-24' : ''}`}>
-                    {selectedSketch ? (<div ref={editorRef} key={`${selectedSketch.id}-content`} contentEditable spellCheck={true} suppressContentEditableWarning onInput={(e) => handleUpdateSketch('content', e.currentTarget.innerHTML)} onKeyDown={handleKeyDown} onKeyUp={handleKeyUp} onPaste={handlePaste} onBlur={cleanupEditor} className={`w-full text-lg leading-relaxed outline-none story-content ${themeClasses.text}`} style={editorStyle} />) : (<div className="flex flex-col items-center justify-center h-full text-center mt-[-4rem]"><LightbulbIcon className={`w-16 h-16 mb-4 ${themeClasses.textSecondary}`} /><h2 className={`text-2xl font-bold ${themeClasses.accentText}`}>Welcome to Demos</h2><p className={`mt-2 max-w-md ${themeClasses.textSecondary}`}>This is your space for ideas and notes. Create a new sketch to get started.</p><button onClick={handleCreateSketch} className={`mt-8 flex items-center justify-center space-x-2 px-6 py-3 text-lg font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}><PlusIcon className="w-6 h-6" /><span>Create First Sketch</span></button></div>)}
+                    {selectedSketch ? (<div ref={editorRef} key={`${selectedSketch.id}-content`} contentEditable spellCheck={true} suppressContentEditableWarning lang={langCode} onInput={(e) => handleUpdateSketch('content', e.currentTarget.innerHTML)} onKeyDown={handleKeyDown} onKeyUp={handleKeyUp} onPaste={handlePaste} onBlur={cleanupEditor} className={`w-full text-lg leading-relaxed outline-none story-content ${themeClasses.text}`} style={editorStyle} />) : (<div className="flex flex-col items-center justify-center h-full text-center mt-[-4rem]"><LightbulbIcon className={`w-16 h-16 mb-4 ${themeClasses.textSecondary}`} /><h2 className={`text-2xl font-bold ${themeClasses.accentText}`}>Welcome to Demos</h2><p className={`mt-2 max-w-md ${themeClasses.textSecondary}`}>This is your space for ideas and notes. Create a new sketch to get started.</p><button onClick={handleCreateSketch} className={`mt-8 flex items-center justify-center space-x-2 px-6 py-3 text-lg font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}><PlusIcon className="w-6 h-6" /><span>Create First Sketch</span></button></div>)}
                 </div>
             </main>
 

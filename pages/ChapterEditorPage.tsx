@@ -93,7 +93,7 @@ const FindReplaceModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
   editorRef: React.RefObject<HTMLDivElement>;
-  onReplaceAllInNovel: (find: string, replace: string) => void;
+  onReplaceAllInNovel: (find: string, replace: string, caseSensitive: boolean, wholeWord: boolean) => void;
 }> = ({ isOpen, onClose, editorRef, onReplaceAllInNovel }) => {
   const { themeClasses } = useContext(ProjectContext);
   const [findText, setFindText] = useState('');
@@ -101,6 +101,8 @@ const FindReplaceModal: React.FC<{
   const [scope, setScope] = useState<'current' | 'all'>('current');
   const [matches, setMatches] = useState<HTMLElement[]>([]);
   const [currentIndex, setCurrentIndex] = useState(-1);
+  const [caseSensitive, setCaseSensitive] = useState(false);
+  const [wholeWord, setWholeWord] = useState(false);
   const debounceTimeout = useRef<number | null>(null);
 
   const clearHighlights = useCallback(() => {
@@ -139,7 +141,13 @@ const FindReplaceModal: React.FC<{
     const textNodes: Text[] = [];
     while (walker.nextNode()) textNodes.push(walker.currentNode as Text);
 
-    const regex = new RegExp(findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    let flags = 'g';
+    if (!caseSensitive) flags += 'i';
+    let pattern = findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (wholeWord) {
+      pattern = `\\b${pattern}\\b`;
+    }
+    const regex = new RegExp(pattern, flags);
 
     textNodes.forEach(node => {
         if (!node.textContent || node.parentElement?.closest('.search-highlight')) return;
@@ -169,7 +177,7 @@ const FindReplaceModal: React.FC<{
 
     setMatches(newMatches);
     setCurrentIndex(newMatches.length > 0 ? 0 : -1);
-  }, [findText, editorRef, clearHighlights]);
+  }, [findText, editorRef, clearHighlights, caseSensitive, wholeWord]);
 
   useEffect(() => {
     if (isOpen) {
@@ -179,7 +187,7 @@ const FindReplaceModal: React.FC<{
     return () => {
       if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
     };
-  }, [findText, isOpen, highlightMatches]);
+  }, [findText, isOpen, highlightMatches, caseSensitive, wholeWord]);
 
   useEffect(() => {
     matches.forEach((match, index) => {
@@ -227,7 +235,7 @@ const FindReplaceModal: React.FC<{
       });
       editorRef.current.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
     } else {
-      onReplaceAllInNovel(findText, replaceText);
+      onReplaceAllInNovel(findText, replaceText, caseSensitive, wholeWord);
     }
     handleClose();
   };
@@ -266,6 +274,10 @@ const FindReplaceModal: React.FC<{
             onChange={(e) => setReplaceText(e.target.value)} 
             className={`w-full px-3 py-2 rounded-md ${themeClasses.input} border ${themeClasses.border}`}
           />
+        </div>
+        <div className="flex items-center space-x-4 mt-3">
+          <button onClick={() => setCaseSensitive(p => !p)} className={`px-3 py-1 text-xs rounded-md font-semibold ${caseSensitive ? `${themeClasses.accent} ${themeClasses.accentText}` : themeClasses.bgTertiary}`}>Aa</button>
+          <button onClick={() => setWholeWord(p => !p)} className={`px-3 py-1 text-xs rounded-md font-semibold ${wholeWord ? `${themeClasses.accent} ${themeClasses.accentText}` : themeClasses.bgTertiary}`}>Whole Word</button>
         </div>
 
         <div className="flex justify-between items-center mt-4">
@@ -324,6 +336,11 @@ const ChapterEditorPage: React.FC = () => {
         size: '18px',
         paragraphSpacing: '1em',
     });
+
+    const langCode = useMemo(() => {
+        const lang = projectData?.settings?.spellcheckLanguage;
+        return lang === 'browser-default' ? undefined : lang;
+    }, [projectData?.settings?.spellcheckLanguage]);
 
     const handleLanguageChange = (lang: SpellcheckLang) => {
         setProjectData(currentData => {
@@ -1010,14 +1027,20 @@ const ChapterEditorPage: React.FC = () => {
         };
     }, [isFormatPanelOpen]);
     
-    const handleReplaceAllInNovel = (find: string, replace: string) => {
+    const handleReplaceAllInNovel = (find: string, replace: string, caseSensitive: boolean, wholeWord: boolean) => {
         if (!find || novelIndex === -1) return;
 
         setProjectData(currentData => {
             if (!currentData) return null;
 
             const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const findRegex = new RegExp(escapeRegExp(find), 'gi');
+            let pattern = escapeRegExp(find);
+            if (wholeWord) {
+                pattern = `\\b${pattern}\\b`;
+            }
+            const flags = caseSensitive ? 'g' : 'gi';
+            const findRegex = new RegExp(pattern, flags);
+
             const tempDiv = document.createElement('div');
 
             const getWordCount = (html: string) => {
@@ -1098,6 +1121,7 @@ const ChapterEditorPage: React.FC = () => {
                             contentEditable
                             spellCheck={true}
                             suppressContentEditableWarning
+                            lang={langCode}
                             onInput={(e) => updateChapterField('content', e.currentTarget.innerHTML)}
                             onKeyDown={handleKeyDown}
                             onKeyUp={handleKeyUp}
