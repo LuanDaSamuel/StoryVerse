@@ -191,19 +191,19 @@ export const BlockquoteIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 export const H1Icon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-        <path d="M3 5h2v14H3V5zm4 0h2v5h4V5h2v14h-2v-7H9v7H7V5zm12 0h-2l-2 4h2v10h2V5z" />
+        <path d="M7 5h2v5h4V5h2v14h-2v-7H9v7H7V5zm12 0h-2l-2 4h2v10h2V5z" />
     </svg>
 );
 
 export const H2Icon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-        <path d="M3 5h2v14H3V5zm4 0h2v5h4V5h2v14h-2v-7H9v7H7V5zm12 14v-2c0-1.11-.9-2-2-2h-2v4h4zm-2-4h-2V9c0-1.1.9-2 2-2s2 .9 2 2v2h2V9c0-2.2-1.8-4-4-4h-4v2h4v2h-2c-1.1 0-2 .9-2 2v2c0 1.1.9 2 2 2h2z" />
+        <path d="M7 5h2v5h4V5h2v14h-2v-7H9v7H7V5z M19 19v-2c0-1.11-.9-2-2-2h-2v4h4zm-2-4h-2V9c0-1.1.9-2 2-2s2 .9 2 2v2h2V9c0-2.2-1.8-4-4-4h-4v2h4v2h-2c-1.1 0-2 .9-2 2v2c0 1.1.9 2 2 2h2z" />
     </svg>
 );
 
 export const H3Icon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-        <path d="M3 5h2v14H3V5zm4 0h2v5h4V5h2v14h-2v-7H9v7H7V5zm10 1c1.1 0 2 .9 2 2v2c0 1.1-.9 2-2 2h-2v2h4v2h-4c-1.1 0-2-.9-2-2v-2c0-1.1.9-2 2-2h2V8h-4V6h4zm-2 2h-2v2h2V8z" />
+        <path d="M7 5h2v5h4V5h2v14h-2v-7H9v7H7V5z M17 6c1.1 0 2 .9 2 2v2c0 1.1-.9 2-2 2h-2v2h4v2h-4c-1.1 0-2-.9-2-2v-2c0-1.1.9-2 2-2h2V8h-4V6h4zm-2 2h-2v2h2V8z" />
     </svg>
 );
 
