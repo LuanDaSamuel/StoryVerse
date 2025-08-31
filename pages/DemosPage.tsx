@@ -489,22 +489,56 @@ const DemosPage: React.FC = () => {
                 selection.removeAllRanges();
                 selection.addRange(range);
             } else {
-                const precedingRange = document.createRange();
+                // If no text is selected, insert a single smart quote based on context.
+                const { startContainer, startOffset } = range;
                 if (!editorRef.current) return;
+
+                // 1. Determine if the cursor is at the beginning of a block-level element.
+                let isAtStartOfBlock = false;
+                let node: Node | null = startContainer;
+                // Find the nearest ancestor element that is a direct child of the editor. This is our block.
+                while (node && node.parentNode !== editorRef.current) {
+                    node = node.parentNode;
+                }
+                
+                // If we are at the very start of the editor, consider it the start of a block.
+                if (editorRef.current.contains(startContainer) && startContainer === editorRef.current && startOffset === 0) {
+                     isAtStartOfBlock = true;
+                } else if (node && node.nodeType === Node.ELEMENT_NODE) {
+                    const rangeToCheck = document.createRange();
+                    rangeToCheck.selectNodeContents(node);
+                    rangeToCheck.setEnd(startContainer, startOffset);
+                    // If the text content from the start of the block to the cursor is empty, it's the start.
+                    if (rangeToCheck.toString().trim() === '') {
+                        isAtStartOfBlock = true;
+                    }
+                }
+
+                // Get text before the cursor for context.
+                const precedingRange = document.createRange();
                 precedingRange.setStart(editorRef.current, 0);
-                precedingRange.setEnd(range.startContainer, range.startOffset);
+                precedingRange.setEnd(startContainer, startOffset);
                 const textBeforeCursor = precedingRange.toString();
                 const lastChar = textBeforeCursor.slice(-1);
-                const isAfterWhitespace = !lastChar.trim();
-                const openQuotePreceders = new Set(['(', '[', '{', '“', '‘']);
-                const shouldBeOpening = isAfterWhitespace || openQuotePreceders.has(lastChar);
-                if (e.key === "'") {
-                    if (/\w/.test(lastChar)) document.execCommand('insertText', false, '’');
-                    else if (shouldBeOpening) document.execCommand('insertText', false, '‘');
-                    else document.execCommand('insertText', false, '’');
-                } else {
-                    if (shouldBeOpening) document.execCommand('insertText', false, '“');
-                    else document.execCommand('insertText', false, '”');
+
+                if (isAtStartOfBlock) {
+                    // Always use an opening quote at the start of a block.
+                    document.execCommand('insertText', false, e.key === '"' ? '“' : '‘');
+                } else if (e.key === "'") {
+                    // Heuristic for apostrophe vs. single quote.
+                    if (/\w/.test(lastChar)) {
+                        document.execCommand('insertText', false, '’'); // Apostrophe
+                    } else {
+                        // Balance single quotes.
+                        const openSingleCount = (textBeforeCursor.match(/‘/g) || []).length;
+                        const closeSingleCount = (textBeforeCursor.match(/’/g) || []).length;
+                        document.execCommand('insertText', false, openSingleCount > closeSingleCount ? '’' : '‘');
+                    }
+                } else { // e.key === '"'
+                    // Balance double quotes.
+                    const openDoubleCount = (textBeforeCursor.match(/“/g) || []).length;
+                    const closeDoubleCount = (textBeforeCursor.match(/”/g) || []).length;
+                    document.execCommand('insertText', false, openDoubleCount > closeDoubleCount ? '”' : '“');
                 }
             }
             editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
