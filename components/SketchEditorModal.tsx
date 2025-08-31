@@ -3,7 +3,7 @@ import React, { useState, useContext, useEffect, useRef } from 'react';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { NovelSketch } from '../types';
 import { SKETCH_TAG_OPTIONS, enhancePlainText } from '../constants';
-import { CloseIcon } from './Icons';
+import { CloseIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon } from './Icons';
 
 interface SketchEditorModalProps {
   sketch: NovelSketch | null;
@@ -21,6 +21,7 @@ const SketchEditorModal: React.FC<SketchEditorModalProps> = ({ sketch, onClose, 
     const [content, setContent] = useState('');
     const [tags, setTags] = useState<string[]>([]);
     const [selectedNovelId, setSelectedNovelId] = useState<string>('');
+    const [isFullScreen, setIsFullScreen] = useState(false);
     const editorRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -47,6 +48,19 @@ const SketchEditorModal: React.FC<SketchEditorModalProps> = ({ sketch, onClose, 
         }
 
     }, [sketch, contextualNovelId, novels]);
+    
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape' && isFullScreen) {
+                event.preventDefault();
+                setIsFullScreen(false);
+            }
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [isFullScreen]);
 
     const handleTagClick = (tag: string) => {
         setTags(prev => {
@@ -80,16 +94,31 @@ const SketchEditorModal: React.FC<SketchEditorModalProps> = ({ sketch, onClose, 
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4" onClick={onClose} role="dialog" aria-modal="true">
-            <div className={`w-full max-w-2xl p-6 rounded-lg shadow-xl ${themeClasses.bgSecondary} ${themeClasses.text} border ${themeClasses.border} flex flex-col max-h-[90vh]`} onClick={e => e.stopPropagation()}>
-                <div className="flex justify-between items-center mb-4 flex-shrink-0">
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center" onClick={onClose} role="dialog" aria-modal="true">
+            <div 
+                className={`
+                    flex flex-col shadow-xl transition-all duration-300
+                    ${themeClasses.bgSecondary} ${themeClasses.text} border ${themeClasses.border}
+                    ${isFullScreen 
+                        ? 'w-screen h-screen max-w-full max-h-full rounded-none' 
+                        : 'w-full max-w-2xl rounded-lg max-h-[90vh] m-4'
+                    }
+                `} 
+                onClick={e => e.stopPropagation()}
+            >
+                <div className="flex justify-between items-center p-6 pb-4 flex-shrink-0">
                     <h2 className="text-2xl font-bold">{isNew ? 'Create Sketch' : 'Edit Sketch'}</h2>
-                    <button onClick={onClose} className={`p-1 rounded-full hover:${themeClasses.bgTertiary}`}>
-                        <CloseIcon className="w-6 h-6" />
-                    </button>
+                     <div className="flex items-center space-x-2">
+                        <button onClick={() => setIsFullScreen(p => !p)} title={isFullScreen ? "Exit Full Screen" : "Enter Full Screen"} className={`p-1 rounded-full hover:${themeClasses.bgTertiary}`}>
+                            {isFullScreen ? <ArrowsPointingInIcon className="w-6 h-6" /> : <ArrowsPointingOutIcon className="w-6 h-6" />}
+                        </button>
+                        <button onClick={onClose} className={`p-1 rounded-full hover:${themeClasses.bgTertiary}`}>
+                            <CloseIcon className="w-6 h-6" />
+                        </button>
+                    </div>
                 </div>
 
-                <div className="space-y-4 overflow-y-auto pr-2 -mr-2">
+                <div className={`space-y-4 overflow-y-auto px-6 ${isFullScreen ? 'flex-grow' : ''}`}>
                     <input
                         type="text"
                         value={title}
@@ -136,12 +165,16 @@ const SketchEditorModal: React.FC<SketchEditorModalProps> = ({ sketch, onClose, 
                         ref={editorRef}
                         contentEditable
                         suppressContentEditableWarning
-                        className={`w-full min-h-[200px] p-3 rounded-md outline-none border ${themeClasses.border} ${themeClasses.input} story-content`}
+                        className={`
+                            w-full p-3 rounded-md outline-none border ${themeClasses.border} ${themeClasses.input} story-content
+                            transition-all duration-300
+                            ${isFullScreen ? 'min-h-[60vh] h-full' : 'min-h-[200px]'}
+                        `}
                         dangerouslySetInnerHTML={{ __html: content }}
                     />
                 </div>
 
-                <div className="flex justify-end space-x-4 mt-6 flex-shrink-0">
+                <div className="flex justify-end space-x-4 p-6 pt-4 flex-shrink-0">
                     <button onClick={onClose} className={`px-6 py-2 font-semibold rounded-lg ${themeClasses.bgTertiary} hover:opacity-80 transition-opacity`}>
                         Cancel
                     </button>
