@@ -10,6 +10,7 @@ const FILE_HANDLE_KEY = 'storyverse-file-handle';
 const defaultProjectData: ProjectData = {
   settings: {
     theme: 'book',
+    spellcheckLanguage: 'en',
   },
   novels: [],
   sketches: [],
@@ -282,7 +283,7 @@ export function useProjectFile() {
         });
 
         const theme = projectData?.settings?.theme || 'book';
-        const newProjectData = { ...defaultProjectData, settings: { theme } };
+        const newProjectData = { ...defaultProjectData, settings: { ...defaultProjectData.settings, theme } };
 
         const writable = await handle.createWritable();
         await writable.write(JSON.stringify(newProjectData, null, 2));

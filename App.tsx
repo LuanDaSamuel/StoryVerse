@@ -63,6 +63,15 @@ const AppContent = () => {
         }
     }, [status, navigate]);
 
+    // This effect sets the document's language for spellchecking.
+    useEffect(() => {
+        const lang = projectData?.settings?.spellcheckLanguage;
+        if (lang) {
+            const langCode = lang === 'browser-default' ? '' : lang;
+            document.documentElement.lang = langCode;
+        }
+    }, [projectData?.settings?.spellcheckLanguage]);
+
     const theme = useMemo(() => {
         const projectTheme = projectData?.settings?.theme || 'book';
         // Fallback to 'book' theme if the saved theme from a project file is no longer valid.

@@ -1,8 +1,8 @@
 import React, { useState, useContext, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
-import { Sketch } from '../types';
-import { UploadIcon, PlusIcon, TrashIcon, LightbulbIcon, ChevronDownIcon, TextIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, Bars3Icon, CloseIcon, ListBulletIcon, HomeIcon, SearchIcon, DownloadIcon, ChartBarIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon, BlockquoteIcon, OrderedListIcon, ChevronLeftIcon, ChevronRightIcon } from '../components/Icons';
+import { Sketch, SpellcheckLang } from '../types';
+import { UploadIcon, PlusIcon, TrashIcon, LightbulbIcon, ChevronDownIcon, TextIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, Bars3Icon, CloseIcon, ListBulletIcon, HomeIcon, SearchIcon, DownloadIcon, ChartBarIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon, BlockquoteIcon, OrderedListIcon, ChevronLeftIcon, ChevronRightIcon, H1Icon, H2Icon, H3Icon } from '../components/Icons';
 import { enhanceHtml, enhancePlainText } from '../constants';
 import { THEME_CONFIG } from '../constants';
 import * as mammoth from 'mammoth';
@@ -223,12 +223,20 @@ const DemosPage: React.FC = () => {
     const [activeFormats, setActiveFormats] = useState({ isBold: false, isItalic: false, isUL: false, isOL: false });
     const [currentFormat, setCurrentFormat] = useState({ paragraphStyle: 'p', font: fontOptions[0].value, size: '18px', paragraphSpacing: '1em' });
 
+    const handleLanguageChange = (lang: SpellcheckLang) => {
+        setProjectData(currentData => {
+            if (!currentData) return null;
+            return {
+                ...currentData,
+                settings: { ...currentData.settings, spellcheckLanguage: lang },
+            };
+        });
+    };
+
     const cleanupEditor = useCallback(() => {
         if (!editorRef.current) return;
         const editor = editorRef.current;
 
-        // Remove empty inline elements that cause deletion issues.
-        // Run multiple passes to handle nested empty elements.
         for (let i = 0; i < 3; i++) {
             let changed = false;
             editor.querySelectorAll('span, strong, em, i, b').forEach(el => {
@@ -240,7 +248,6 @@ const DemosPage: React.FC = () => {
             if (!changed) break;
         }
 
-        // Merge adjacent text nodes. This is the key fix for "stuck word" issues.
         editor.normalize();
     }, []);
 
@@ -249,8 +256,6 @@ const DemosPage: React.FC = () => {
     
     const editorStyle = useMemo(() => theme === 'book' ? { color: THEME_CONFIG.book.text.match(/\[(.*?)\]/)?.[1] || '#F5EADD' } : { color: 'inherit' }, [theme]);
     const colorPalette = useMemo(() => theme === 'book' ? [THEME_CONFIG.book.text.match(/\[(.*?)\]/)?.[1] || '#F5EADD', '#3B82F6', '#FBBF24', '#22C55E', '#EC4899'] : ['#3B2F27', '#3B82F6', '#FBBF24', '#22C55E', '#EC4899'], [theme]);
-
-    // --- Effects for state management and setup ---
 
     useEffect(() => {
         if (sketches.length > 0 && !sketches.some(s => s.id === selectedSketchId)) setSelectedSketchId(sketches[0].id);
@@ -325,8 +330,6 @@ const DemosPage: React.FC = () => {
         };
     }, [selectedSketchId]);
 
-    // --- Handlers for sketch data operations ---
-
     const handleCreateSketch = () => {
         const now = new Date().toISOString();
         const newSketch: Sketch = { id: crypto.randomUUID(), title: 'Untitled Sketch', content: '<p><br></p>', createdAt: now, updatedAt: now };
@@ -384,8 +387,6 @@ const DemosPage: React.FC = () => {
         e.target.value = '';
     };
 
-    // --- Handlers for export ---
-
     const handleExport = (format: 'txt' | 'html' | 'md') => {
         if (!selectedSketch) return;
         const slugify = (text: string) => text.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
@@ -433,7 +434,6 @@ const DemosPage: React.FC = () => {
             const closeQuote = e.key === '"' ? '”' : '’';
 
             if (!range.collapsed) {
-                // If text is selected, wrap it with smart quotes
                 const selectedContent = range.extractContents();
                 const fragment = document.createDocumentFragment();
                 fragment.appendChild(document.createTextNode(openQuote));
@@ -444,38 +444,22 @@ const DemosPage: React.FC = () => {
                 selection.removeAllRanges();
                 selection.addRange(range);
             } else {
-                // If no text is selected, insert a single smart quote based on context
                 const precedingRange = document.createRange();
                 if (!editorRef.current) return;
-
                 precedingRange.setStart(editorRef.current, 0);
                 precedingRange.setEnd(range.startContainer, range.startOffset);
-                
                 const textBeforeCursor = precedingRange.toString();
                 const lastChar = textBeforeCursor.slice(-1);
-
-                // An opening quote should appear at the start of the text, after whitespace,
-                // or after another opening punctuation/quote mark.
-                const isAfterWhitespace = !lastChar.trim(); // This is true for '', ' ', '\n', etc.
+                const isAfterWhitespace = !lastChar.trim();
                 const openQuotePreceders = new Set(['(', '[', '{', '“', '‘']);
-                
                 const shouldBeOpening = isAfterWhitespace || openQuotePreceders.has(lastChar);
-
                 if (e.key === "'") {
-                    // Apostrophe rule: if immediately preceded by a word character.
-                    if (/\w/.test(lastChar)) {
-                        document.execCommand('insertText', false, '’');
-                    } else if (shouldBeOpening) {
-                        document.execCommand('insertText', false, '‘');
-                    } else {
-                        document.execCommand('insertText', false, '’');
-                    }
-                } else { // key is '"'
-                    if (shouldBeOpening) {
-                        document.execCommand('insertText', false, '“');
-                    } else {
-                        document.execCommand('insertText', false, '”');
-                    }
+                    if (/\w/.test(lastChar)) document.execCommand('insertText', false, '’');
+                    else if (shouldBeOpening) document.execCommand('insertText', false, '‘');
+                    else document.execCommand('insertText', false, '’');
+                } else {
+                    if (shouldBeOpening) document.execCommand('insertText', false, '“');
+                    else document.execCommand('insertText', false, '”');
                 }
             }
             editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
@@ -486,12 +470,8 @@ const DemosPage: React.FC = () => {
             setTimeout(() => {
                 const sel = window.getSelection();
                 if (!sel?.rangeCount || !editorRef.current) return;
-        
                 let currentBlock = sel.getRangeAt(0).startContainer;
-                while (currentBlock && currentBlock.parentNode !== editorRef.current) {
-                    currentBlock = currentBlock.parentNode;
-                }
-        
+                while (currentBlock && currentBlock.parentNode !== editorRef.current) currentBlock = currentBlock.parentNode;
                 if (currentBlock instanceof HTMLElement) {
                     const isNewBlockEmpty = (currentBlock.textContent?.trim() === '' && currentBlock.children.length === 0) || currentBlock.innerHTML === '<br>';
                     if (isNewBlockEmpty) {
@@ -499,23 +479,16 @@ const DemosPage: React.FC = () => {
                         if (previousBlock instanceof HTMLElement) {
                             let styleSource: Element = previousBlock;
                             let lastNode: Node | null = previousBlock;
-                            while (lastNode && lastNode.lastChild) {
-                                lastNode = lastNode.lastChild;
-                            }
-                            if (lastNode) {
-                                styleSource = lastNode.nodeType === Node.TEXT_NODE ? lastNode.parentElement! : lastNode as Element;
-                            }
-                            
+                            while (lastNode && lastNode.lastChild) lastNode = lastNode.lastChild;
+                            if (lastNode) styleSource = lastNode.nodeType === Node.TEXT_NODE ? lastNode.parentElement! : lastNode as Element;
                             const computedStyle = window.getComputedStyle(styleSource);
                             const editorStyles = window.getComputedStyle(editorRef.current!);
-                            
                             if (computedStyle.fontFamily !== editorStyles.fontFamily) {
                                 currentBlock.innerHTML = '';
                                 const styleCarrier = document.createElement('span');
                                 styleCarrier.style.fontFamily = computedStyle.fontFamily;
                                 styleCarrier.innerHTML = '&#8203;';
                                 currentBlock.appendChild(styleCarrier);
-        
                                 const newRange = document.createRange();
                                 newRange.setStart(styleCarrier, 1);
                                 newRange.collapse(true);
@@ -529,18 +502,51 @@ const DemosPage: React.FC = () => {
             setTimeout(cleanupEditor, 10);
         }
     };
+    
+    const handleKeyUp = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+        if (e.key !== ' ' || !editorRef.current) return;
+
+        const selection = window.getSelection();
+        if (!selection || !selection.rangeCount) return;
+
+        const range = selection.getRangeAt(0);
+        if (!range.collapsed) return;
+
+        let blockElement: Node | null = range.startContainer;
+        while (blockElement && blockElement.parentNode !== editorRef.current) {
+            blockElement = blockElement.parentNode;
+        }
+
+        if (!(blockElement instanceof HTMLElement)) return;
+
+        const text = blockElement.textContent || '';
+        let format: 'h1' | 'h2' | 'h3' | null = null;
+        let markdownLength = 0;
+
+        if (text.startsWith('# ')) { format = 'h1'; markdownLength = 2; } 
+        else if (text.startsWith('## ')) { format = 'h2'; markdownLength = 3; } 
+        else if (text.startsWith('### ')) { format = 'h3'; markdownLength = 4; }
+        
+        if (format) {
+            const textNode = blockElement.firstChild;
+            if (textNode?.nodeType === Node.TEXT_NODE && (textNode.textContent?.length ?? 0) >= markdownLength) {
+                const markdownRange = document.createRange();
+                markdownRange.setStart(textNode, 0);
+                markdownRange.setEnd(textNode, markdownLength);
+                selection.removeAllRanges();
+                selection.addRange(markdownRange);
+                document.execCommand('delete', false);
+                document.execCommand('formatBlock', false, format);
+                editorRef.current.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+            }
+        }
+    }, []);
 
     const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
         e.preventDefault();
-        
         const text = e.clipboardData.getData('text/plain');
         if (!text) return;
-
-        const htmlToInsert = text
-            .split(/\r?\n/)
-            .map(line => `<p>${line.trim() === '' ? '<br>' : enhancePlainText(line)}</p>`)
-            .join('');
-
+        const htmlToInsert = text.split(/\r?\n/).map(line => `<p>${line.trim() === '' ? '<br>' : enhancePlainText(line)}</p>`).join('');
         document.execCommand('insertHTML', false, htmlToInsert);
         cleanupEditor();
     };
@@ -548,23 +554,17 @@ const DemosPage: React.FC = () => {
     const handleCopy = useCallback((e: ClipboardEvent) => {
         const selection = window.getSelection();
         if (!selection?.rangeCount) return;
-    
         const selectedText = selection.toString();
         const cleanedText = selectedText.replace(/(\r\n|\n|\r){2,}/g, '\n\n').trim();
-    
         if (cleanedText.length < selectedText.length || (selectedText.length > 0 && cleanedText.length === 0)) {
             e.preventDefault();
-    
             const selectedHtmlFragment = selection.getRangeAt(0).cloneContents();
             const tempDiv = document.createElement('div');
             tempDiv.appendChild(selectedHtmlFragment);
-            
             e.clipboardData?.setData('text/plain', cleanedText);
             e.clipboardData?.setData('text/html', tempDiv.innerHTML);
         }
     }, []);
-
-    // --- Formatting Logic ---
 
     const updateActiveFormats = useCallback(() => {
         setActiveFormats({
@@ -609,34 +609,87 @@ const DemosPage: React.FC = () => {
         updateCurrentFormat();
     }, [updateActiveFormats, updateCurrentFormat]);
 
-    const applyCommand = (cmd: string, value?: string) => {
+    const applyAndSaveFormat = useCallback((formatAction: () => void) => {
         if (!editorRef.current) return;
-        document.execCommand(cmd, false, value);
-        editorRef.current.dispatchEvent(new Event('input', { bubbles: true }));
+        formatAction();
         cleanupEditor();
+        editorRef.current.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
         editorRef.current.focus();
         handleSelectionChange();
-    };
+    }, [handleSelectionChange, cleanupEditor]);
 
+    const applyCommand = (cmd: string, value?: string) => {
+        applyAndSaveFormat(() => document.execCommand(cmd, false, value));
+    };
+    
     const applyParagraphStyle = (style: string) => applyCommand('formatBlock', style);
     const applyFont = (fontValue: string) => applyCommand('fontName', fontOptions.find(f => f.value === fontValue)?.name || 'serif');
     const applyColor = (color: string) => applyCommand('foreColor', color);
     const applyParagraphSpacing = (spacing: string) => {
-        const selection = window.getSelection();
-        if (!selection?.rangeCount) return;
-        let node = selection.getRangeAt(0).startContainer;
-        if (node.nodeType === 3) node = node.parentNode!;
-        while (node && node !== editorRef.current) {
-            if (node instanceof HTMLElement && ['P', 'H1', 'H2', 'H3', 'DIV'].includes(node.tagName)) {
-                node.style.marginBottom = spacing;
-                editorRef.current?.dispatchEvent(new Event('input', { bubbles: true }));
-                return;
+        applyAndSaveFormat(() => {
+            const selection = window.getSelection();
+            if (!selection?.rangeCount) return;
+            let node = selection.getRangeAt(0).startContainer;
+            if (node.nodeType === 3) node = node.parentNode!;
+            while (node && node !== editorRef.current) {
+                if (node instanceof HTMLElement && ['P', 'H1', 'H2', 'H3', 'DIV'].includes(node.tagName)) {
+                    node.style.marginBottom = spacing; return;
+                }
+                node = node.parentNode!;
             }
-            node = node.parentNode!;
-        }
+        });
     };
     
-    // --- Lifecycle and event listeners ---
+    const applyFontSize = (size: string) => {
+        applyAndSaveFormat(() => {
+            if (!editorRef.current) return;
+            editorRef.current.focus();
+            const selection = window.getSelection();
+            if (!selection?.rangeCount) return;
+            if (selection.isCollapsed) {
+                const range = selection.getRangeAt(0);
+                const span = document.createElement('span');
+                span.style.fontSize = size;
+                span.textContent = '\u200B';
+                range.insertNode(span);
+                range.selectNodeContents(span);
+                range.collapse(false);
+                selection.removeAllRanges();
+                selection.addRange(range);
+                return;
+            }
+            const DUMMY_COLOR_RGB = 'rgb(1, 2, 3)';
+            document.execCommand('styleWithCSS', false, 'true');
+            document.execCommand('hiliteColor', false, DUMMY_COLOR_RGB);
+            const tempSpans = Array.from(editorRef.current.querySelectorAll<HTMLElement>(`span[style*="background-color: ${DUMMY_COLOR_RGB}"]`));
+            const parentsToClean = new Set<Node>();
+            tempSpans.forEach(span => {
+                if (span.parentElement) parentsToClean.add(span.parentElement);
+                span.style.backgroundColor = '';
+                span.style.fontSize = size;
+                if (!span.getAttribute('style')?.trim()) {
+                    const parent = span.parentNode;
+                    if (parent) {
+                        while (span.firstChild) parent.insertBefore(span.firstChild, span);
+                        parent.removeChild(span);
+                    }
+                }
+            });
+            parentsToClean.forEach(parent => {
+                let child = parent.firstChild;
+                while (child) {
+                    const next = child.nextSibling;
+                    if (next && child instanceof HTMLSpanElement && next instanceof HTMLSpanElement && child.style.cssText === next.style.cssText) {
+                        while (next.firstChild) child.appendChild(next.firstChild);
+                        parent.removeChild(next);
+                    } else {
+                        child = next;
+                    }
+                }
+                parent.normalize();
+            });
+        });
+    };
 
     useEffect(() => {
         const editorEl = editorRef.current;
@@ -654,18 +707,11 @@ const DemosPage: React.FC = () => {
         };
     }, [handleSelectionChange, handleCopy]);
 
-    // --- Render ---
-
     return (
         <div className={`flex flex-col h-screen ${themeClasses.bg} font-sans transition-all duration-300 ${isDistractionFree ? 'is-distraction-free' : ''}`}>
             {!isOutlineSidebarOpen && (
                 <div className="fixed top-0 left-0 h-full z-40 flex items-center">
-                    <button
-                        onClick={() => setIsOutlineSidebarOpen(true)}
-                        className={`pl-2 pr-1 py-3 bg-stone-900/70 backdrop-blur-sm border-y border-r border-white/10 rounded-r-lg text-white/70 hover:bg-stone-800/70 transition-colors ${!selectedSketchId ? 'hidden' : ''}`}
-                        aria-label="Show document outline"
-                        disabled={!selectedSketchId}
-                    >
+                    <button onClick={() => setIsOutlineSidebarOpen(true)} className={`pl-2 pr-1 py-3 bg-stone-900/70 backdrop-blur-sm border-y border-r border-white/10 rounded-r-lg text-white/70 hover:bg-stone-800/70 transition-colors ${!selectedSketchId ? 'hidden' : ''}`} aria-label="Show document outline" disabled={!selectedSketchId}>
                         <ChevronRightIcon className="w-5 h-5" />
                     </button>
                 </div>
@@ -673,92 +719,50 @@ const DemosPage: React.FC = () => {
             
              <div className={`fixed top-0 left-0 h-full z-40 flex items-start transition-transform duration-300 ease-in-out ${isOutlineSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
                 <div className={`w-64 h-full bg-stone-900/80 border-r border-white/10 backdrop-blur-sm flex flex-col ${isDistractionFree ? 'pt-4' : 'pt-16'}`}>
-                    <div className="p-4 border-b border-white/10 flex justify-between items-center flex-shrink-0">
-                        <h3 className="font-bold text-white">Document Outline</h3>
-                        <button
-                            onClick={() => setIsOutlineSidebarOpen(false)}
-                            className="p-1 rounded-full text-white/70 hover:bg-white/10"
-                            aria-label="Close outline"
-                        >
-                            <ChevronLeftIcon className="w-5 h-5"/>
-                        </button>
-                    </div>
+                    <div className="p-4 border-b border-white/10 flex justify-between items-center flex-shrink-0"><h3 className="font-bold text-white">Document Outline</h3><button onClick={() => setIsOutlineSidebarOpen(false)} className="p-1 rounded-full text-white/70 hover:bg-white/10" aria-label="Close outline"><ChevronLeftIcon className="w-5 h-5"/></button></div>
                     <nav className="flex-1 overflow-y-auto p-2">
-                        {headings.length > 0 ? (
-                            <ul className="space-y-1">
-                                {headings.map(h => (
-                                    <li key={h.id}>
-                                        <button
-                                            onClick={() => {
-                                                const el = document.getElementById(h.id);
-                                                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                            }}
-                                            className={`w-full text-left px-2 py-1 rounded text-sm text-white/80 hover:bg-white/10 truncate ${h.level === 2 ? 'pl-6' : ''} ${h.level === 3 ? 'pl-10' : ''}`}
-                                            title={h.text}
-                                        >
-                                            {enhancePlainText(h.text)}
-                                        </button>
-                                    </li>
-                                ))}
-                            </ul>
-                        ) : (
-                            <p className="p-4 text-sm text-white/50">No headings in document.</p>
-                        )}
+                        {headings.length > 0 ? (<ul className="space-y-1">{headings.map(h => (<li key={h.id}><button onClick={() => {const el = document.getElementById(h.id); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });}} className={`w-full text-left px-2 py-1 rounded text-sm text-white/80 hover:bg-white/10 truncate ${h.level === 2 ? 'pl-6' : ''} ${h.level === 3 ? 'pl-10' : ''}`} title={h.text}>{enhancePlainText(h.text)}</button></li>))}</ul>) : (<p className="p-4 text-sm text-white/50">No headings in document.</p>)}
                     </nav>
+                    <div className="p-4 border-t border-white/10 flex-shrink-0">
+                        <label className="block text-sm font-semibold mb-2 text-white/90" htmlFor="spellcheck-lang-demos">
+                            Language & Spelling
+                        </label>
+                        <select
+                            id="spellcheck-lang-demos"
+                            value={projectData?.settings.spellcheckLanguage || 'en'}
+                            onChange={(e) => handleLanguageChange(e.target.value as SpellcheckLang)}
+                            className="w-full px-3 py-2 rounded-md text-sm bg-stone-800 border border-stone-600 text-white"
+                        >
+                            <option value="en">English</option>
+                            <option value="fi">Finnish (Suomi)</option>
+                            <option value="vi">Vietnamese (Tiếng Việt)</option>
+                            <option value="browser-default">Browser Default</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
-            {/* Header */}
             <header className={`flex-shrink-0 flex items-center justify-between p-3 border-b ${themeClasses.border} ${isDistractionFree ? 'hidden' : ''}`}>
-                <div className="flex items-center space-x-2">
-                    <button onClick={() => navigate('/')} className="p-2 rounded-md hover:bg-white/10"><HomeIcon className={`w-5 h-5 ${themeClasses.text}`} /></button>
-                    <div className="w-px h-5 bg-white/20"></div>
-                    <button onClick={() => setIsOutlineModalOpen(true)} className="p-2 rounded-md hover:bg-white/10"><Bars3Icon className={`w-5 h-5 ${themeClasses.text}`} /></button>
-                </div>
+                <div className="flex items-center space-x-2"><button onClick={() => navigate('/')} className="p-2 rounded-md hover:bg-white/10"><HomeIcon className={`w-5 h-5 ${themeClasses.text}`} /></button><div className="w-px h-5 bg-white/20"></div><button onClick={() => setIsOutlineModalOpen(true)} className="p-2 rounded-md hover:bg-white/10"><Bars3Icon className={`w-5 h-5 ${themeClasses.text}`} /></button></div>
                 {selectedSketch && <input key={`${selectedSketch.id}-title`} defaultValue={selectedSketch.title} onBlur={(e) => handleUpdateSketch('title', e.target.value)} placeholder="Sketch Title" className={`text-lg font-semibold bg-transparent outline-none w-1/2 text-center ${themeClasses.text}`} />}
-                <div className="flex items-center space-x-2">
-                    <button onClick={() => setIsFindReplaceOpen(p => !p)} className="p-2 rounded-md hover:bg-white/10" disabled={!selectedSketchId}><SearchIcon className={`w-5 h-5 ${themeClasses.text}`} /></button>
-                    <button onClick={() => setIsStatsOpen(p => !p)} className="p-2 rounded-md hover:bg-white/10" disabled={!selectedSketchId}><ChartBarIcon className={`w-5 h-5 ${themeClasses.text}`} /></button>
-                    <div className="relative"><button onClick={() => setIsExportMenuOpen(p => !p)} className="p-2 rounded-md hover:bg-white/10" disabled={!selectedSketchId}><DownloadIcon className={`w-5 h-5 ${themeClasses.text}`} /></button>
-                        {isExportMenuOpen && <div className={`absolute top-full right-0 mt-2 w-48 p-2 rounded-md shadow-lg ${themeClasses.bgSecondary} border ${themeClasses.border}`}><button onClick={() => handleExport('html')} className={`block w-full text-left px-3 py-2 rounded hover:${themeClasses.bgTertiary}`}>Export as .html</button><button onClick={() => handleExport('txt')} className={`block w-full text-left px-3 py-2 rounded hover:${themeClasses.bgTertiary}`}>Export as .txt</button><button onClick={() => handleExport('md')} className={`block w-full text-left px-3 py-2 rounded hover:${themeClasses.bgTertiary}`}>Export as .md</button></div>}
-                    </div>
-                    <button onClick={() => setIsDistractionFree(p => !p)} className="p-2 rounded-md hover:bg-white/10">{isDistractionFree ? <ArrowsPointingInIcon className={`w-5 h-5 ${themeClasses.text}`} /> : <ArrowsPointingOutIcon className={`w-5 h-5 ${themeClasses.text}`} />}</button>
-                </div>
+                <div className="flex items-center space-x-2"><button onClick={() => setIsFindReplaceOpen(p => !p)} className="p-2 rounded-md hover:bg-white/10" disabled={!selectedSketchId}><SearchIcon className={`w-5 h-5 ${themeClasses.text}`} /></button><button onClick={() => setIsStatsOpen(p => !p)} className="p-2 rounded-md hover:bg-white/10" disabled={!selectedSketchId}><ChartBarIcon className={`w-5 h-5 ${themeClasses.text}`} /></button><div className="relative"><button onClick={() => setIsExportMenuOpen(p => !p)} className="p-2 rounded-md hover:bg-white/10" disabled={!selectedSketchId}><DownloadIcon className={`w-5 h-5 ${themeClasses.text}`} /></button>{isExportMenuOpen && <div className={`absolute top-full right-0 mt-2 w-48 p-2 rounded-md shadow-lg ${themeClasses.bgSecondary} border ${themeClasses.border}`}><button onClick={() => handleExport('html')} className={`block w-full text-left px-3 py-2 rounded hover:${themeClasses.bgTertiary}`}>Export as .html</button><button onClick={() => handleExport('txt')} className={`block w-full text-left px-3 py-2 rounded hover:${themeClasses.bgTertiary}`}>Export as .txt</button><button onClick={() => handleExport('md')} className={`block w-full text-left px-3 py-2 rounded hover:${themeClasses.bgTertiary}`}>Export as .md</button></div>}</div><button onClick={() => setIsDistractionFree(p => !p)} className="p-2 rounded-md hover:bg-white/10">{isDistractionFree ? <ArrowsPointingInIcon className={`w-5 h-5 ${themeClasses.text}`} /> : <ArrowsPointingOutIcon className={`w-5 h-5 ${themeClasses.text}`} />}</button></div>
             </header>
             
             <input type="file" ref={docxInputRef} onChange={handleDocxImport} className="hidden" accept=".docx" />
             
             <main className="flex-1 overflow-y-auto" ref={scrollContainerRef}>
                 <div className={`p-8 md:p-12 font-serif min-h-full max-w-4xl mx-auto ${isDistractionFree ? 'pt-24' : ''}`}>
-                    {selectedSketch ? (
-                        <div 
-                            ref={editorRef} 
-                            key={`${selectedSketch.id}-content`} 
-                            contentEditable 
-                            spellCheck={true} 
-                            suppressContentEditableWarning 
-                            onInput={(e) => handleUpdateSketch('content', e.currentTarget.innerHTML)} 
-                            onKeyDown={handleKeyDown}
-                            onPaste={handlePaste}
-                            onBlur={cleanupEditor}
-                            className={`w-full text-lg leading-relaxed outline-none story-content ${themeClasses.text}`} 
-                            style={editorStyle} 
-                        />
-                    ) : (
-                        <div className="flex flex-col items-center justify-center h-full text-center mt-[-4rem]"><LightbulbIcon className={`w-16 h-16 mb-4 ${themeClasses.textSecondary}`} /><h2 className={`text-2xl font-bold ${themeClasses.accentText}`}>Welcome to Demos</h2><p className={`mt-2 max-w-md ${themeClasses.textSecondary}`}>This is your space for ideas and notes. Create a new sketch to get started.</p><button onClick={handleCreateSketch} className={`mt-8 flex items-center justify-center space-x-2 px-6 py-3 text-lg font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}><PlusIcon className="w-6 h-6" /><span>Create First Sketch</span></button></div>
-                    )}
+                    {selectedSketch ? (<div ref={editorRef} key={`${selectedSketch.id}-content`} contentEditable spellCheck={true} suppressContentEditableWarning onInput={(e) => handleUpdateSketch('content', e.currentTarget.innerHTML)} onKeyDown={handleKeyDown} onKeyUp={handleKeyUp} onPaste={handlePaste} onBlur={cleanupEditor} className={`w-full text-lg leading-relaxed outline-none story-content ${themeClasses.text}`} style={editorStyle} />) : (<div className="flex flex-col items-center justify-center h-full text-center mt-[-4rem]"><LightbulbIcon className={`w-16 h-16 mb-4 ${themeClasses.textSecondary}`} /><h2 className={`text-2xl font-bold ${themeClasses.accentText}`}>Welcome to Demos</h2><p className={`mt-2 max-w-md ${themeClasses.textSecondary}`}>This is your space for ideas and notes. Create a new sketch to get started.</p><button onClick={handleCreateSketch} className={`mt-8 flex items-center justify-center space-x-2 px-6 py-3 text-lg font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}><PlusIcon className="w-6 h-6" /><span>Create First Sketch</span></button></div>)}
                 </div>
             </main>
 
-            {/* Modals & Dialogs */}
             <SketchesOutlineModal isOpen={isOutlineModalOpen} onClose={() => setIsOutlineModalOpen(false)} sketches={sketches} selectedSketchId={selectedSketchId} onSelect={handleSelectSketch} onCreate={handleCreateSketch} onImportClick={() => docxInputRef.current?.click()} onDelete={handleDeleteSketch} themeClasses={themeClasses} />
             <FindReplaceDialog isOpen={isFindReplaceOpen} onClose={() => setIsFindReplaceOpen(false)} editorRef={editorRef} />
             {isStatsOpen && <div className={`fixed top-20 right-8 p-4 rounded-lg shadow-2xl w-full max-w-xs ${themeClasses.bgSecondary} ${themeClasses.accentText} border ${themeClasses.border} z-50`}><div className="flex justify-between items-center mb-2"><h2 className="text-lg font-bold">Statistics</h2><button onClick={() => setIsStatsOpen(false)} className={`p-1 rounded-full hover:${themeClasses.bgTertiary}`}><CloseIcon className="w-5 h-5" /></button></div><div className="space-y-2 text-sm"><div><strong>Word Count:</strong> {stats.wordCount.toLocaleString()}</div><div><strong>Character Count:</strong> {stats.charCount.toLocaleString()}</div></div></div>}
             
-            {/* Floating Toolbar */}
             <div className={`absolute bottom-0 left-0 w-full flex justify-center pb-4 z-20 pointer-events-none transition-opacity duration-300 ${isDistractionFree ? 'opacity-0' : 'opacity-100'}`}>
                 <div ref={toolbarRef} className="relative pointer-events-auto">
-                    {isFormatPanelOpen && (<div className="absolute bottom-full mb-2 p-4 rounded-lg shadow-lg bg-stone-900/80 border border-white/10 backdrop-blur-sm w-[320px]"><div className="space-y-4"><ToolbarDropdown label="Paragraph Style" value={currentFormat.paragraphStyle} onChange={(e) => applyParagraphStyle(e.target.value)}><option value="p">Paragraph</option><option value="h1">Heading 1</option><option value="h2">Heading 2</option><option value="h3">Heading 3</option><option value="blockquote">Blockquote</option></ToolbarDropdown><ToolbarDropdown label="Font" value={currentFormat.font} onChange={(e) => applyFont(e.target.value)}>{fontOptions.map(f => <option key={f.name} value={f.value}>{f.name}</option>)}</ToolbarDropdown><div className="grid grid-cols-2 gap-4"><ToolbarDropdown label="Size" value={currentFormat.size} onChange={(e) => console.log('Size change not implemented yet')}><option value="14px">14</option><option value="16px">16</option><option value="18px">18</option><option value="20px">20</option><option value="24px">24</option></ToolbarDropdown><ToolbarDropdown label="Paragraph Spacing" value={currentFormat.paragraphSpacing} onChange={(e) => applyParagraphSpacing(e.target.value)}><option value="0.5em">0.5</option><option value="1em">1.0</option><option value="1.5em">1.5</option><option value="2em">2.0</option></ToolbarDropdown></div><div><label className="block text-xs font-semibold mb-2 text-white/70">Color</label><div className="flex space-x-2">{colorPalette.map(c => (<button key={c} onClick={() => applyColor(c)} className="w-6 h-6 rounded-full border border-gray-400" style={{backgroundColor: c}}></button>))}</div></div></div></div>)}
+                    {isFormatPanelOpen && (<div className="absolute bottom-full mb-2 p-4 rounded-lg shadow-lg bg-stone-900/80 border border-white/10 backdrop-blur-sm w-[320px]"><div className="space-y-4"><ToolbarDropdown label="Paragraph Style" value={currentFormat.paragraphStyle} onChange={(e) => applyParagraphStyle(e.target.value)}><option value="p">Paragraph</option><option value="h1">Heading 1</option><option value="h2">Heading 2</option><option value="h3">Heading 3</option><option value="blockquote">Blockquote</option></ToolbarDropdown><ToolbarDropdown label="Font" value={currentFormat.font} onChange={(e) => applyFont(e.target.value)}>{fontOptions.map(f => <option key={f.name} value={f.value}>{f.name}</option>)}</ToolbarDropdown><div className="grid grid-cols-2 gap-4"><ToolbarDropdown label="Size" value={currentFormat.size} onChange={(e) => applyFontSize(e.target.value)}><option value="14px">14</option><option value="16px">16</option><option value="18px">18</option><option value="20px">20</option><option value="24px">24</option></ToolbarDropdown><ToolbarDropdown label="Paragraph Spacing" value={currentFormat.paragraphSpacing} onChange={(e) => applyParagraphSpacing(e.target.value)}><option value="0.5em">0.5</option><option value="1em">1.0</option><option value="1.5em">1.5</option><option value="2em">2.0</option></ToolbarDropdown></div><div><label className="block text-xs font-semibold mb-2 text-white/70">Color</label><div className="flex space-x-2">{colorPalette.map(c => (<button key={c} onClick={() => applyColor(c)} className="w-6 h-6 rounded-full border border-gray-400" style={{backgroundColor: c}}></button>))}</div></div></div></div>)}
                     <div className="flex items-center space-x-1 p-1 rounded-full shadow-lg bg-stone-900/70 border border-white/10 backdrop-blur-sm" onMouseDown={(e) => e.preventDefault()}>
                         <button onClick={() => setIsFormatPanelOpen(p => !p)} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${isFormatPanelOpen ? 'bg-white/20' : ''}`}><TextIcon className="w-5 h-5"/></button>
                         <button onClick={() => applyCommand('bold')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.isBold ? 'bg-white/20' : ''}`}><BoldIcon className="w-5 h-5"/></button>
@@ -767,6 +771,10 @@ const DemosPage: React.FC = () => {
                         <button onClick={() => applyCommand('insertUnorderedList')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.isUL ? 'bg-white/20' : ''}`}><ListBulletIcon className="w-5 h-5"/></button>
                         <button onClick={() => applyCommand('insertOrderedList')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.isOL ? 'bg-white/20' : ''}`}><OrderedListIcon className="w-5 h-5"/></button>
                         <button onClick={() => applyParagraphStyle('blockquote')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${currentFormat.paragraphStyle === 'blockquote' ? 'bg-white/20' : ''}`}><BlockquoteIcon className="w-5 h-5"/></button>
+                        <div className="w-px h-5 bg-white/20 mx-1"></div>
+                        <button onClick={() => applyParagraphStyle('h1')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${currentFormat.paragraphStyle === 'h1' ? 'bg-white/20' : ''}`}><H1Icon className="w-5 h-5"/></button>
+                        <button onClick={() => applyParagraphStyle('h2')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${currentFormat.paragraphStyle === 'h2' ? 'bg-white/20' : ''}`}><H2Icon className="w-5 h-5"/></button>
+                        <button onClick={() => applyParagraphStyle('h3')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${currentFormat.paragraphStyle === 'h3' ? 'bg-white/20' : ''}`}><H3Icon className="w-5 h-5"/></button>
                         <div className="w-px h-5 bg-white/20 mx-1"></div>
                         <button onClick={() => applyCommand('undo')} className="p-2 rounded-full text-white/90 hover:bg-white/10"><UndoIcon className="w-5 h-5"/></button>
                         <button onClick={() => applyCommand('redo')} className="p-2 rounded-full text-white/90 hover:bg-white/10"><RedoIcon className="w-5 h-5"/></button>

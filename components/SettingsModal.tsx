@@ -1,7 +1,8 @@
 
+
 import React, { useContext, useState } from 'react';
 import { ProjectContext } from '../contexts/ProjectContext';
-import { Theme } from '../types';
+import { Theme, SpellcheckLang } from '../types';
 import { THEME_CONFIG } from '../constants';
 import { CloseIcon, DownloadIcon, TrashIcon } from './Icons';
 import ConfirmModal from './ConfirmModal';
@@ -17,7 +18,7 @@ const themeOptions: { name: Theme; label: string; colors: string[] }[] = [
 ];
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
-  const { theme, setProjectData, saveProjectAs, unlinkFile, themeClasses } = useContext(ProjectContext);
+  const { projectData, theme, setProjectData, saveProjectAs, unlinkFile, themeClasses } = useContext(ProjectContext);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
   if (!isOpen) return null;
@@ -28,6 +29,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
         return {
             ...currentData,
             settings: { ...currentData.settings, theme: newTheme },
+        };
+    });
+  };
+
+  const handleLanguageChange = (lang: SpellcheckLang) => {
+    setProjectData(currentData => {
+        if (!currentData) return null;
+        return {
+            ...currentData,
+            settings: { ...currentData.settings, spellcheckLanguage: lang },
         };
     });
   };
@@ -81,6 +92,23 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                 </div>
               ))}
             </div>
+          </div>
+
+          <div className="mb-8">
+            <h3 className={`text-lg mb-2 ${subHeadingStyle}`}>Language & Spelling</h3>
+            <p className={`${descriptionColor} mb-4`}>
+              Set the primary language for spellchecking. Your browser must have the corresponding dictionary installed.
+            </p>
+            <select
+              value={projectData?.settings.spellcheckLanguage || 'en'}
+              onChange={(e) => handleLanguageChange(e.target.value as SpellcheckLang)}
+              className={`w-full px-3 py-2 rounded-md ${themeClasses.input} border ${themeClasses.border}`}
+            >
+              <option value="en">English</option>
+              <option value="fi">Finnish (Suomi)</option>
+              <option value="vi">Vietnamese (Tiếng Việt)</option>
+              <option value="browser-default">Browser Default</option>
+            </select>
           </div>
 
           <div>

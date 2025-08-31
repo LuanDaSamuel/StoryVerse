@@ -3,9 +3,10 @@
 import React, { useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
-import { BackIcon, BookOpenIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, TextIcon, SearchIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, CloseIcon, Bars3Icon, DownloadIcon } from '../components/Icons';
+import { BackIcon, BookOpenIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, TextIcon, SearchIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, CloseIcon, Bars3Icon, DownloadIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, H1Icon, H2Icon, H3Icon } from '../components/Icons';
 import { enhancePlainText, enhanceHtml, THEME_CONFIG } from '../constants';
 import ExportModal from '../components/ExportModal';
+import { SpellcheckLang } from '../types';
 
 // --- Reusable Components ---
 const ChapterListModal: React.FC<{
@@ -316,13 +317,23 @@ const ChapterEditorPage: React.FC = () => {
     const [isChapterListModalOpen, setIsChapterListModalOpen] = useState(false);
     const [isFormatPanelOpen, setIsFormatPanelOpen] = useState(false);
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-    const [activeFormats, setActiveFormats] = useState({ isBold: false, isItalic: false });
+    const [activeFormats, setActiveFormats] = useState({ isBold: false, isItalic: false, isUL: false, isOL: false });
     const [currentFormat, setCurrentFormat] = useState({
         paragraphStyle: 'p',
         font: fontOptions[0].value,
         size: '18px',
         paragraphSpacing: '1em',
     });
+
+    const handleLanguageChange = (lang: SpellcheckLang) => {
+        setProjectData(currentData => {
+            if (!currentData) return null;
+            return {
+                ...currentData,
+                settings: { ...currentData.settings, spellcheckLanguage: lang },
+            };
+        });
+    };
 
     const cleanupEditor = useCallback(() => {
         if (!editorRef.current) return;
@@ -437,6 +448,8 @@ const ChapterEditorPage: React.FC = () => {
         setActiveFormats({
             isBold: document.queryCommandState('bold'),
             isItalic: document.queryCommandState('italic'),
+            isUL: document.queryCommandState('insertUnorderedList'),
+            isOL: document.queryCommandState('insertOrderedList'),
         });
     }, []);
 
@@ -460,7 +473,7 @@ const ChapterEditorPage: React.FC = () => {
         let blockElement: HTMLElement | null = element;
         while (blockElement && blockElement !== editorRef.current) {
             const tagName = blockElement.tagName.toLowerCase();
-            if (['p', 'h1', 'h2'].includes(tagName)) {
+            if (['p', 'h1', 'h2', 'h3', 'blockquote'].includes(tagName)) {
                 detectedParagraphStyle = tagName;
                 const styles = window.getComputedStyle(blockElement);
 
@@ -515,8 +528,8 @@ const ChapterEditorPage: React.FC = () => {
 
     }, [handleSelectionChange, cleanupEditor]);
 
-    const applyFormat = (command: 'bold' | 'italic' | 'undo' | 'redo') => {
-        applyAndSaveFormat(() => document.execCommand(command, false));
+    const applyCommand = (command: string, value?: string) => {
+        applyAndSaveFormat(() => document.execCommand(command, false, value));
     };
     
     const applyParagraphStyle = (style: string) => {
@@ -860,16 +873,12 @@ const ChapterEditorPage: React.FC = () => {
         if (!blockElement || !(blockElement instanceof HTMLElement)) return;
 
         const text = blockElement.textContent || '';
-        let format: 'h1' | 'h2' | null = null;
+        let format: 'h1' | 'h2' | 'h3' | null = null;
         let markdownLength = 0;
 
-        if (text.startsWith('# ')) {
-            format = 'h1';
-            markdownLength = 2;
-        } else if (text.startsWith('## ')) {
-            format = 'h2';
-            markdownLength = 3;
-        }
+        if (text.startsWith('# ')) { format = 'h1'; markdownLength = 2; } 
+        else if (text.startsWith('## ')) { format = 'h2'; markdownLength = 3; } 
+        else if (text.startsWith('### ')) { format = 'h3'; markdownLength = 4; }
         
         if (format) {
             const textNode = blockElement.firstChild;
@@ -1154,6 +1163,22 @@ const ChapterEditorPage: React.FC = () => {
                                     </div>
                                 </button>
                             </div>
+                             <div className={`px-4 py-4 border-b ${themeClasses.border}`}>
+                                <label className="block text-sm font-semibold mb-2" htmlFor="spellcheck-lang-chapter">
+                                    Language & Spelling
+                                </label>
+                                <select
+                                    id="spellcheck-lang-chapter"
+                                    value={projectData?.settings.spellcheckLanguage || 'en'}
+                                    onChange={(e) => handleLanguageChange(e.target.value as SpellcheckLang)}
+                                    className={`w-full px-3 py-2 rounded-md text-sm ${themeClasses.input} border ${themeClasses.border}`}
+                                >
+                                    <option value="en">English</option>
+                                    <option value="fi">Finnish (Suomi)</option>
+                                    <option value="vi">Vietnamese (Tiếng Việt)</option>
+                                    <option value="browser-default">Browser Default</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1170,6 +1195,8 @@ const ChapterEditorPage: React.FC = () => {
                                         <option value="p">Paragraph</option>
                                         <option value="h1">Heading 1</option>
                                         <option value="h2">Heading 2</option>
+                                        <option value="h3">Heading 3</option>
+                                        <option value="blockquote">Blockquote</option>
                                     </ToolbarDropdown>
                                     <ToolbarDropdown label="Font" value={currentFormat.font} onChange={(e) => applyFont(e.target.value)}>
                                         {fontOptions.map(font => <option key={font.name} value={font.value}>{font.name}</option>)}
@@ -1205,14 +1232,21 @@ const ChapterEditorPage: React.FC = () => {
                             onMouseDown={(e) => e.preventDefault()}
                         >
                             <button onClick={() => setIsFormatPanelOpen(p => !p)} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors ${isFormatPanelOpen ? 'bg-white/20' : ''}`}><TextIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyCommand('bold')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors ${activeFormats.isBold ? 'bg-white/20' : ''}`}><BoldIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyCommand('italic')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors ${activeFormats.isItalic ? 'bg-white/20' : ''}`}><ItalicIcon className="w-5 h-5"/></button>
                             <div className="w-px h-5 bg-white/20 mx-1"></div>
-                            <button onClick={() => applyFormat('bold')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors ${activeFormats.isBold ? 'bg-white/20' : ''}`}><BoldIcon className="w-5 h-5"/></button>
-                            <button onClick={() => applyFormat('italic')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors ${activeFormats.isItalic ? 'bg-white/20' : ''}`}><ItalicIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyCommand('insertUnorderedList')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.isUL ? 'bg-white/20' : ''}`}><ListBulletIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyCommand('insertOrderedList')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.isOL ? 'bg-white/20' : ''}`}><OrderedListIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyParagraphStyle('blockquote')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${currentFormat.paragraphStyle === 'blockquote' ? 'bg-white/20' : ''}`}><BlockquoteIcon className="w-5 h-5"/></button>
+                            <div className="w-px h-5 bg-white/20 mx-1"></div>
+                            <button onClick={() => applyParagraphStyle('h1')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${currentFormat.paragraphStyle === 'h1' ? 'bg-white/20' : ''}`}><H1Icon className="w-5 h-5"/></button>
+                            <button onClick={() => applyParagraphStyle('h2')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${currentFormat.paragraphStyle === 'h2' ? 'bg-white/20' : ''}`}><H2Icon className="w-5 h-5"/></button>
+                            <button onClick={() => applyParagraphStyle('h3')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${currentFormat.paragraphStyle === 'h3' ? 'bg-white/20' : ''}`}><H3Icon className="w-5 h-5"/></button>
                             <div className="w-px h-5 bg-white/20 mx-1"></div>
                             <button onClick={() => setIsFindReplaceOpen(true)} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors`}><SearchIcon className="w-5 h-5"/></button>
                             <div className="w-px h-5 bg-white/20 mx-1"></div>
-                            <button onClick={() => applyFormat('undo')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors`}><UndoIcon className="w-5 h-5"/></button>
-                            <button onClick={() => applyFormat('redo')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors`}><RedoIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyCommand('undo')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors`}><UndoIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyCommand('redo')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors`}><RedoIcon className="w-5 h-5"/></button>
                         </div>
                     </div>
                 </div>
