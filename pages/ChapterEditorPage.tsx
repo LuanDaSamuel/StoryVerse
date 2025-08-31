@@ -1,5 +1,4 @@
 
-
 import React, { useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
@@ -10,62 +9,60 @@ import { SpellcheckLang } from '../types';
 
 declare var Typo: any;
 
-interface SpellcheckError {
+interface SpellcheckPopoverState {
+    top: number;
+    left: number;
     word: string;
     suggestions: string[];
-    context: { before: string; after: string; };
-    node: Text;
-    startOffset: number;
-    endOffset: number;
+    target: HTMLElement;
 }
 
 // --- Reusable Components ---
 
-const SpellCheckPanel: React.FC<{
-    error: SpellcheckError;
+const SpellcheckPopover: React.FC<{
+    state: SpellcheckPopoverState;
     onClose: () => void;
-    onNext: () => void;
+    onReplace: (target: HTMLElement, newWord: string) => void;
     onIgnore: (word: string) => void;
-    onChange: (newWord: string) => void;
     onAddToDictionary: (word: string) => void;
     themeClasses: any;
-    isLast: boolean;
-}> = ({ error, onClose, onNext, onIgnore, onChange, onAddToDictionary, themeClasses, isLast }) => (
-    <div className={`fixed top-4 right-4 z-50 w-80 p-4 rounded-lg shadow-2xl font-sans ${themeClasses.bgSecondary} ${themeClasses.accentText} border ${themeClasses.border}`}>
-        <div className="flex justify-between items-center mb-2">
-            <h3 className="font-bold text-lg">Spell Check</h3>
-            <button onClick={onClose} className={`p-1 rounded-full hover:${themeClasses.bgTertiary}`}><CloseIcon className="w-5 h-5"/></button>
-        </div>
-        <div className={`p-3 rounded-md ${themeClasses.bgTertiary} text-sm mb-3`}>
-            <p className={themeClasses.textSecondary}>
-                {error.context.before}
-                <span className="font-bold text-red-400">{error.word}</span>
-                {error.context.after}
-            </p>
-        </div>
-        <div className="space-y-2 max-h-32 overflow-y-auto mb-3">
-            {error.suggestions.length > 0 ? (
-                error.suggestions.slice(0, 5).map(sugg => (
-                    <button key={sugg} onClick={() => onChange(sugg)} className={`block w-full text-left px-3 py-1.5 rounded-md text-sm hover:${themeClasses.bgTertiary}`}>
-                        {sugg}
-                    </button>
-                ))
-            ) : (
-                <p className={`text-sm px-3 py-2 ${themeClasses.textSecondary}`}>No suggestions found.</p>
-            )}
-        </div>
-        <div className="flex justify-between items-center pt-2 border-t border-white/10">
-            <div className="space-x-1">
-                <button onClick={() => onIgnore(error.word)} className={`px-3 py-1 text-xs font-semibold rounded-md hover:opacity-80 ${themeClasses.bgTertiary}`}>Ignore</button>
-                <button onClick={() => onAddToDictionary(error.word)} className={`px-3 py-1 text-xs font-semibold rounded-md hover:opacity-80 ${themeClasses.bgTertiary}`}>Add Word</button>
-            </div>
-            <button onClick={onNext} className={`px-4 py-2 text-sm font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}>
-                {isLast ? 'Finish' : 'Next'}
-            </button>
-        </div>
-    </div>
-);
+}> = ({ state, onClose, onReplace, onIgnore, onAddToDictionary, themeClasses }) => {
+    const popoverRef = useRef<HTMLDivElement>(null);
 
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
+                onClose();
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [onClose]);
+
+    return (
+        <div 
+            ref={popoverRef}
+            className={`absolute z-50 w-60 p-2 rounded-lg shadow-2xl font-sans ${themeClasses.bgSecondary} ${themeClasses.accentText} border ${themeClasses.border}`}
+            style={{ top: `${state.top}px`, left: `${state.left}px` }}
+        >
+            <div className="space-y-1 max-h-32 overflow-y-auto mb-2">
+                {state.suggestions.length > 0 ? (
+                    state.suggestions.slice(0, 5).map(sugg => (
+                        <button key={sugg} onClick={() => onReplace(state.target, sugg)} className={`block w-full text-left px-2 py-1 rounded-md text-sm hover:${themeClasses.bgTertiary}`}>
+                            {sugg}
+                        </button>
+                    ))
+                ) : (
+                    <p className={`text-sm px-2 py-1 ${themeClasses.textSecondary}`}>No suggestions.</p>
+                )}
+            </div>
+            <div className={`pt-2 border-t ${themeClasses.border} text-sm space-y-1`}>
+                <button onClick={() => onIgnore(state.word)} className={`block w-full text-left px-2 py-1 rounded-md hover:${themeClasses.bgTertiary}`}>Ignore</button>
+                <button onClick={() => onAddToDictionary(state.word)} className={`block w-full text-left px-2 py-1 rounded-md hover:${themeClasses.bgTertiary}`}>Add to Dictionary</button>
+            </div>
+        </div>
+    );
+};
 
 const ChapterListModal: React.FC<{
     isOpen: boolean;
@@ -400,10 +397,10 @@ const ChapterEditorPage: React.FC = () => {
 
     // --- Spellcheck State and Logic ---
     const [spellchecker, setSpellchecker] = useState<any>(null);
-    const [isSpellcheckPanelOpen, setIsSpellcheckPanelOpen] = useState(false);
-    const [spellcheckErrors, setSpellcheckErrors] = useState<SpellcheckError[]>([]);
-    const [currentErrorIndex, setCurrentErrorIndex] = useState(0);
+    const [isSpellcheckActive, setIsSpellcheckActive] = useState(true);
+    const [spellcheckPopover, setSpellcheckPopover] = useState<SpellcheckPopoverState | null>(null);
     const sessionIgnoredWords = useRef(new Set<string>());
+    const spellcheckTimeoutRef = useRef<number | null>(null);
 
     useEffect(() => {
         const lang = projectData?.settings?.spellcheckLanguage;
@@ -426,106 +423,93 @@ const ChapterEditorPage: React.FC = () => {
         }
     }, [projectData?.settings?.spellcheckLanguage]);
 
-    const cleanupSpellcheckHighlight = () => {
-        const existingHighlight = editorRef.current?.querySelector('.spell-error-current');
-        if (existingHighlight) {
-            const parent = existingHighlight.parentNode;
-            while (existingHighlight.firstChild) {
-                parent?.insertBefore(existingHighlight.firstChild, existingHighlight);
-            }
-            parent?.removeChild(existingHighlight);
-            parent?.normalize();
-        }
-    };
-
-    const startSpellcheck = () => {
-        if (!spellchecker || !editorRef.current) {
-            alert('Spellchecker dictionary is not loaded or editor is not available.');
-            return;
-        }
-
-        sessionIgnoredWords.current.clear();
-        const errors: SpellcheckError[] = [];
-        const customDictionary = new Set(projectData?.settings?.customDictionary || []);
-        
-        const walker = document.createTreeWalker(editorRef.current, NodeFilter.SHOW_TEXT);
-        let node;
-        while (node = walker.nextNode()) {
-            const textNode = node as Text;
-            const text = textNode.textContent || '';
-            const wordRegex = /\b[a-zA-Z']+\b/g;
-            let match;
-            while ((match = wordRegex.exec(text)) !== null) {
-                const word = match[0];
-                if (!customDictionary.has(word.toLowerCase()) && !spellchecker.check(word)) {
-                    const suggestions = spellchecker.suggest(word);
-                    const contextWindow = 15;
-                    const context = {
-                        before: text.substring(Math.max(0, match.index - contextWindow), match.index),
-                        after: text.substring(match.index + word.length, match.index + word.length + contextWindow),
-                    };
-                    errors.push({
-                        word, suggestions, context, node: textNode,
-                        startOffset: match.index,
-                        endOffset: match.index + word.length
-                    });
+    const clearAllSpellcheckHighlights = useCallback(() => {
+        if (!editorRef.current) return;
+        const highlights = Array.from(editorRef.current.querySelectorAll('.spell-error'));
+        highlights.forEach(node => {
+            const parent = node.parentNode;
+            if (parent) {
+                while(node.firstChild) {
+                    parent.insertBefore(node.firstChild, node);
                 }
+                parent.removeChild(node);
+                parent.normalize();
+            }
+        });
+    }, []);
+
+    const runInlineSpellcheck = useCallback(() => {
+        clearAllSpellcheckHighlights();
+        if (!isSpellcheckActive || !spellchecker || !editorRef.current) return;
+
+        const customDictionary = new Set(projectData?.settings?.customDictionary || []);
+        const walker = document.createTreeWalker(editorRef.current, NodeFilter.SHOW_TEXT);
+        const textNodes: Text[] = [];
+        while(walker.nextNode()) {
+            if (!walker.currentNode.parentElement?.closest('.spell-error')) {
+                textNodes.push(walker.currentNode as Text);
             }
         }
+        const wordRegex = /\b[a-zA-Z']+\b/g;
 
-        setSpellcheckErrors(errors);
-        setCurrentErrorIndex(0);
-        setIsSpellcheckPanelOpen(errors.length > 0);
-        if (errors.length === 0) {
-            alert('No spelling errors found!');
-        }
-    };
+        textNodes.forEach(node => {
+            const text = node.textContent || '';
+            const matches = [...text.matchAll(wordRegex)];
+            if (matches.length === 0) return;
 
-    const handleCloseSpellcheck = () => {
-        cleanupSpellcheckHighlight();
-        setIsSpellcheckPanelOpen(false);
-        setSpellcheckErrors([]);
-        setCurrentErrorIndex(0);
-    };
-    
-    const handleSpellcheckNext = () => {
-        if (currentErrorIndex >= spellcheckErrors.length - 1) {
-            handleCloseSpellcheck();
-        } else {
-            setCurrentErrorIndex(prev => prev + 1);
-        }
-    };
-    
-    const handleSpellcheckIgnore = (word: string) => {
-        sessionIgnoredWords.current.add(word.toLowerCase());
-        const remainingErrors = spellcheckErrors.filter((e, idx) => idx > currentErrorIndex && e.word.toLowerCase() !== word.toLowerCase());
-        
-        if (remainingErrors.length > 0) {
-            const nextError = remainingErrors[0];
-            const nextIndex = spellcheckErrors.indexOf(nextError);
-            cleanupSpellcheckHighlight(); // manually clean before jumping index
-            setCurrentErrorIndex(nextIndex);
-        } else {
-            handleCloseSpellcheck();
-        }
-    };
+            let lastIndex = 0;
+            const fragment = document.createDocumentFragment();
+            let hasMisspelling = false;
 
-    const handleSpellcheckChange = (newWord: string) => {
-        const error = spellcheckErrors[currentErrorIndex];
-        if (!error) return;
+            matches.forEach(match => {
+                const word = match[0];
+                const index = match.index!;
+                if (!customDictionary.has(word.toLowerCase()) && !sessionIgnoredWords.current.has(word.toLowerCase()) && !spellchecker.check(word)) {
+                    hasMisspelling = true;
+                    if (index > lastIndex) {
+                        fragment.appendChild(document.createTextNode(text.slice(lastIndex, index)));
+                    }
+                    const span = document.createElement('span');
+                    span.className = 'spell-error';
+                    span.textContent = word;
+                    fragment.appendChild(span);
+                    lastIndex = index + word.length;
+                }
+            });
 
-        const range = document.createRange();
-        range.setStart(error.node, error.startOffset);
-        range.setEnd(error.node, error.endOffset);
-        range.deleteContents();
-        range.insertNode(document.createTextNode(newWord));
-        
+            if (hasMisspelling) {
+                if (lastIndex < text.length) {
+                    fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
+                }
+                node.parentNode?.replaceChild(fragment, node);
+            }
+        });
+    }, [isSpellcheckActive, spellchecker, projectData?.settings?.customDictionary, clearAllSpellcheckHighlights]);
+
+    const debouncedSpellcheck = useCallback(() => {
+        if (spellcheckTimeoutRef.current) clearTimeout(spellcheckTimeoutRef.current);
+        spellcheckTimeoutRef.current = window.setTimeout(runInlineSpellcheck, 1000);
+    }, [runInlineSpellcheck]);
+
+    const handleReplaceWord = useCallback((target: HTMLElement, newWord: string) => {
+        const parent = target.parentNode;
+        if (!parent) return;
+
+        parent.insertBefore(document.createTextNode(newWord), target);
+        parent.removeChild(target);
+        parent.normalize();
+
         editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+        setSpellcheckPopover(null);
+    }, []);
 
-        handleSpellcheckNext();
-    };
+    const handleIgnoreWord = useCallback((word: string) => {
+        sessionIgnoredWords.current.add(word.toLowerCase());
+        setSpellcheckPopover(null);
+        runInlineSpellcheck();
+    }, [runInlineSpellcheck]);
 
-    const handleAddToDictionary = (word: string) => {
+    const handleAddToDictionary = useCallback((word: string) => {
         const lowerWord = word.toLowerCase();
         setProjectData(currentData => {
             if (!currentData || currentData.settings.customDictionary.includes(lowerWord)) return currentData;
@@ -537,37 +521,31 @@ const ChapterEditorPage: React.FC = () => {
                 },
             };
         });
-        handleSpellcheckIgnore(word);
-    };
+        handleIgnoreWord(word);
+    }, [setProjectData, handleIgnoreWord]);
+    
+    const handleEditorClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+        const target = e.target as HTMLElement;
+        if (target.classList.contains('spell-error')) {
+            e.preventDefault();
+            const word = target.textContent || '';
+            const suggestions = spellchecker?.suggest(word) || [];
+            const rect = target.getBoundingClientRect();
+            setSpellcheckPopover({
+                top: rect.bottom + window.scrollY + 5,
+                left: rect.left + window.scrollX,
+                word,
+                suggestions,
+                target,
+            });
+        } else if (spellcheckPopover) {
+            setSpellcheckPopover(null);
+        }
+    }, [spellchecker, spellcheckPopover]);
 
     useEffect(() => {
-        cleanupSpellcheckHighlight();
-        if (isSpellcheckPanelOpen && spellcheckErrors.length > 0 && currentErrorIndex < spellcheckErrors.length) {
-            const error = spellcheckErrors[currentErrorIndex];
-            const range = document.createRange();
-            range.setStart(error.node, error.startOffset);
-            range.setEnd(error.node, error.endOffset);
-
-            // Check if the range is still valid before trying to surround it
-            if (error.node.parentNode && editorRef.current?.contains(error.node)) {
-                const span = document.createElement('span');
-                span.className = 'spell-error-current';
-                try {
-                    range.surroundContents(span);
-                    span.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                } catch (e) {
-                    console.error("Could not highlight spellcheck error:", e);
-                    // If surroundContents fails, it means the range crosses element boundaries.
-                    // We just move to the next error in this case.
-                    handleSpellcheckNext();
-                }
-            } else {
-                 // Node is no longer in the document, skip to the next error
-                 handleSpellcheckNext();
-            }
-        }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isSpellcheckPanelOpen, currentErrorIndex]);
+        debouncedSpellcheck();
+    }, [isSpellcheckActive, spellchecker, debouncedSpellcheck]);
 
 
     const handleLanguageChange = (lang: SpellcheckLang) => {
@@ -590,8 +568,10 @@ const ChapterEditorPage: React.FC = () => {
             let changed = false;
             editor.querySelectorAll('span, strong, em, i, b').forEach(el => {
                 if (!el.hasChildNodes() || el.textContent === '\u200B') {
-                    el.remove();
-                    changed = true;
+                    if (!el.classList.contains('spell-error')) {
+                        el.remove();
+                        changed = true;
+                    }
                 }
             });
             if (!changed) break;
@@ -1215,12 +1195,14 @@ const ChapterEditorPage: React.FC = () => {
     // This effect handles loading content when the chapter is switched.
     useEffect(() => {
         if (editorRef.current && chapter) {
+            sessionIgnoredWords.current.clear();
             const initialContent = chapter.content || '<p><br></p>';
             const enhancedContent = enhanceHtml(initialContent);
 
             // Directly set content and sync the tracking ref
             editorRef.current.innerHTML = enhancedContent;
             editorContentRef.current = initialContent;
+            debouncedSpellcheck();
 
             // After loading a new chapter, focus the editor and move cursor to the end.
             editorRef.current.focus();
@@ -1246,6 +1228,7 @@ const ChapterEditorPage: React.FC = () => {
                 const enhancedContent = enhanceHtml(contentFromState);
                 editorRef.current.innerHTML = enhancedContent;
                 editorContentRef.current = contentFromState; // Re-sync the ref
+                debouncedSpellcheck();
 
                 // After a programmatic change, moving cursor to the end is a sensible default.
                 const selection = window.getSelection();
@@ -1385,16 +1368,14 @@ const ChapterEditorPage: React.FC = () => {
     return (
         <>
             <div className={`flex h-screen font-serif ${themeClasses.bg} ${themeClasses.text}`}>
-                {isSpellcheckPanelOpen && spellcheckErrors.length > 0 && (
-                    <SpellCheckPanel 
-                        error={spellcheckErrors[currentErrorIndex]}
-                        onClose={handleCloseSpellcheck}
-                        onNext={handleSpellcheckNext}
-                        onIgnore={handleSpellcheckIgnore}
-                        onChange={handleSpellcheckChange}
+                {spellcheckPopover && (
+                    <SpellcheckPopover 
+                        state={spellcheckPopover}
+                        onClose={() => setSpellcheckPopover(null)}
+                        onReplace={handleReplaceWord}
+                        onIgnore={handleIgnoreWord}
                         onAddToDictionary={handleAddToDictionary}
                         themeClasses={themeClasses}
-                        isLast={currentErrorIndex >= spellcheckErrors.length - 1}
                     />
                 )}
 
@@ -1432,10 +1413,12 @@ const ChapterEditorPage: React.FC = () => {
                                 const newHTML = e.currentTarget.innerHTML;
                                 editorContentRef.current = newHTML;
                                 updateChapterField('content', newHTML);
+                                debouncedSpellcheck();
                             }}
                             onKeyDown={handleKeyDown}
                             onKeyUp={handleKeyUp}
                             onPaste={handlePaste}
+                            onClick={handleEditorClick}
                             onBlur={cleanupEditor}
                             className="w-full text-lg leading-relaxed outline-none story-content"
                             style={editorStyle}
@@ -1581,7 +1564,7 @@ const ChapterEditorPage: React.FC = () => {
                             <button onClick={() => applyParagraphStyle('h3')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${currentFormat.paragraphStyle === 'h3' ? 'bg-white/20' : ''}`}><H3Icon className="w-5 h-5"/></button>
                             <div className="w-px h-5 bg-white/20 mx-1"></div>
                             <button onClick={() => setIsFindReplaceOpen(true)} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors`}><SearchIcon className="w-5 h-5"/></button>
-                            <button onClick={startSpellcheck} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors`} disabled={!spellchecker}><SpellcheckIcon className="w-5 h-5"/></button>
+                            <button onClick={() => setIsSpellcheckActive(p => !p)} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors ${isSpellcheckActive ? 'bg-white/20' : ''}`} disabled={!spellchecker}><SpellcheckIcon className="w-5 h-5"/></button>
                             <div className="w-px h-5 bg-white/20 mx-1"></div>
                             <button onClick={() => applyCommand('undo')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors`}><UndoIcon className="w-5 h-5"/></button>
                             <button onClick={() => applyCommand('redo')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors`}><RedoIcon className="w-5 h-5"/></button>
