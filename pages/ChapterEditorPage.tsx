@@ -190,7 +190,7 @@ const FindReplaceModal: React.FC<{
 
   const highlightMatches = useCallback(() => {
     clearHighlights();
-    if (!findText || !editorRef.current) {
+    if (!findText || !editorRef.current || scope === 'all') {
         setMatches([]);
         setCurrentIndex(-1);
         return;
@@ -237,7 +237,7 @@ const FindReplaceModal: React.FC<{
 
     setMatches(newMatches);
     setCurrentIndex(newMatches.length > 0 ? 0 : -1);
-  }, [findText, editorRef, clearHighlights, caseSensitive, wholeWord]);
+  }, [findText, editorRef, clearHighlights, caseSensitive, wholeWord, scope]);
 
   useEffect(() => {
     if (isOpen) {
@@ -247,7 +247,7 @@ const FindReplaceModal: React.FC<{
     return () => {
       if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
     };
-  }, [findText, isOpen, highlightMatches, caseSensitive, wholeWord]);
+  }, [findText, isOpen, highlightMatches, caseSensitive, wholeWord, scope]);
 
   useEffect(() => {
     matches.forEach((match, index) => {
@@ -321,7 +321,7 @@ const FindReplaceModal: React.FC<{
               onChange={(e) => setFindText(e.target.value)} 
               className={`w-full px-3 py-2 rounded-md ${themeClasses.input} border ${themeClasses.border}`}
             />
-            {findText && (
+            {findText && scope === 'current' && (
                 <div className={`absolute right-3 top-1/2 -translate-y-1/2 text-xs ${themeClasses.textSecondary}`}>
                     {matches.length > 0 ? `${currentIndex + 1} / ${matches.length}` : '0 matches'}
                 </div>
@@ -342,11 +342,11 @@ const FindReplaceModal: React.FC<{
 
         <div className="flex justify-between items-center mt-4">
             <div className="flex items-center space-x-2">
-                <button onClick={() => handleNavigate('prev')} disabled={matches.length === 0} className={`px-3 py-1 rounded-md text-sm font-semibold ${themeClasses.bgTertiary} disabled:opacity-50`}>Previous</button>
-                <button onClick={() => handleNavigate('next')} disabled={matches.length === 0} className={`px-3 py-1 rounded-md text-sm font-semibold ${themeClasses.bgTertiary} disabled:opacity-50`}>Next</button>
+                <button onClick={() => handleNavigate('prev')} disabled={matches.length === 0 || scope === 'all'} className={`px-3 py-1 rounded-md text-sm font-semibold ${themeClasses.bgTertiary} disabled:opacity-50`}>Previous</button>
+                <button onClick={() => handleNavigate('next')} disabled={matches.length === 0 || scope === 'all'} className={`px-3 py-1 rounded-md text-sm font-semibold ${themeClasses.bgTertiary} disabled:opacity-50`}>Next</button>
             </div>
             <div className="flex items-center space-x-2">
-                <button onClick={handleReplace} disabled={currentIndex === -1} className={`px-4 py-2 font-semibold rounded-lg ${themeClasses.bgTertiary} disabled:opacity-50`}>Replace</button>
+                <button onClick={handleReplace} disabled={currentIndex === -1 || scope === 'all'} className={`px-4 py-2 font-semibold rounded-lg ${themeClasses.bgTertiary} disabled:opacity-50`}>Replace</button>
                 <button onClick={handleReplaceAll} disabled={!findText} className={`px-4 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} disabled:opacity-50`}>Replace All</button>
             </div>
         </div>
@@ -1310,9 +1310,30 @@ const ChapterEditorPage: React.FC = () => {
             let changesMade = false;
 
             const updatedChapters = currentNovel.chapters.map(chap => {
-                const newContent = chap.content.replace(findRegex, replace);
-                if (newContent !== chap.content) {
+                const docFragment = document.createElement('div');
+                docFragment.innerHTML = chap.content;
+                
+                const walker = document.createTreeWalker(docFragment, NodeFilter.SHOW_TEXT);
+                const textNodes: Text[] = [];
+                let currentNode = walker.nextNode();
+                while(currentNode) {
+                    textNodes.push(currentNode as Text);
+                    currentNode = walker.nextNode();
+                }
+                
+                let chapterChanged = false;
+                textNodes.forEach(textNode => {
+                    const originalText = textNode.nodeValue || '';
+                    const newText = originalText.replace(findRegex, replace);
+                    if (originalText !== newText) {
+                        textNode.nodeValue = newText;
+                        chapterChanged = true;
+                    }
+                });
+
+                if (chapterChanged) {
                     changesMade = true;
+                    const newContent = docFragment.innerHTML;
                     return { 
                         ...chap, 
                         content: newContent, 
