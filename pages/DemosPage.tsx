@@ -1,23 +1,13 @@
 
+
 import React, { useState, useContext, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
-import { Sketch, SpellcheckLang } from '../types';
-import { UploadIcon, PlusIcon, TrashIcon, QuillPenIcon, ChevronDownIcon, TextIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, Bars3Icon, CloseIcon, ListBulletIcon, HomeIcon, SearchIcon, DownloadIcon, ChartBarIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon, BlockquoteIcon, OrderedListIcon, ChevronLeftIcon, ChevronRightIcon, H1Icon, H2Icon, H3Icon, SpellcheckIcon } from '../components/Icons';
+import { Sketch } from '../types';
+import { UploadIcon, PlusIcon, TrashIcon, QuillPenIcon, ChevronDownIcon, TextIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, Bars3Icon, CloseIcon, ListBulletIcon, HomeIcon, SearchIcon, DownloadIcon, ChartBarIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon, BlockquoteIcon, OrderedListIcon, ChevronLeftIcon, ChevronRightIcon, H1Icon, H2Icon, H3Icon } from '../components/Icons';
 import { enhanceHtml, enhancePlainText } from '../constants';
 import { THEME_CONFIG } from '../constants';
 import * as mammoth from 'mammoth';
-
-declare var Typo: any;
-
-interface SpellcheckError {
-    word: string;
-    suggestions: string[];
-    context: { before: string; after: string; };
-    node: Text;
-    startOffset: number;
-    endOffset: number;
-}
 
 // --- Reusable Utility and Type Definitions ---
 
@@ -41,52 +31,6 @@ const fontOptions = [
 ];
 
 // --- Sub-components for Demos Page UI ---
-
-const SpellCheckPanel: React.FC<{
-    error: SpellcheckError;
-    onClose: () => void;
-    onNext: () => void;
-    onIgnore: (word: string) => void;
-    onChange: (newWord: string) => void;
-    onAddToDictionary: (word: string) => void;
-    themeClasses: any;
-    isLast: boolean;
-}> = ({ error, onClose, onNext, onIgnore, onChange, onAddToDictionary, themeClasses, isLast }) => (
-    <div className={`fixed top-20 right-8 z-50 w-80 p-4 rounded-lg shadow-2xl font-sans ${themeClasses.bgSecondary} ${themeClasses.accentText} border ${themeClasses.border}`}>
-        <div className="flex justify-between items-center mb-2">
-            <h3 className="font-bold text-lg">Spell Check</h3>
-            <button onClick={onClose} className={`p-1 rounded-full hover:${themeClasses.bgTertiary}`}><CloseIcon className="w-5 h-5"/></button>
-        </div>
-        <div className={`p-3 rounded-md ${themeClasses.bgTertiary} text-sm mb-3`}>
-            <p className={themeClasses.textSecondary}>
-                {error.context.before}
-                <span className="font-bold text-red-400">{error.word}</span>
-                {error.context.after}
-            </p>
-        </div>
-        <div className="space-y-2 max-h-32 overflow-y-auto mb-3">
-            {error.suggestions.length > 0 ? (
-                error.suggestions.slice(0, 5).map(sugg => (
-                    <button key={sugg} onClick={() => onChange(sugg)} className={`block w-full text-left px-3 py-1.5 rounded-md text-sm hover:${themeClasses.bgTertiary}`}>
-                        {sugg}
-                    </button>
-                ))
-            ) : (
-                <p className={`text-sm px-3 py-2 ${themeClasses.textSecondary}`}>No suggestions found.</p>
-            )}
-        </div>
-        <div className="flex justify-between items-center pt-2 border-t border-white/10">
-            <div className="space-x-1">
-                <button onClick={() => onIgnore(error.word)} className={`px-3 py-1 text-xs font-semibold rounded-md hover:opacity-80 ${themeClasses.bgTertiary}`}>Ignore</button>
-                <button onClick={() => onAddToDictionary(error.word)} className={`px-3 py-1 text-xs font-semibold rounded-md hover:opacity-80 ${themeClasses.bgTertiary}`}>Add Word</button>
-            </div>
-            <button onClick={onNext} className={`px-4 py-2 text-sm font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}>
-                {isLast ? 'Finish' : 'Next'}
-            </button>
-        </div>
-    </div>
-);
-
 
 const SketchesOutlineModal: React.FC<{
     isOpen: boolean;
@@ -254,7 +198,7 @@ const FindReplaceDialog: React.FC<{
                     <button onClick={() => setCaseSensitive(p => !p)} className={`px-2 py-1 text-xs rounded-md font-semibold ${caseSensitive ? `${themeClasses.accent} ${themeClasses.accentText}` : themeClasses.bgTertiary}`}>Aa</button>
                     <button onClick={() => setWholeWord(p => !p)} className={`px-2 py-1 text-xs rounded-md font-semibold ${wholeWord ? `${themeClasses.accent} ${themeClasses.accentText}` : themeClasses.bgTertiary}`}>Whole Word</button>
                 </div>
-                <div className="flex justify-between items-center mt-3"><div className="flex items-center space-x-1"><button onClick={() => handleNavigate('prev')} disabled={matches.length < 2} className={`px-2 py-1 rounded text-xs font-semibold ${themeClasses.bgTertiary} disabled:opacity-50`}>Prev</button><button onClick={() => handleNavigate('next')} disabled={matches.length < 2} className={`px-2 py-1 rounded text-xs font-semibold ${themeClasses.bgTertiary} disabled:opacity-50`}>Next</button></div><div className="flex items-center space-x-1"><button onClick={handleReplace} disabled={currentIndex === -1} className={`px-2 py-1 text-xs rounded font-semibold ${themeClasses.bgTertiary} disabled:opacity-50`}>Replace</button><button onClick={handleReplaceAll} disabled={matches.length === 0} className={`px-2 py-1 text-xs rounded font-semibold ${themeClasses.accent} ${themeClasses.accentText} disabled:opacity-50`}>All</button></div></div>
+                <div className="flex justify-between items-center mt-3"><div className="flex items-center space-x-1"><button onClick={() => handleNavigate('prev')} disabled={matches.length < 2} className={`px-2 py-1 rounded text-xs font-semibold ${themeClasses.bgTertiary} disabled:opacity-50`}>Prev</button><button onClick={() => handleNavigate('next')} disabled={matches.length < 2} className={`px-2 py-1 rounded text-xs font-semibold ${themeClasses.bgTertiary} disabled:opacity-50`}>Next</button></div><div className="flex items-center space-x-1"><button onClick={handleReplace} disabled={currentIndex === -1} className={`px-2 py-1 text-xs rounded font-semibold ${themeClasses.bgTertiary} disabled:opacity-50`}>Replace</button><button onClick={() => handleReplaceAll} disabled={matches.length === 0} className={`px-2 py-1 text-xs rounded font-semibold ${themeClasses.accent} ${themeClasses.accentText} disabled:opacity-50`}>All</button></div></div>
             </div>
         </div>
     );
@@ -299,183 +243,6 @@ const DemosPage: React.FC = () => {
     const [activeFormats, setActiveFormats] = useState({ isBold: false, isItalic: false, isUL: false, isOL: false });
     const [currentFormat, setCurrentFormat] = useState({ paragraphStyle: 'p', font: fontOptions[0].value, size: '18px', paragraphSpacing: '1em' });
     
-    // --- Spellcheck State and Logic ---
-    const [spellchecker, setSpellchecker] = useState<any>(null);
-    const [isSpellcheckPanelOpen, setIsSpellcheckPanelOpen] = useState(false);
-    const [spellcheckErrors, setSpellcheckErrors] = useState<SpellcheckError[]>([]);
-    const [currentErrorIndex, setCurrentErrorIndex] = useState(0);
-    const sessionIgnoredWords = useRef(new Set<string>());
-
-    useEffect(() => {
-        const lang = projectData?.settings?.spellcheckLanguage;
-        if (lang && lang !== 'browser-default' && typeof Typo !== 'undefined') {
-            const dictionaryId = lang === 'en' ? 'en_US' : lang;
-            const affUrl = `https://cdn.jsdelivr.net/npm/typo-js@1.2.1/dictionaries/${dictionaryId}/${dictionaryId}.aff`;
-            const dicUrl = `https://cdn.jsdelivr.net/npm/typo-js@1.2.1/dictionaries/${dictionaryId}/${dictionaryId}.dic`;
-
-            Promise.all([fetch(affUrl).then(r => r.text()), fetch(dicUrl).then(r => r.text())])
-              .then(([affData, dicData]) => {
-                const typo = new Typo(dictionaryId, affData, dicData);
-                setSpellchecker(typo);
-              })
-              .catch(err => {
-                console.error(`Could not load dictionary for ${lang}`, err);
-                setSpellchecker(null);
-              });
-        } else {
-            setSpellchecker(null);
-        }
-    }, [projectData?.settings?.spellcheckLanguage]);
-
-    const cleanupSpellcheckHighlight = () => {
-        const existingHighlight = editorRef.current?.querySelector('.spell-error-current');
-        if (existingHighlight) {
-            const parent = existingHighlight.parentNode;
-            while (existingHighlight.firstChild) {
-                parent?.insertBefore(existingHighlight.firstChild, existingHighlight);
-            }
-            parent?.removeChild(existingHighlight);
-            parent?.normalize();
-        }
-    };
-
-    const startSpellcheck = () => {
-        if (!spellchecker || !editorRef.current) {
-            alert('Spellchecker dictionary is not loaded or editor is not available.');
-            return;
-        }
-
-        sessionIgnoredWords.current.clear();
-        const errors: SpellcheckError[] = [];
-        const customDictionary = new Set(projectData?.settings?.customDictionary || []);
-        
-        const walker = document.createTreeWalker(editorRef.current, NodeFilter.SHOW_TEXT);
-        let node;
-        while (node = walker.nextNode()) {
-            const textNode = node as Text;
-            const text = textNode.textContent || '';
-            const wordRegex = /\b[\p{L}']+\b/gu;
-            let match;
-            while ((match = wordRegex.exec(text)) !== null) {
-                const word = match[0];
-                if (!customDictionary.has(word.toLowerCase()) && !spellchecker.check(word)) {
-                    const suggestions = spellchecker.suggest(word);
-                    const contextWindow = 15;
-                    const context = {
-                        before: text.substring(Math.max(0, match.index - contextWindow), match.index),
-                        after: text.substring(match.index + word.length, match.index + word.length + contextWindow),
-                    };
-                    errors.push({
-                        word, suggestions, context, node: textNode,
-                        startOffset: match.index,
-                        endOffset: match.index + word.length
-                    });
-                }
-            }
-        }
-
-        setSpellcheckErrors(errors);
-        setCurrentErrorIndex(0);
-        setIsSpellcheckPanelOpen(errors.length > 0);
-        if (errors.length === 0) {
-            alert('No spelling errors found!');
-        }
-    };
-
-    const handleCloseSpellcheck = () => {
-        cleanupSpellcheckHighlight();
-        setIsSpellcheckPanelOpen(false);
-        setSpellcheckErrors([]);
-        setCurrentErrorIndex(0);
-    };
-    
-    const handleSpellcheckNext = () => {
-        if (currentErrorIndex >= spellcheckErrors.length - 1) {
-            handleCloseSpellcheck();
-        } else {
-            setCurrentErrorIndex(prev => prev + 1);
-        }
-    };
-    
-    const handleSpellcheckIgnore = (word: string) => {
-        sessionIgnoredWords.current.add(word.toLowerCase());
-        const remainingErrors = spellcheckErrors.filter((e, idx) => idx > currentErrorIndex && e.word.toLowerCase() !== word.toLowerCase());
-        
-        if (remainingErrors.length > 0) {
-            const nextError = remainingErrors[0];
-            const nextIndex = spellcheckErrors.indexOf(nextError);
-            cleanupSpellcheckHighlight(); // manually clean before jumping index
-            setCurrentErrorIndex(nextIndex);
-        } else {
-            handleCloseSpellcheck();
-        }
-    };
-
-    const handleSpellcheckChange = (newWord: string) => {
-        const error = spellcheckErrors[currentErrorIndex];
-        if (!error) return;
-
-        const range = document.createRange();
-        range.setStart(error.node, error.startOffset);
-        range.setEnd(error.node, error.endOffset);
-        range.deleteContents();
-        range.insertNode(document.createTextNode(newWord));
-        
-        editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
-
-        handleSpellcheckNext();
-    };
-
-    const handleAddToDictionary = (word: string) => {
-        const lowerWord = word.toLowerCase();
-        setProjectData(currentData => {
-            if (!currentData || currentData.settings.customDictionary.includes(lowerWord)) return currentData;
-            return {
-                ...currentData,
-                settings: {
-                    ...currentData.settings,
-                    customDictionary: [...currentData.settings.customDictionary, lowerWord].sort(),
-                },
-            };
-        });
-        handleSpellcheckIgnore(word);
-    };
-
-    useEffect(() => {
-        cleanupSpellcheckHighlight();
-        if (isSpellcheckPanelOpen && spellcheckErrors.length > 0 && currentErrorIndex < spellcheckErrors.length) {
-            const error = spellcheckErrors[currentErrorIndex];
-            const range = document.createRange();
-            range.setStart(error.node, error.startOffset);
-            range.setEnd(error.node, error.endOffset);
-            
-            if (error.node.parentNode && editorRef.current?.contains(error.node)) {
-                const span = document.createElement('span');
-                span.className = 'spell-error-current';
-                try {
-                    range.surroundContents(span);
-                    span.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                } catch (e) {
-                    console.error("Could not highlight spellcheck error:", e);
-                    handleSpellcheckNext();
-                }
-            } else {
-                 handleSpellcheckNext();
-            }
-        }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isSpellcheckPanelOpen, currentErrorIndex]);
-    
-    const handleLanguageChange = (lang: SpellcheckLang) => {
-        setProjectData(currentData => {
-            if (!currentData) return null;
-            return {
-                ...currentData,
-                settings: { ...currentData.settings, spellcheckLanguage: lang },
-            };
-        });
-    };
-
     const cleanupEditor = useCallback(() => {
         if (!editorRef.current) return;
         const editor = editorRef.current;
@@ -987,18 +754,6 @@ const DemosPage: React.FC = () => {
 
     return (
         <div className={`flex flex-col h-screen ${themeClasses.bg} font-sans transition-all duration-300 ${isDistractionFree ? 'is-distraction-free' : ''}`}>
-            {isSpellcheckPanelOpen && spellcheckErrors.length > 0 && (
-                <SpellCheckPanel 
-                    error={spellcheckErrors[currentErrorIndex]}
-                    onClose={handleCloseSpellcheck}
-                    onNext={handleSpellcheckNext}
-                    onIgnore={handleSpellcheckIgnore}
-                    onChange={handleSpellcheckChange}
-                    onAddToDictionary={handleAddToDictionary}
-                    themeClasses={themeClasses}
-                    isLast={currentErrorIndex >= spellcheckErrors.length - 1}
-                />
-            )}
             {!isOutlineSidebarOpen && (
                 <div className="fixed top-0 left-0 h-full z-40 flex items-center">
                     <button onClick={() => setIsOutlineSidebarOpen(true)} className={`pl-2 pr-1 py-3 bg-stone-900/70 backdrop-blur-sm border-y border-r border-white/10 rounded-r-lg text-white/70 hover:bg-stone-800/70 transition-colors ${!selectedSketchId ? 'hidden' : ''}`} aria-label="Show document outline" disabled={!selectedSketchId}>
@@ -1013,39 +768,20 @@ const DemosPage: React.FC = () => {
                     <nav className="flex-1 overflow-y-auto p-2">
                         {headings.length > 0 ? (<ul className="space-y-1">{headings.map(h => (<li key={h.id}><button onClick={() => {const el = document.getElementById(h.id); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });}} className={`w-full text-left px-2 py-1 rounded text-sm text-white/80 hover:bg-white/10 truncate ${h.level === 2 ? 'pl-6' : ''} ${h.level === 3 ? 'pl-10' : ''}`} title={h.text}>{enhancePlainText(h.text)}</button></li>))}</ul>) : (<p className="p-4 text-sm text-white/50">No headings in document.</p>)}
                     </nav>
-                    <div className="p-4 border-t border-white/10 flex-shrink-0">
-                        <label className="block text-sm font-semibold mb-2 text-white/90" htmlFor="spellcheck-lang-demos">
-                            Language & Spelling
-                        </label>
-                        <select
-                            id="spellcheck-lang-demos"
-                            value={projectData?.settings.spellcheckLanguage || 'en'}
-                            onChange={(e) => handleLanguageChange(e.target.value as SpellcheckLang)}
-                            className="w-full px-3 py-2 rounded-md text-sm bg-stone-800 border border-stone-600 text-white"
-                        >
-                            <option value="en">English</option>
-                            <option value="fi">Finnish (Suomi)</option>
-                            <option value="vi">Vietnamese (Tiếng Việt)</option>
-                            <option value="browser-default">Browser Default</option>
-                        </select>
-                        <p className="mt-2 text-xs text-white/50">
-                            Note: Custom spellchecker requires a dictionary. May not be available for all languages.
-                        </p>
-                    </div>
                 </div>
             </div>
 
             <header className={`flex-shrink-0 flex items-center justify-between p-3 border-b ${themeClasses.border} ${isDistractionFree ? 'hidden' : ''}`}>
                 <div className="flex items-center space-x-2"><button onClick={() => navigate('/')} className="p-2 rounded-md hover:bg-white/10"><HomeIcon className={`w-5 h-5 ${themeClasses.text}`} /></button><div className="w-px h-5 bg-white/20"></div><button onClick={() => setIsOutlineModalOpen(true)} className="p-2 rounded-md hover:bg-white/10"><Bars3Icon className={`w-5 h-5 ${themeClasses.text}`} /></button></div>
                 {selectedSketch && <input key={`${selectedSketch.id}-title`} defaultValue={selectedSketch.title} onBlur={(e) => handleUpdateSketch('title', e.target.value)} placeholder="Sketch Title" className={`text-lg font-semibold bg-transparent outline-none w-1/2 text-center ${themeClasses.text}`} />}
-                <div className="flex items-center space-x-2"><button onClick={() => startSpellcheck()} className="p-2 rounded-md hover:bg-white/10" disabled={!selectedSketchId || !spellchecker}><SpellcheckIcon className={`w-5 h-5 ${themeClasses.text}`} /></button><button onClick={() => setIsFindReplaceOpen(p => !p)} className="p-2 rounded-md hover:bg-white/10" disabled={!selectedSketchId}><SearchIcon className={`w-5 h-5 ${themeClasses.text}`} /></button><button onClick={() => setIsStatsOpen(p => !p)} className="p-2 rounded-md hover:bg-white/10" disabled={!selectedSketchId}><ChartBarIcon className={`w-5 h-5 ${themeClasses.text}`} /></button><div className="relative"><button onClick={() => setIsExportMenuOpen(p => !p)} className="p-2 rounded-md hover:bg-white/10" disabled={!selectedSketchId}><DownloadIcon className={`w-5 h-5 ${themeClasses.text}`} /></button>{isExportMenuOpen && <div className={`absolute top-full right-0 mt-2 w-48 p-2 rounded-md shadow-lg ${themeClasses.bgSecondary} border ${themeClasses.border}`}><button onClick={() => handleExport('html')} className={`block w-full text-left px-3 py-2 rounded hover:${themeClasses.bgTertiary}`}>Export as .html</button><button onClick={() => handleExport('txt')} className={`block w-full text-left px-3 py-2 rounded hover:${themeClasses.bgTertiary}`}>Export as .txt</button><button onClick={() => handleExport('md')} className={`block w-full text-left px-3 py-2 rounded hover:${themeClasses.bgTertiary}`}>Export as .md</button></div>}</div><button onClick={() => setIsDistractionFree(p => !p)} className="p-2 rounded-md hover:bg-white/10">{isDistractionFree ? <ArrowsPointingInIcon className={`w-5 h-5 ${themeClasses.text}`} /> : <ArrowsPointingOutIcon className={`w-5 h-5 ${themeClasses.text}`} />}</button></div>
+                <div className="flex items-center space-x-2"><button onClick={() => setIsFindReplaceOpen(p => !p)} className="p-2 rounded-md hover:bg-white/10" disabled={!selectedSketchId}><SearchIcon className={`w-5 h-5 ${themeClasses.text}`} /></button><button onClick={() => setIsStatsOpen(p => !p)} className="p-2 rounded-md hover:bg-white/10" disabled={!selectedSketchId}><ChartBarIcon className={`w-5 h-5 ${themeClasses.text}`} /></button><div className="relative"><button onClick={() => setIsExportMenuOpen(p => !p)} className="p-2 rounded-md hover:bg-white/10" disabled={!selectedSketchId}><DownloadIcon className={`w-5 h-5 ${themeClasses.text}`} /></button>{isExportMenuOpen && <div className={`absolute top-full right-0 mt-2 w-48 p-2 rounded-md shadow-lg ${themeClasses.bgSecondary} border ${themeClasses.border}`}><button onClick={() => handleExport('html')} className={`block w-full text-left px-3 py-2 rounded hover:${themeClasses.bgTertiary}`}>Export as .html</button><button onClick={() => handleExport('txt')} className={`block w-full text-left px-3 py-2 rounded hover:${themeClasses.bgTertiary}`}>Export as .txt</button><button onClick={() => handleExport('md')} className={`block w-full text-left px-3 py-2 rounded hover:${themeClasses.bgTertiary}`}>Export as .md</button></div>}</div><button onClick={() => setIsDistractionFree(p => !p)} className="p-2 rounded-md hover:bg-white/10">{isDistractionFree ? <ArrowsPointingInIcon className={`w-5 h-5 ${themeClasses.text}`} /> : <ArrowsPointingOutIcon className={`w-5 h-5 ${themeClasses.text}`} />}</button></div>
             </header>
             
             <input type="file" ref={docxInputRef} onChange={handleDocxImport} className="hidden" accept=".docx" />
             
             <main className="flex-1 overflow-y-auto" ref={scrollContainerRef}>
                 <div className={`p-8 md:p-12 font-serif min-h-full max-w-4xl mx-auto ${isDistractionFree ? 'pt-24' : ''}`}>
-                    {selectedSketch ? (<div ref={editorRef} key={`${selectedSketch.id}-content`} contentEditable spellCheck={false} suppressContentEditableWarning onInput={(e) => handleUpdateSketch('content', e.currentTarget.innerHTML)} onKeyDown={handleKeyDown} onKeyUp={handleKeyUp} onPaste={handlePaste} onBlur={cleanupEditor} className={`w-full text-lg leading-relaxed outline-none story-content ${themeClasses.text}`} style={editorStyle} />) : (<div className="flex flex-col items-center justify-center h-full text-center mt-[-4rem]"><QuillPenIcon className={`w-16 h-16 mb-4 ${themeClasses.textSecondary}`} /><h2 className={`text-2xl font-bold ${themeClasses.accentText}`}>Welcome to Demos</h2><p className={`mt-2 max-w-md ${themeClasses.textSecondary}`}>This is your space for ideas and notes. Create a new sketch to get started.</p><button onClick={handleCreateSketch} className={`mt-8 flex items-center justify-center space-x-2 px-6 py-3 text-lg font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}><PlusIcon className="w-6 h-6" /><span>Create First Sketch</span></button></div>)}
+                    {selectedSketch ? (<div ref={editorRef} key={`${selectedSketch.id}-content`} contentEditable spellCheck={true} suppressContentEditableWarning onInput={(e) => handleUpdateSketch('content', e.currentTarget.innerHTML)} onKeyDown={handleKeyDown} onKeyUp={handleKeyUp} onPaste={handlePaste} onBlur={cleanupEditor} className={`w-full text-lg leading-relaxed outline-none story-content ${themeClasses.text}`} style={editorStyle} />) : (<div className="flex flex-col items-center justify-center h-full text-center mt-[-4rem]"><QuillPenIcon className={`w-16 h-16 mb-4 ${themeClasses.textSecondary}`} /><h2 className={`text-2xl font-bold ${themeClasses.accentText}`}>Welcome to Demos</h2><p className={`mt-2 max-w-md ${themeClasses.textSecondary}`}>This is your space for ideas and notes. Create a new sketch to get started.</p><button onClick={handleCreateSketch} className={`mt-8 flex items-center justify-center space-x-2 px-6 py-3 text-lg font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}><PlusIcon className="w-6 h-6" /><span>Create First Sketch</span></button></div>)}
                 </div>
             </main>
 

@@ -1,7 +1,7 @@
 
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ProjectData, FileStatus, SaveStatus } from '../types';
+import { ProjectData, FileStatus, SaveStatus, Theme } from '../types';
 import { get, set, del } from 'idb-keyval';
 
 const LOCAL_BACKUP_KEY = 'storyverse-local-backup';
@@ -9,8 +9,6 @@ const LOCAL_BACKUP_KEY = 'storyverse-local-backup';
 const defaultProjectData: ProjectData = {
   settings: {
     theme: 'book',
-    spellcheckLanguage: 'en',
-    customDictionary: [],
   },
   novels: [],
   sketches: [],
@@ -24,11 +22,8 @@ const sanitizeProjectData = (data: any): ProjectData => {
   const sanitized = JSON.parse(JSON.stringify(defaultProjectData));
 
   // Merge settings safely
-  if (data?.settings) {
-    sanitized.settings = { ...sanitized.settings, ...data.settings };
-  }
-  if (!Array.isArray(sanitized.settings.customDictionary)) {
-      sanitized.settings.customDictionary = [];
+  if (data?.settings?.theme) {
+    sanitized.settings.theme = data.settings.theme as Theme;
   }
 
   // Sanitize novels and their nested structures

@@ -2,8 +2,6 @@ export type Theme = 'dark' | 'book';
 
 export type SaveStatus = 'saved' | 'saving' | 'unsaved';
 
-export type SpellcheckLang = 'en' | 'fi' | 'vi' | 'browser-default';
-
 export interface ChapterHistory {
   timestamp: string;
   content: string;
@@ -40,8 +38,6 @@ export interface Sketch {
 export interface ProjectData {
   settings: {
     theme: Theme;
-    spellcheckLanguage: SpellcheckLang;
-    customDictionary: string[];
   };
   novels: Novel[];
   sketches: Sketch[];
