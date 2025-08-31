@@ -17,6 +17,15 @@ export interface Chapter {
   history: ChapterHistory[];
 }
 
+export interface NovelSketch {
+  id: string;
+  title: string;
+  content: string; // HTML content
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Novel {
   id:string;
   title: string;
@@ -24,6 +33,7 @@ export interface Novel {
   coverImage?: string; // base64 string
   tags: string[];
   chapters: Chapter[];
+  sketches: NovelSketch[];
   createdAt: string;
 }
 

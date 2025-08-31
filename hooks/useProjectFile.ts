@@ -37,6 +37,16 @@ const sanitizeProjectData = (data: any): ProjectData => {
             history: Array.isArray(chapter.history) ? chapter.history : [],
           }))
         : [],
+      sketches: Array.isArray(novel.sketches)
+        ? novel.sketches.map((sketch: any) => ({
+            id: sketch.id || crypto.randomUUID(),
+            title: sketch.title || "Untitled Sketch",
+            content: sketch.content || "",
+            tags: Array.isArray(sketch.tags) ? sketch.tags : [],
+            createdAt: sketch.createdAt || new Date().toISOString(),
+            updatedAt: sketch.updatedAt || new Date().toISOString(),
+        }))
+        : [],
       createdAt: novel.createdAt || new Date().toISOString(),
     }));
   }

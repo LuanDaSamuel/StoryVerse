@@ -1,14 +1,16 @@
 
 
+
 import React, { useState, useContext, useRef, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
-import { TAG_OPTIONS, enhancePlainText } from '../constants';
-import { Novel, Chapter } from '../types';
+import { TAG_OPTIONS, enhancePlainText, enhanceHtml } from '../constants';
+import { Novel, Chapter, NovelSketch } from '../types';
 import { BackIcon, BookOpenIcon, DownloadIcon, TrashIcon, UploadIcon, PlusIcon, TextIcon } from '../components/Icons';
 import ConfirmModal from '../components/ConfirmModal';
 import NovelHistoryPage from '../components/NovelHistoryPage';
 import ExportModal from '../components/ExportModal';
+import SketchEditorModal from '../components/SketchEditorModal';
 import * as mammoth from 'mammoth';
 
 const NovelDetailPage: React.FC = () => {
@@ -22,9 +24,13 @@ const NovelDetailPage: React.FC = () => {
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
     const [chapterToDelete, setChapterToDelete] = useState<Chapter | null>(null);
-    const [activeTab, setActiveTab] = useState<'Details' | 'History'>('Details');
+    const [activeTab, setActiveTab] = useState<'Details' | 'Sketches' | 'History'>('Details');
     const [isDocxConfirmOpen, setIsDocxConfirmOpen] = useState(false);
     const [pendingFiles, setPendingFiles] = useState<FileList | null>(null);
+
+    const [editingSketch, setEditingSketch] = useState<NovelSketch | 'new' | null>(null);
+    const [sketchToDelete, setSketchToDelete] = useState<NovelSketch | null>(null);
+
 
     const { novel, novelIndex } = useMemo(() => {
         const novels = projectData?.novels;
@@ -292,9 +298,80 @@ const NovelDetailPage: React.FC = () => {
         setChapterToDelete(null);
     };
 
+    const handleSaveSketch = (savedSketch: NovelSketch) => {
+        if (novelIndex === -1) return;
+        setProjectData(currentData => {
+            if (!currentData) return null;
+            const updatedNovels = [...currentData.novels];
+            const currentNovel = { ...updatedNovels[novelIndex] };
+            const sketchIndex = currentNovel.sketches.findIndex(s => s.id === savedSketch.id);
+            if (sketchIndex > -1) {
+                currentNovel.sketches[sketchIndex] = savedSketch;
+            } else {
+                currentNovel.sketches.unshift(savedSketch);
+            }
+            updatedNovels[novelIndex] = { ...currentNovel, sketches: [...currentNovel.sketches] };
+            return { ...currentData, novels: updatedNovels };
+        });
+        setEditingSketch(null);
+    };
+    
+    const handleDeleteSketch = () => {
+        if (!sketchToDelete || novelIndex === -1) return;
+        setProjectData(currentData => {
+            if (!currentData) return null;
+            const updatedNovels = [...currentData.novels];
+            const currentNovel = { ...updatedNovels[novelIndex] };
+            currentNovel.sketches = currentNovel.sketches.filter(s => s.id !== sketchToDelete.id);
+            updatedNovels[novelIndex] = currentNovel;
+            return { ...currentData, novels: updatedNovels };
+        });
+        setSketchToDelete(null);
+    };
+
     const renderTabContent = () => {
         if (activeTab === 'History') {
             return <NovelHistoryPage novel={novel} />;
+        }
+
+        if (activeTab === 'Sketches') {
+             const tempDiv = document.createElement('div');
+            const getSnippet = (html: string) => {
+                tempDiv.innerHTML = html;
+                const text = tempDiv.textContent || "";
+                return text.length > 150 ? text.substring(0, 150) + '...' : text;
+            };
+
+            return (
+                <div className="pt-6">
+                    <button onClick={() => setEditingSketch('new')} className={`w-full flex items-center justify-center space-x-2 p-4 rounded-lg border-2 border-dashed transition-colors ${themeClasses.border} ${themeClasses.textSecondary} hover:border-opacity-70 hover:text-opacity-70 mb-6`}>
+                        <PlusIcon className="w-5 h-5"/>
+                        <span>Create New Sketch</span>
+                    </button>
+
+                    <div className="space-y-4">
+                        {novel.sketches.length === 0 ? (
+                             <div className="text-center py-8">
+                                <p className={themeClasses.textSecondary}>No sketches yet. Click the button above to add one!</p>
+                            </div>
+                        ) : novel.sketches.map(sketch => (
+                            <div key={sketch.id} className={`group relative p-4 rounded-lg ${themeClasses.bgTertiary}`}>
+                                <h3 className={`font-bold text-lg ${themeClasses.accentText}`}>{enhancePlainText(sketch.title) || 'Untitled Sketch'}</h3>
+                                <div className="flex flex-wrap gap-2 my-2">
+                                    {sketch.tags.map(tag => (
+                                        <span key={tag} className={`px-2 py-0.5 text-xs rounded-full font-semibold ${themeClasses.accent} ${themeClasses.accentText}`}>{tag}</span>
+                                    ))}
+                                </div>
+                                <p className={`text-sm ${themeClasses.textSecondary}`}>{enhancePlainText(getSnippet(sketch.content))}</p>
+                                <div className="absolute top-3 right-3 flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onClick={() => setEditingSketch(sketch)} className={`px-3 py-1 text-sm rounded-md font-semibold ${themeClasses.bg} ${themeClasses.text} hover:opacity-80`}>Edit</button>
+                                    <button onClick={() => setSketchToDelete(sketch)} className="p-2 rounded-full text-red-500 hover:bg-red-500/10"><TrashIcon className="w-5 h-5" /></button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
         }
 
         return (
@@ -446,6 +523,9 @@ const NovelDetailPage: React.FC = () => {
                             <button onClick={() => setActiveTab('Details')} className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'Details' ? `${themeClasses.accentText} border-b-2 ${themeClasses.accentBorder}` : `${themeClasses.textSecondary} hover:${themeClasses.accentText}` }`}>
                                 Details
                             </button>
+                             <button onClick={() => setActiveTab('Sketches')} className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'Sketches' ? `${themeClasses.accentText} border-b-2 ${themeClasses.accentBorder}` : `${themeClasses.textSecondary} hover:${themeClasses.accentText}` }`}>
+                                Sketches
+                            </button>
                             <button onClick={() => setActiveTab('History')} className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'History' ? `${themeClasses.accentText} border-b-2 ${themeClasses.accentBorder}` : `${themeClasses.textSecondary} hover:${themeClasses.accentText}` }`}>
                                 History
                             </button>
@@ -454,6 +534,13 @@ const NovelDetailPage: React.FC = () => {
                     </div>
                 </div>
             </div>
+            {editingSketch && (
+                <SketchEditorModal
+                    sketch={editingSketch === 'new' ? null : editingSketch}
+                    onClose={() => setEditingSketch(null)}
+                    onSave={handleSaveSketch}
+                />
+            )}
             <ConfirmModal
                 isOpen={isDeleteConfirmOpen}
                 onClose={() => setIsDeleteConfirmOpen(false)}
@@ -467,6 +554,13 @@ const NovelDetailPage: React.FC = () => {
                 onConfirm={handleDeleteChapter}
                 title={`Delete "${chapterToDelete?.title}"?`}
                 message="Are you sure you want to delete this chapter? This action is permanent and cannot be undone."
+            />
+             <ConfirmModal
+                isOpen={!!sketchToDelete}
+                onClose={() => setSketchToDelete(null)}
+                onConfirm={handleDeleteSketch}
+                title={`Delete "${sketchToDelete?.title}"?`}
+                message="Are you sure you want to delete this sketch? This action is permanent and cannot be undone."
             />
             <ConfirmModal
                 isOpen={isDocxConfirmOpen}

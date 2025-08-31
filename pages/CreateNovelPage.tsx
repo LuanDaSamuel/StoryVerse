@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useContext, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
@@ -89,6 +90,7 @@ const CreateNovelPage: React.FC = () => {
                 updatedAt: now,
                 history: [],
             }],
+            sketches: [],
             createdAt: now,
             ...(coverImage && { coverImage }),
         };
