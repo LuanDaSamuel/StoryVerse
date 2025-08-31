@@ -1,6 +1,4 @@
 
-
-
 import React, { useState, useContext, useRef, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
@@ -298,8 +296,8 @@ const NovelDetailPage: React.FC = () => {
         setChapterToDelete(null);
     };
 
-    const handleSaveSketch = (savedSketch: NovelSketch) => {
-        if (novelIndex === -1) return;
+    const handleSaveSketch = (savedSketch: NovelSketch, sketchNovelId: string) => {
+        if (novelIndex === -1 || novel.id !== sketchNovelId) return;
         setProjectData(currentData => {
             if (!currentData) return null;
             const updatedNovels = [...currentData.novels];
@@ -539,6 +537,7 @@ const NovelDetailPage: React.FC = () => {
                     sketch={editingSketch === 'new' ? null : editingSketch}
                     onClose={() => setEditingSketch(null)}
                     onSave={handleSaveSketch}
+                    novelId={novel.id}
                 />
             )}
             <ConfirmModal

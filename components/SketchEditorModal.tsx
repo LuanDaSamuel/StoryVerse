@@ -1,22 +1,26 @@
+
 import React, { useState, useContext, useEffect, useRef } from 'react';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { NovelSketch } from '../types';
-import { SKETCH_TAG_OPTIONS, enhanceHtml, enhancePlainText } from '../constants';
+import { SKETCH_TAG_OPTIONS, enhancePlainText } from '../constants';
 import { CloseIcon } from './Icons';
 
 interface SketchEditorModalProps {
   sketch: NovelSketch | null;
   onClose: () => void;
-  onSave: (sketch: NovelSketch) => void;
+  onSave: (sketch: NovelSketch, novelId: string) => void;
+  novels?: { id: string, title: string }[];
+  novelId?: string;
 }
 
-const SketchEditorModal: React.FC<SketchEditorModalProps> = ({ sketch, onClose, onSave }) => {
+const SketchEditorModal: React.FC<SketchEditorModalProps> = ({ sketch, onClose, onSave, novels, novelId: contextualNovelId }) => {
     const { themeClasses } = useContext(ProjectContext);
     const isNew = sketch === null;
     
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
     const [tags, setTags] = useState<string[]>([]);
+    const [selectedNovelId, setSelectedNovelId] = useState<string>('');
     const editorRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -35,7 +39,14 @@ const SketchEditorModal: React.FC<SketchEditorModalProps> = ({ sketch, onClose, 
                 editorRef.current.innerHTML = '<p><br></p>';
             }
         }
-    }, [sketch]);
+
+        if (contextualNovelId) {
+            setSelectedNovelId(contextualNovelId);
+        } else if (novels && novels.length > 0) {
+            setSelectedNovelId(novels[0].id);
+        }
+
+    }, [sketch, contextualNovelId, novels]);
 
     const handleTagClick = (tag: string) => {
         setTags(prev => {
@@ -50,6 +61,10 @@ const SketchEditorModal: React.FC<SketchEditorModalProps> = ({ sketch, onClose, 
     };
 
     const handleSave = () => {
+        if (isNew && novels && !selectedNovelId) {
+            alert('Please select a novel to associate this sketch with.');
+            return;
+        }
         const now = new Date().toISOString();
         const editorContent = editorRef.current?.innerHTML || '';
         
@@ -61,7 +76,7 @@ const SketchEditorModal: React.FC<SketchEditorModalProps> = ({ sketch, onClose, 
             createdAt: sketch?.createdAt || now,
             updatedAt: now,
         };
-        onSave(finalSketch);
+        onSave(finalSketch, selectedNovelId);
     };
 
     return (
@@ -83,6 +98,21 @@ const SketchEditorModal: React.FC<SketchEditorModalProps> = ({ sketch, onClose, 
                         className={`w-full text-2xl font-bold bg-transparent outline-none p-2 -mx-2 rounded-md focus:ring-1 ${themeClasses.accentBorder} ${themeClasses.accentText}`}
                     />
                     
+                    {isNew && novels && novels.length > 0 && (
+                        <div>
+                            <h3 className={`font-bold mb-2 text-sm ${themeClasses.textSecondary}`}>Novel</h3>
+                            <select
+                                value={selectedNovelId}
+                                onChange={e => setSelectedNovelId(e.target.value)}
+                                className={`w-full p-3 rounded-md border ${themeClasses.border} ${themeClasses.input}`}
+                            >
+                                {novels.map(n => (
+                                    <option key={n.id} value={n.id}>{enhancePlainText(n.title)}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
                     <div>
                         <h3 className={`font-bold mb-2 text-sm ${themeClasses.textSecondary}`}>Tags (up to 6)</h3>
                         <div className="flex flex-wrap gap-2">

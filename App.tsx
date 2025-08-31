@@ -11,6 +11,7 @@ import ChapterEditorPage from './pages/ChapterEditorPage';
 import NovelDetailPage from './pages/NovelDetailPage';
 import ReadNovelPage from './pages/ReadNovelPage';
 import DemosPage from './pages/DemosPage';
+import SketchesPage from './pages/SketchesPage';
 import { THEME_CONFIG } from './constants';
 import { LoadingIcon } from './components/Icons';
 import { Theme } from './types';
@@ -112,6 +113,7 @@ const AppContent = () => {
                             <Routes>
                                 <Route path="/" element={<HomePage />} />
                                 <Route path="/create-novel" element={<CreateNovelPage />} />
+                                <Route path="/sketches" element={<SketchesPage />} />
                                 <Route path="/demos" element={<DemosPage />} />
                                 <Route path="/novel/:novelId" element={<NovelDetailPage />} />
                                 <Route path="/novel/:novelId/read/:chapterId?" element={<ReadNovelPage />} />
