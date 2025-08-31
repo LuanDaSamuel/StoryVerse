@@ -5,6 +5,7 @@ import { ProjectData, FileStatus, SaveStatus, Theme } from '../types';
 import { get, set, del } from 'idb-keyval';
 
 const LOCAL_BACKUP_KEY = 'storyverse-local-backup';
+const BACKUP_DIR_HANDLE_KEY = 'storyverse-backup-dir-handle';
 
 const defaultProjectData: ProjectData = {
   settings: {
@@ -63,16 +64,34 @@ const sanitizeProjectData = (data: any): ProjectData => {
   return sanitized;
 };
 
+async function verifyPermission(handle: FileSystemDirectoryHandle) {
+    const options = { mode: 'readwrite' as const };
+    // Check if permission was already granted
+    if ((await handle.queryPermission(options)) === 'granted') {
+        return true;
+    }
+    // Request permission if not granted
+    if ((await handle.requestPermission(options)) === 'granted') {
+        return true;
+    }
+    // Permission was denied
+    return false;
+}
 
 export function useProjectFile() {
   const [projectData, setProjectData] = useState<ProjectData | null>(null);
   const [status, setStatus] = useState<FileStatus>('loading');
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
+  const [backupDirHandle, setBackupDirHandle] = useState<FileSystemDirectoryHandle | null>(null);
+  const [backupDirName, setBackupDirName] = useState<string>('');
   
   const saveTimeout = useRef<number | null>(null);
   const dataVersion = useRef(0);
   const lastSavedVersion = useRef(0);
   const projectDataRef = useRef(projectData);
+  projectDataRef.current = projectData;
+  const backupDirHandleRef = useRef(backupDirHandle);
+  backupDirHandleRef.current = backupDirHandle;
 
   // Create a ref to hold the latest saveStatus to prevent stale closures in callbacks.
   const saveStatusRef = useRef(saveStatus);
@@ -91,6 +110,16 @@ export function useProjectFile() {
         } else {
           setStatus('welcome');
         }
+        
+        // Check for a saved directory handle for auto-backup
+        const handle: FileSystemDirectoryHandle | undefined = await get(BACKUP_DIR_HANDLE_KEY);
+        if (handle && await verifyPermission(handle)) {
+            setBackupDirHandle(handle);
+            setBackupDirName(handle.name);
+        } else {
+            await del(BACKUP_DIR_HANDLE_KEY); // Clean up if permission is lost
+        }
+
       } catch (error) {
         console.error('Error loading from local backup:', error);
         setStatus('welcome');
@@ -107,6 +136,24 @@ export function useProjectFile() {
       if (dataVersion.current === lastSavedVersion.current) {
         setSaveStatus('saved');
       }
+
+      if (backupDirHandleRef.current) {
+          try {
+              const fileHandle = await backupDirHandleRef.current.getFileHandle('StoryVerse-AutoBackup.json', { create: true });
+              const writable = await fileHandle.createWritable();
+              await writable.write(JSON.stringify(data, null, 2));
+              await writable.close();
+          } catch (error) {
+              console.error('Auto-backup to file system failed:', error);
+              if (error instanceof DOMException && error.name === 'NotAllowedError') {
+                  // User denied permission, so unlink the directory
+                  await del(BACKUP_DIR_HANDLE_KEY);
+                  setBackupDirHandle(null);
+                  setBackupDirName('');
+              }
+          }
+      }
+
     } catch (error) {
       console.error('Error saving to local backup:', error);
       setSaveStatus('unsaved');
@@ -199,7 +246,8 @@ export function useProjectFile() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'StoryVerse-Project.json';
+    
+    a.download = `StoryVerse-Project.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -215,6 +263,25 @@ export function useProjectFile() {
     setStatus('welcome');
   }, [saveNow]);
 
+  const linkBackupDirectory = async () => {
+      try {
+          const handle = await window.showDirectoryPicker();
+          if (await verifyPermission(handle)) {
+              await set(BACKUP_DIR_HANDLE_KEY, handle);
+              setBackupDirHandle(handle);
+              setBackupDirName(handle.name);
+          }
+      } catch (error) {
+          console.error('Error linking backup directory:', error);
+      }
+  };
+
+  const unlinkBackupDirectory = async () => {
+      await del(BACKUP_DIR_HANDLE_KEY);
+      setBackupDirHandle(null);
+      setBackupDirName('');
+  };
+
   return { 
     projectData, 
     setProjectData: setProjectDataWithSave, 
@@ -223,6 +290,10 @@ export function useProjectFile() {
     createProject, 
     openProject, 
     downloadProject, 
-    closeProject
+    closeProject,
+    isBackupLinked: !!backupDirHandle,
+    backupDirName,
+    linkBackupDirectory,
+    unlinkBackupDirectory,
   };
 }

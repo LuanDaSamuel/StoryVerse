@@ -18,7 +18,10 @@ const themeOptions: { name: Theme; label: string; colors: string[] }[] = [
 ];
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
-  const { projectData, theme, setProjectData, downloadProject, closeProject, themeClasses } = useContext(ProjectContext);
+  const { 
+      projectData, theme, setProjectData, downloadProject, closeProject, themeClasses, 
+      isBackupLinked, backupDirName, linkBackupDirectory, unlinkBackupDirectory 
+  } = useContext(ProjectContext);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
   if (!isOpen || !projectData) return null;
@@ -51,62 +54,71 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   
   return (
     <>
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 transition-opacity">
-        <div className={`p-8 rounded-lg shadow-2xl w-full max-w-lg m-4 ${themeClasses.bgSecondary} ${modalTextColor} border ${themeClasses.border} flex flex-col max-h-[90vh]`}>
-          <div className="flex-shrink-0">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold">Settings</h2>
-              <button onClick={onClose} className={`p-1 rounded-full hover:${themeClasses.bgTertiary}`}>
-                <CloseIcon className="w-6 h-6" />
-              </button>
-            </div>
-            <hr className={`mb-6 ${themeClasses.border}`} />
+      <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 font-sans" onClick={onClose} role="dialog" aria-modal="true">
+        <div 
+            className={`w-full max-w-lg p-6 rounded-lg shadow-xl ${themeClasses.bgSecondary} ${modalTextColor} border ${themeClasses.border}`} 
+            onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex justify-between items-center mb-6">
+            <h2 className={`text-2xl font-bold ${modalTextColor}`}>Settings</h2>
+            <button onClick={onClose} className={`p-1 rounded-full hover:${themeClasses.bgTertiary}`}>
+              <CloseIcon className="w-6 h-6" />
+            </button>
           </div>
 
-          <div className="flex-grow overflow-y-auto pr-2 -mr-4">
-            <div className="mb-8">
-              <h3 className={`text-lg mb-2 ${subHeadingStyle}`}>Appearance</h3>
-              <p className={`${descriptionColor} mb-4`}>Choose a color theme that suits your mood.</p>
-              <div className="flex justify-center space-x-8">
-                {themeOptions.map(opt => (
-                  <div key={opt.name} className="text-center">
-                    <button
-                      onClick={() => handleThemeChange(opt.name)}
-                      className={`w-16 h-12 md:w-20 md:h-14 rounded-lg flex items-center justify-center border-2 transition-all ${getActiveThemeBorderStyle(opt.name)}`}
-                      style={{ backgroundColor: opt.colors[1] }}
-                    >
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full overflow-hidden" style={{ backgroundColor: opt.colors[1] }}>
-                          <div className="w-4 h-8" style={{backgroundColor: opt.colors[0]}}></div>
-                          <div className="w-4 h-8" style={{backgroundColor: opt.colors[1]}}></div>
+          <div className="space-y-6">
+            {/* Theme selection */}
+            <div>
+              <h3 className={`text-lg mb-3 ${subHeadingStyle}`}>Theme</h3>
+              <div className="grid grid-cols-2 gap-4">
+                {themeOptions.map(option => (
+                  <button 
+                    key={option.name} 
+                    onClick={() => handleThemeChange(option.name)} 
+                    className={`p-4 rounded-lg border-2 transition-all ${getActiveThemeBorderStyle(option.name)}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className={`font-semibold ${modalTextColor}`}>{option.label}</span>
+                      <div className="flex -space-x-2">
+                        {option.colors.map(color => <div key={color} className="w-6 h-6 rounded-full border-2 border-white" style={{ backgroundColor: color }} />)}
                       </div>
-                    </button>
-                    <span className={`mt-2 block text-sm ${themeClasses.textSecondary}`}>{opt.label}</span>
-                  </div>
+                    </div>
+                  </button>
                 ))}
               </div>
             </div>
 
+            {/* Project management */}
             <div>
-              <h3 className={`text-lg mb-2 ${subHeadingStyle}`}>Project Data</h3>
-              <p className={`${descriptionColor} mb-4`}>
-                Your work is auto-saved to your browser. You can download a project file to create a backup or move to another computer.
-              </p>
-              <div className="flex space-x-4">
-                <button
-                  onClick={downloadProject}
-                  className={`flex items-center space-x-2 px-4 py-2 font-semibold rounded-lg ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-80 transition-opacity`}
-                >
-                  <DownloadIcon className="w-5 h-5" />
-                  <span>Download Project</span>
+              <h3 className={`text-lg mb-3 ${subHeadingStyle}`}>Project Management</h3>
+              <div className="space-y-3">
+                <button onClick={downloadProject} className={`w-full flex items-center space-x-3 text-left px-4 py-3 rounded-lg font-semibold transition-colors ${themeClasses.bgTertiary} hover:opacity-80`}>
+                  <DownloadIcon className="w-5 h-5"/>
+                  <span>Download Project File</span>
                 </button>
-                <button
-                  onClick={() => setIsConfirmOpen(true)}
-                  className={`flex items-center space-x-2 px-4 py-2 font-semibold rounded-lg ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-80 transition-opacity`}
-                >
-                  <TrashIcon className="w-5 h-5" />
+                <button onClick={() => setIsConfirmOpen(true)} className="w-full flex items-center space-x-3 text-left px-4 py-3 rounded-lg font-semibold transition-colors bg-red-700 text-red-100 hover:bg-red-800">
+                  <TrashIcon className="w-5 h-5"/>
                   <span>Close Project</span>
                 </button>
               </div>
+            </div>
+
+            {/* Backup */}
+            <div>
+                <h3 className={`text-lg mb-3 ${subHeadingStyle}`}>Auto-Backup to Folder</h3>
+                {isBackupLinked ? (
+                    <div className={`p-3 rounded-lg ${themeClasses.bgTertiary}`}>
+                        <p className={`text-sm ${descriptionColor}`}>Backing up to: <span className="font-semibold">{backupDirName}</span></p>
+                        <button onClick={unlinkBackupDirectory} className="mt-2 text-sm text-red-500 hover:underline">Unlink directory</button>
+                    </div>
+                ) : (
+                    <>
+                        <p className={`text-sm mb-3 ${descriptionColor}`}>Link a directory on your computer for automatic backups of your project file.</p>
+                        <button onClick={linkBackupDirectory} className={`w-full flex items-center justify-center space-x-3 text-left px-4 py-3 rounded-lg font-semibold transition-colors ${themeClasses.bgTertiary} hover:opacity-80`}>
+                            <span>Link Backup Directory</span>
+                        </button>
+                    </>
+                )}
             </div>
           </div>
         </div>
@@ -116,8 +128,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
         onClose={() => setIsConfirmOpen(false)}
         onConfirm={handleCloseProject}
         title="Close Project?"
-        message="Are you sure you want to close this project? This will clear it from the browser and return you to the welcome screen. Your downloaded project files will not be affected."
-        confirmButtonClass={`px-6 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90 transition-opacity`}
+        message="Are you sure you want to close this project? Any unsaved changes will be saved before closing. You can open it again later from the file."
       />
     </>
   );
