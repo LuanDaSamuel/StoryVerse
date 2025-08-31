@@ -1,3 +1,5 @@
+
+
 import React, { useMemo, useContext, useEffect, useRef } from 'react';
 import { HashRouter, Routes, Route, Navigate, useParams, useMatch, useNavigate } from 'react-router-dom';
 import { useProjectFile } from './hooks/useProjectFile';
@@ -60,6 +62,22 @@ const AppContent = () => {
             initialLoadHandled.current = true;
         }
     }, [status, navigate]);
+
+    // This effect sets the document's language for spellchecking.
+    useEffect(() => {
+        const lang = projectData?.settings?.spellcheckLanguage;
+        if (lang) {
+            if (lang === 'browser-default') {
+                document.documentElement.removeAttribute('lang');
+            } else {
+                document.documentElement.lang = lang;
+            }
+        } else {
+            // When projectData is null (no project open), or if the setting is missing,
+            // reset the lang attribute to avoid incorrect spellchecking from a previous session.
+            document.documentElement.removeAttribute('lang');
+        }
+    }, [projectData?.settings?.spellcheckLanguage]);
 
     const theme = useMemo(() => {
         const projectTheme = projectData?.settings?.theme || 'book';

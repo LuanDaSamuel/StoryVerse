@@ -1,3 +1,5 @@
+
+
 import React, { useContext, useState } from 'react';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { Theme, SpellcheckLang } from '../types';
@@ -18,7 +20,7 @@ const themeOptions: { name: Theme; label: string; colors: string[] }[] = [
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const { projectData, theme, setProjectData, downloadProject, closeProject, themeClasses } = useContext(ProjectContext);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const [customWord, setCustomWord] = useState('');
+  const [newWord, setNewWord] = useState('');
 
   if (!isOpen || !projectData) return null;
 
@@ -42,38 +44,35 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
     });
   };
 
-  const handleAddCustomWord = () => {
-      const wordToAdd = customWord.trim().toLowerCase();
-      if (!wordToAdd) return;
-      setProjectData(currentData => {
-          if (!currentData || currentData.settings.customDictionary.includes(wordToAdd)) {
-              setCustomWord('');
-              return currentData;
-          }
-          return {
-              ...currentData,
-              settings: {
-                  ...currentData.settings,
-                  customDictionary: [...currentData.settings.customDictionary, wordToAdd].sort(),
-              },
-          };
-      });
-      setCustomWord('');
+  const handleAddWord = () => {
+    const wordToAdd = newWord.trim().toLowerCase();
+    if (wordToAdd && !projectData.settings.customDictionary.includes(wordToAdd)) {
+        setProjectData(currentData => {
+            if (!currentData) return null;
+            return {
+                ...currentData,
+                settings: {
+                    ...currentData.settings,
+                    customDictionary: [...currentData.settings.customDictionary, wordToAdd].sort(),
+                },
+            };
+        });
+        setNewWord('');
+    }
   };
 
-  const handleRemoveCustomWord = (wordToRemove: string) => {
-      setProjectData(currentData => {
-          if (!currentData) return null;
-          return {
-              ...currentData,
-              settings: {
-                  ...currentData.settings,
-                  customDictionary: currentData.settings.customDictionary.filter(w => w !== wordToRemove),
-              },
-          };
-      });
+  const handleRemoveWord = (wordToRemove: string) => {
+    setProjectData(currentData => {
+        if (!currentData) return null;
+        return {
+            ...currentData,
+            settings: {
+                ...currentData.settings,
+                customDictionary: currentData.settings.customDictionary.filter(w => w !== wordToRemove),
+            },
+        };
+    });
   };
-
 
   const handleCloseProject = () => {
     onClose();
@@ -128,48 +127,54 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                 ))}
               </div>
             </div>
-            
+
             <div className="mb-8">
               <h3 className={`text-lg mb-2 ${subHeadingStyle}`}>Language & Spelling</h3>
-              <p className={`${descriptionColor} mb-2`}>Select the primary language for spellchecking your work.</p>
+              <p className={`${descriptionColor} mb-4 text-sm`}>
+                Select the language for spellchecking. This feature uses your browser's dictionary. For some languages, you may need to install a language pack in your OS or browser settings.
+              </p>
               <select
-                value={projectData.settings.spellcheckLanguage || 'en'}
+                value={projectData?.settings.spellcheckLanguage || 'en'}
                 onChange={(e) => handleLanguageChange(e.target.value as SpellcheckLang)}
-                className={`w-full px-3 py-2 rounded-md text-sm ${themeClasses.input} border ${themeClasses.border}`}
+                className={`w-full px-3 py-2 rounded-md ${themeClasses.input} border ${themeClasses.border}`}
               >
                 <option value="en">English</option>
                 <option value="fi">Finnish (Suomi)</option>
                 <option value="vi">Vietnamese (Tiếng Việt)</option>
-                <option value="browser-default">Use Browser Default</option>
+                <option value="browser-default">Browser Default</option>
               </select>
             </div>
             
             <div className="mb-8">
-              <h3 className={`text-lg mb-2 ${subHeadingStyle}`}>Custom Dictionary</h3>
-              <p className={`${descriptionColor} mb-4`}>Add custom words (like character names or fantasy terms) to prevent them from being flagged as errors.</p>
-              <div className="flex space-x-2">
-                  <input
-                      type="text"
-                      value={customWord}
-                      onChange={(e) => setCustomWord(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleAddCustomWord()}
-                      placeholder="Add a word..."
-                      className={`flex-grow px-3 py-2 rounded-md text-sm ${themeClasses.input} border ${themeClasses.border}`}
-                  />
-                  <button onClick={handleAddCustomWord} className={`px-4 py-2 rounded-md ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-80`}><PlusIcon className="w-5 h-5"/></button>
-              </div>
-              <div className={`mt-4 p-2 rounded-md border ${themeClasses.border} h-32 overflow-y-auto`}>
-                  {projectData.settings.customDictionary.length > 0 ? (
-                      projectData.settings.customDictionary.map(word => (
-                          <div key={word} className="flex justify-between items-center px-2 py-1 rounded hover:bg-white/5">
-                              <span>{word}</span>
-                              <button onClick={() => handleRemoveCustomWord(word)} className="p-1 rounded-full text-red-500 hover:bg-red-500/10"><CloseIcon className="w-4 h-4"/></button>
-                          </div>
-                      ))
-                  ) : (
-                      <p className={`text-sm text-center py-4 ${themeClasses.textSecondary}`}>Your dictionary is empty.</p>
-                  )}
-              </div>
+                <h3 className={`text-lg mb-2 ${subHeadingStyle}`}>Custom Dictionary</h3>
+                <p className={`${descriptionColor} mb-4 text-sm`}>
+                    Add words like character names or places to prevent them from being flagged as spelling errors.
+                </p>
+                <div className="flex space-x-2 mb-4">
+                    <input
+                        type="text"
+                        value={newWord}
+                        onChange={(e) => setNewWord(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleAddWord()}
+                        placeholder="Add a word..."
+                        className={`flex-grow px-3 py-2 rounded-md ${themeClasses.input} border ${themeClasses.border}`}
+                    />
+                    <button onClick={handleAddWord} className={`px-4 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90 transition-opacity`}><PlusIcon className="w-5 h-5"/></button>
+                </div>
+                <div className={`max-h-48 overflow-y-auto rounded-md p-2 border ${themeClasses.border} ${themeClasses.bgTertiary}`}>
+                    {projectData.settings.customDictionary.length > 0 ? (
+                        <ul className="divide-y divide-white/10">
+                            {projectData.settings.customDictionary.map(word => (
+                                <li key={word} className="flex justify-between items-center py-2 px-2">
+                                    <span>{word}</span>
+                                    <button onClick={() => handleRemoveWord(word)} className="p-1 rounded-full text-red-500 hover:bg-red-500/10"><TrashIcon className="w-4 h-4"/></button>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <p className={`text-center py-4 text-sm ${themeClasses.textSecondary}`}>Your dictionary is empty.</p>
+                    )}
+                </div>
             </div>
 
             <div>

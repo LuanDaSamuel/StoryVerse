@@ -1,9 +1,7 @@
-
 export type Theme = 'dark' | 'book';
 
 export type SaveStatus = 'saved' | 'saving' | 'unsaved';
 
-// FIX: Add SpellcheckLang type for spellchecker language options.
 export type SpellcheckLang = 'en' | 'fi' | 'vi' | 'browser-default';
 
 export interface ChapterHistory {
@@ -42,7 +40,6 @@ export interface Sketch {
 export interface ProjectData {
   settings: {
     theme: Theme;
-    // FIX: Add spellcheckLanguage and customDictionary to settings.
     spellcheckLanguage: SpellcheckLang;
     customDictionary: string[];
   };
