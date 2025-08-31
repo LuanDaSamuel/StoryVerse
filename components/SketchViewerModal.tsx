@@ -13,12 +13,12 @@ const SketchViewerModal: React.FC<SketchViewerModalProps> = ({ sketch, onClose }
     const { themeClasses } = useContext(ProjectContext);
     const [processedContent, setProcessedContent] = useState('');
     const [numberedTags, setNumberedTags] = useState<number[]>([]);
+    const [activeTag, setActiveTag] = useState<number | null>(null);
 
     useEffect(() => {
         if (!sketch) return;
 
         const tempDiv = document.createElement('div');
-        // Use enhanceHtml to ensure typographic correctness before processing
         tempDiv.innerHTML = enhanceHtml(sketch.content);
         const uniqueTags = new Set<number>();
         const tagRegex = /#(\d+)/g;
@@ -30,54 +30,76 @@ const SketchViewerModal: React.FC<SketchViewerModalProps> = ({ sketch, onClose }
         }
 
         textNodes.forEach(node => {
-            // Early exit if the node's content doesn't contain a pattern match
             if (!node.textContent || !tagRegex.test(node.textContent)) return;
             
             const fragment = document.createDocumentFragment();
             let lastIndex = 0;
             let match;
             
-            // Reset regex state before executing on a new string
             tagRegex.lastIndex = 0;
 
             while ((match = tagRegex.exec(node.textContent)) !== null) {
                 const tagNumber = parseInt(match[1], 10);
                 uniqueTags.add(tagNumber);
                 
-                // Append text preceding the current match
                 if (match.index > lastIndex) {
                     fragment.appendChild(document.createTextNode(node.textContent.substring(lastIndex, match.index)));
                 }
 
-                // Create a styled, interactive anchor for the tag
-                const anchor = document.createElement('a');
-                anchor.id = `sketch-tag-ref-${tagNumber}`;
-                anchor.className = `p-1 rounded font-semibold ${themeClasses.accent} ${themeClasses.accentText} no-underline cursor-pointer`;
-                anchor.href = `#sketch-tag-nav-${tagNumber}`;
-                anchor.textContent = match[0];
-                anchor.onclick = (e) => {
-                    e.preventDefault();
-                    const navEl = document.getElementById(`sketch-tag-nav-${tagNumber}`);
-                    navEl?.focus();
-                };
-                fragment.appendChild(anchor);
-
+                const styledSpan = document.createElement('span');
+                styledSpan.id = `sketch-tag-ref-${tagNumber}`;
+                styledSpan.className = `p-1 rounded font-semibold ${themeClasses.accent} ${themeClasses.accentText}`;
+                styledSpan.textContent = match[0];
+                fragment.appendChild(styledSpan);
+                
                 lastIndex = tagRegex.lastIndex;
             }
 
-            // Append any text remaining after the last match
             if (lastIndex < node.textContent.length) {
                 fragment.appendChild(document.createTextNode(node.textContent.substring(lastIndex)));
             }
             
-            // Replace the original text node with the new fragment containing styled tags
             node.parentNode?.replaceChild(fragment, node);
         });
 
         setProcessedContent(tempDiv.innerHTML);
         setNumberedTags(Array.from(uniqueTags).sort((a, b) => a - b));
+        setActiveTag(null);
 
     }, [sketch, themeClasses]);
+
+    useEffect(() => {
+        if (!sketch || numberedTags.length === 0 || !processedContent) return;
+
+        const contentElement = document.querySelector('.sketch-viewer-content');
+        if (!contentElement) return;
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                const visibleTags = entries
+                    .filter(entry => entry.isIntersecting)
+                    .map(entry => ({
+                        tag: parseInt(entry.target.id.replace('sketch-tag-ref-', ''), 10),
+                        pos: entry.boundingClientRect.top,
+                    }))
+                    .sort((a, b) => a.pos - b.pos);
+                
+                if (visibleTags.length > 0) {
+                    setActiveTag(visibleTags[0].tag);
+                }
+            },
+            {
+                root: contentElement,
+                threshold: 0,
+                rootMargin: "-50% 0px -50% 0px"
+            }
+        );
+
+        const elements = numberedTags.map(tag => document.getElementById(`sketch-tag-ref-${tag}`)).filter(Boolean);
+        elements.forEach(el => observer.observe(el!));
+
+        return () => elements.forEach(el => observer.unobserve(el!));
+    }, [processedContent, sketch, numberedTags]);
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
@@ -96,6 +118,7 @@ const SketchViewerModal: React.FC<SketchViewerModalProps> = ({ sketch, onClose }
     const scrollToTag = (tagNumber: number) => {
         const el = document.getElementById(`sketch-tag-ref-${tagNumber}`);
         el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setActiveTag(tagNumber);
     };
 
     return (
@@ -106,7 +129,7 @@ const SketchViewerModal: React.FC<SketchViewerModalProps> = ({ sketch, onClose }
                     <CloseIcon className="w-6 h-6" />
                 </button>
                 
-                <div className="flex-1 h-full overflow-y-auto p-8 md:p-12">
+                <div className="sketch-viewer-content flex-1 h-full overflow-y-auto p-8 md:p-12">
                     <div className={`text-sm font-semibold uppercase tracking-wider mb-2 ${themeClasses.textSecondary}`}>{enhancePlainText(sketch.novelTitle)}</div>
                     <h1 className={`text-4xl font-bold mb-4 ${themeClasses.accentText}`}>{enhancePlainText(sketch.title)}</h1>
                     <div className="flex flex-wrap gap-2 mb-8">
@@ -127,7 +150,7 @@ const SketchViewerModal: React.FC<SketchViewerModalProps> = ({ sketch, onClose }
                                         key={tag}
                                         id={`sketch-tag-nav-${tag}`}
                                         onClick={() => scrollToTag(tag)}
-                                        className={`flex items-center justify-center aspect-square rounded-md font-bold text-xl transition-colors ${themeClasses.bg} ${themeClasses.text} hover:opacity-80 focus:ring-2 ${themeClasses.accentBorder}`}
+                                        className={`flex items-center justify-center aspect-square rounded-md font-bold text-xl transition-colors hover:opacity-80 focus:ring-2 ${themeClasses.accentBorder} ${activeTag === tag ? `${themeClasses.accent} ${themeClasses.accentText}` : `${themeClasses.bg} ${themeClasses.text}`}`}
                                         title={`Jump to tag #${tag}`}
                                     >
                                         {tag}
