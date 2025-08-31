@@ -12,7 +12,7 @@ export const PlusIcon = (props: React.SVGProps<SVGSVGElement>) => (
     </svg>
 );
 
-// This is the new, user-approved Settings icon.
+// This is the user-approved Settings icon.
 export const SettingsIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" {...props}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 12h9.75M10.5 18h9.75M3.75 6a1.875 1.875 0 1 1-3.75 0 1.875 1.875 0 0 1 3.75 0ZM3.75 12a1.875 1.875 0 1 1-3.75 0 1.875 1.875 0 0 1 3.75 0ZM3.75 18a1.875 1.875 0 1 1-3.75 0 1.875 1.875 0 0 1 3.75 0Z" />
@@ -56,7 +56,7 @@ export const LightbulbIcon = (props: React.SVGProps<SVGSVGElement>) => (
     </svg>
 );
 
-// This is the new, user-approved Demo icon.
+// This is the user-approved Demo icon.
 export const QuillPenIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" {...props}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M4 20l10 -10a2.828 2.828 0 1 0 -4 -4l-10 10v4h4z" />
@@ -97,7 +97,7 @@ export const UploadIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 export const BackIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" {...props}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 12h-15m0 0l6.75 6.75M4.5 12l6.75-6.75" />
     </svg>
 );
 
@@ -127,7 +127,7 @@ export const ChevronRightIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 export const TextIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" {...props}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m-6-15h12" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 4h14M12 4v16" />
     </svg>
 );
 
@@ -139,13 +139,13 @@ export const SearchIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 export const BoldIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" {...props}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 5.25h4.5a3.75 3.75 0 010 7.5h-4.5v-7.5zm0 7.5h5.25a3.75 3.75 0 010 7.5h-5.25v-7.5zM6 5.25v15" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6 3h6.5a4.5 4.5 0 010 9H6V3zm0 9h7.5a4.5 4.5 0 010 9H6v-9z" />
     </svg>
 );
 
 export const ItalicIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" {...props}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 4.5l-4.5 15m4.5-15h4.5m-4.5 15h-4.5" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8 4h8m-6 16h8M10 4l4 16" />
     </svg>
 );
 
@@ -181,32 +181,25 @@ export const OrderedListIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 export const BlockquoteIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" {...props}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 4v16m4-12h14m-14 4h14m-14 4h10" />
     </svg>
 );
 
 export const H1Icon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" {...props}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M7 5v14m-3 0h6m8-14v14l-3-3" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 4.5v15m3 0V4.5m-3 7.5h3m9-7.5v15l-3.75-3.75" />
     </svg>
 );
 
 export const H2Icon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" {...props}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M7 5v14m-3 0h6m5-14a4 4 0 014 4v1a3 3 0 003 3h-7" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 4.5v15m3 0V4.5m-3 7.5h3m6-7.5a4.5 4.5 0 014.5 4.5v0a4.5 4.5 0 01-4.5 4.5h-4.5v4.5h9" />
     </svg>
 );
 
 export const H3Icon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" {...props}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M7 5v14m-3 0h6m5-14a4 4 0 014 4v1a3 3 0 003 3h-7a3 3 0 00-3-3v-1a4 4 0 014-4z" />
-    </svg>
-);
-
-export const SpellcheckIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" {...props}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 21l5.25-11.25L21 21m-9-3.75h.008v.008h-.008v-.008z" />
-        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12h15" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 4.5v15m3 0V4.5m-3 7.5h3m6-7.5a4.5 4.5 0 014.5 4.5v0a4.5 4.5 0 01-4.5 4.5h-4.5m4.5 0a4.5 4.5 0 014.5 4.5v0a4.5 4.5 0 01-4.5 4.5h-4.5" />
     </svg>
 );
 
@@ -225,5 +218,12 @@ export const ArrowsPointingOutIcon = (props: React.SVGProps<SVGSVGElement>) => (
 export const ArrowsPointingInIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" {...props}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9V4.5M15 9h4.5M15 9l5.25-5.25M15 15v4.5M15 15h4.5M15 15l5.25 5.25" />
+    </svg>
+);
+
+// FIX: Add missing SpellcheckIcon
+export const SpellcheckIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m5.231 13.481L15 17.25m-4.5-1.5l-2.636 2.636a.563.563 0 01-.796 0l-1.122-1.122a.563.563 0 010-.796L9.75 14.25m6-6.375a1.125 1.125 0 00-1.125-1.125H8.25a1.125 1.125 0 00-1.125 1.125v3.75c0 .621.504 1.125 1.125 1.125h5.25c.621 0 1.125-.504 1.125-1.125v-3.75z" />
     </svg>
 );

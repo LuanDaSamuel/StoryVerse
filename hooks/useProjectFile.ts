@@ -1,5 +1,3 @@
-
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ProjectData, FileStatus, SaveStatus } from '../types';
 import { get, set, del } from 'idb-keyval';
@@ -9,6 +7,7 @@ const LOCAL_BACKUP_KEY = 'storyverse-local-backup';
 const defaultProjectData: ProjectData = {
   settings: {
     theme: 'book',
+    // FIX: Added default spellcheck settings.
     spellcheckLanguage: 'en',
     customDictionary: [],
   },
@@ -25,10 +24,10 @@ const sanitizeProjectData = (data: any): ProjectData => {
 
   // Merge settings safely
   if (data?.settings) {
-    sanitized.settings = { ...sanitized.settings, ...data.settings };
-  }
-  if (!Array.isArray(sanitized.settings.customDictionary)) {
-      sanitized.settings.customDictionary = [];
+    sanitized.settings.theme = data.settings.theme || 'book';
+    // FIX: Sanitize new spellcheck settings.
+    sanitized.settings.spellcheckLanguage = data.settings.spellcheckLanguage || 'en';
+    sanitized.settings.customDictionary = Array.isArray(data.settings.customDictionary) ? data.settings.customDictionary : [];
   }
 
   // Sanitize novels and their nested structures
