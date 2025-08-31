@@ -1,3 +1,4 @@
+
 import React, { useContext, useEffect, useState } from 'react';
 import { AggregatedSketch } from '../types';
 import { ProjectContext } from '../contexts/ProjectContext';
@@ -10,7 +11,7 @@ interface SketchViewerModalProps {
 }
 
 const SketchViewerModal: React.FC<SketchViewerModalProps> = ({ sketch, onClose }) => {
-    const { themeClasses } = useContext(ProjectContext);
+    const { theme, themeClasses } = useContext(ProjectContext);
     const [processedContent, setProcessedContent] = useState('');
     const [numberedTags, setNumberedTags] = useState<number[]>([]);
     const [activeTag, setActiveTag] = useState<number | null>(null);
@@ -120,24 +121,27 @@ const SketchViewerModal: React.FC<SketchViewerModalProps> = ({ sketch, onClose }
         el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         setActiveTag(tagNumber);
     };
+    
+    const textColor = theme === 'book' ? themeClasses.accentText : themeClasses.text;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex font-sans" onClick={onClose} role="dialog" aria-modal="true">
-            <div className="flex-1 min-w-0" />
-            <main className={`relative flex-1 h-full w-full max-w-7xl flex ${themeClasses.bgSecondary} shadow-2xl`} onClick={e => e.stopPropagation()}>
-                <button onClick={onClose} className={`absolute top-4 right-4 z-20 p-2 rounded-full hover:${themeClasses.bgTertiary} transition-colors`}>
+        <div className={`fixed inset-0 z-50 font-sans ${themeClasses.bgSecondary}`} role="dialog" aria-modal="true">
+            <main className="relative h-full w-full flex">
+                <button onClick={onClose} className={`absolute top-4 right-4 z-20 p-2 rounded-full hover:${themeClasses.bgTertiary} transition-colors ${textColor}`}>
                     <CloseIcon className="w-6 h-6" />
                 </button>
                 
-                <div className="sketch-viewer-content flex-1 h-full overflow-y-auto p-8 md:p-12">
-                    <div className={`text-sm font-semibold uppercase tracking-wider mb-2 ${themeClasses.textSecondary}`}>{enhancePlainText(sketch.novelTitle)}</div>
-                    <h1 className={`text-4xl font-bold mb-4 ${themeClasses.accentText}`}>{enhancePlainText(sketch.title)}</h1>
-                    <div className="flex flex-wrap gap-2 mb-8">
-                        {sketch.tags.map(tag => (
-                            <span key={tag} className={`px-3 py-1 text-xs rounded-full font-semibold ${themeClasses.accent} ${themeClasses.accentText}`}>{tag}</span>
-                        ))}
+                <div className={`sketch-viewer-content flex-1 h-full overflow-y-auto p-8 md:p-16 ${textColor}`}>
+                    <div className="max-w-3xl mx-auto">
+                        <div className={`text-sm font-semibold uppercase tracking-wider mb-2 ${themeClasses.textSecondary}`}>{enhancePlainText(sketch.novelTitle)}</div>
+                        <h1 className={`text-4xl font-bold mb-4 ${themeClasses.accentText}`}>{enhancePlainText(sketch.title)}</h1>
+                        <div className="flex flex-wrap gap-2 mb-8">
+                            {sketch.tags.map(tag => (
+                                <span key={tag} className={`px-3 py-1 text-xs rounded-full font-semibold ${themeClasses.accent} ${themeClasses.accentText}`}>{tag}</span>
+                            ))}
+                        </div>
+                        <div className="story-content prose-styles text-lg leading-relaxed" dangerouslySetInnerHTML={{ __html: processedContent }} />
                     </div>
-                    <div className="story-content prose-styles text-lg leading-relaxed" dangerouslySetInnerHTML={{ __html: processedContent }} />
                 </div>
 
                 {numberedTags.length > 0 && (
@@ -161,7 +165,6 @@ const SketchViewerModal: React.FC<SketchViewerModalProps> = ({ sketch, onClose }
                     </aside>
                 )}
             </main>
-            <div className="flex-1 min-w-0" />
         </div>
     );
 };

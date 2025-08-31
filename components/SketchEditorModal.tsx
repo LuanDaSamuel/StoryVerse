@@ -14,7 +14,7 @@ interface SketchEditorModalProps {
 }
 
 const SketchEditorModal: React.FC<SketchEditorModalProps> = ({ sketch, onClose, onSave, novels, novelId: contextualNovelId }) => {
-    const { themeClasses } = useContext(ProjectContext);
+    const { theme, themeClasses } = useContext(ProjectContext);
     const isNew = sketch === null;
     
     const [title, setTitle] = useState('');
@@ -92,13 +92,15 @@ const SketchEditorModal: React.FC<SketchEditorModalProps> = ({ sketch, onClose, 
         };
         onSave(finalSketch, selectedNovelId);
     };
+    
+    const modalTextColor = theme === 'book' ? themeClasses.accentText : themeClasses.text;
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center" onClick={onClose} role="dialog" aria-modal="true">
             <div 
                 className={`
                     flex flex-col shadow-xl transition-all duration-300
-                    ${themeClasses.bgSecondary} ${themeClasses.text} border ${themeClasses.border}
+                    ${themeClasses.bgSecondary} ${modalTextColor} border ${themeClasses.border}
                     ${isFullScreen 
                         ? 'w-screen h-screen max-w-full max-h-full rounded-none' 
                         : 'w-full max-w-2xl rounded-lg max-h-[90vh] m-4'
