@@ -884,54 +884,8 @@ const ChapterEditorPage: React.FC = () => {
     };
 
     const handleKeyUp = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
-        if (e.key !== ' ' || !editorRef.current) return;
-
-        const selection = window.getSelection();
-        if (!selection || !selection.rangeCount) return;
-
-        const range = selection.getRangeAt(0);
-        if (!range.collapsed) return;
-
-        let node = range.startContainer;
-        let blockElement: Node | null = node;
-
-        // Traverse up to find the direct child of the editor
-        while (blockElement && blockElement.parentNode !== editorRef.current) {
-            blockElement = blockElement.parentNode;
-        }
-
-        if (!blockElement || !(blockElement instanceof HTMLElement)) return;
-
-        const text = blockElement.textContent || '';
-        let format: 'h1' | 'h2' | 'h3' | null = null;
-        let markdownLength = 0;
-
-        if (text.startsWith('# ')) { format = 'h1'; markdownLength = 2; } 
-        else if (text.startsWith('## ')) { format = 'h2'; markdownLength = 3; } 
-        else if (text.startsWith('### ')) { format = 'h3'; markdownLength = 4; }
-        
-        if (format) {
-            const textNode = blockElement.firstChild;
-            if (textNode && textNode.nodeType === Node.TEXT_NODE && (textNode.textContent?.length ?? 0) >= markdownLength) {
-                // To preserve undo history, we perform operations with execCommand
-                
-                // 1. Select the markdown characters
-                const markdownRange = document.createRange();
-                markdownRange.setStart(textNode, 0);
-                markdownRange.setEnd(textNode, markdownLength);
-                selection.removeAllRanges();
-                selection.addRange(markdownRange);
-                
-                // 2. Delete them
-                document.execCommand('delete', false);
-                
-                // 3. Apply the heading format to the now-empty block
-                document.execCommand('formatBlock', false, format);
-                
-                // 4. Trigger the input event so changes are saved
-                editorRef.current.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
-            }
-        }
+        // This function is intentionally left empty after removing heading markdown shortcuts.
+        // It can be used for future key-up-based features.
     }, []);
 
     const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
@@ -1257,9 +1211,6 @@ const ChapterEditorPage: React.FC = () => {
                                 <div className="space-y-4">
                                     <ToolbarDropdown label="Paragraph Style" value={currentFormat.paragraphStyle} onChange={(e) => applyParagraphStyle(e.target.value)}>
                                         <option value="p">Paragraph</option>
-                                        <option value="h1">Heading 1</option>
-                                        <option value="h2">Heading 2</option>
-                                        <option value="h3">Heading 3</option>
                                         <option value="blockquote">Blockquote</option>
                                     </ToolbarDropdown>
                                     <ToolbarDropdown label="Font" value={currentFormat.font} onChange={(e) => applyFont(e.target.value)}>
@@ -1302,10 +1253,6 @@ const ChapterEditorPage: React.FC = () => {
                             <button onClick={() => applyCommand('insertUnorderedList')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.isUL ? 'bg-white/20' : ''}`}><ListBulletIcon className="w-5 h-5"/></button>
                             <button onClick={() => applyCommand('insertOrderedList')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.isOL ? 'bg-white/20' : ''}`}><OrderedListIcon className="w-5 h-5"/></button>
                             <button onClick={() => applyParagraphStyle('blockquote')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${currentFormat.paragraphStyle === 'blockquote' ? 'bg-white/20' : ''}`}><BlockquoteIcon className="w-5 h-5"/></button>
-                            <div className="w-px h-5 bg-white/20 mx-1"></div>
-                            <button onClick={() => applyParagraphStyle('h1')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${currentFormat.paragraphStyle === 'h1' ? 'bg-white/20' : ''}`}><H1Icon className="w-5 h-5"/></button>
-                            <button onClick={() => applyParagraphStyle('h2')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${currentFormat.paragraphStyle === 'h2' ? 'bg-white/20' : ''}`}><H2Icon className="w-5 h-5"/></button>
-                            <button onClick={() => applyParagraphStyle('h3')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${currentFormat.paragraphStyle === 'h3' ? 'bg-white/20' : ''}`}><H3Icon className="w-5 h-5"/></button>
                             <div className="w-px h-5 bg-white/20 mx-1"></div>
                             <button onClick={() => setIsFindReplaceOpen(true)} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors`}><SearchIcon className="w-5 h-5"/></button>
                             <div className="w-px h-5 bg-white/20 mx-1"></div>
