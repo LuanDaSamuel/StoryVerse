@@ -15,7 +15,7 @@ export const PlusIcon = (props: React.SVGProps<SVGSVGElement>) => (
 // Fix: Completed SettingsIcon component
 export const SettingsIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" {...props}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-1.008 1.11-1.226.55-.218 1.19-.243 1.73.062l2.96 1.48a6.375 6.375 0 014.242 4.243l1.48 2.96c.305.54.38 1.18.062 1.73-.218.55-.684 1.02-1.226 1.11a19.497 19.497 0 01-3.922 0c-.542-.09-1.008-.56-1.226-1.11-.218-.55-.243-1.19.062-1.73l1.48-2.96a6.375 6.375 0 00-4.242-4.243l-2.96-1.48a2.534 2.534 0 01-.062-1.73zM7.125 10.125a6.375 6.375 0 1112.75 0 6.375 6.375 0 01-12.75 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 12h9.75M10.5 18h9.75M3.75 6a1.875 1.875 0 1 1-3.75 0 1.875 1.875 0 0 1 3.75 0ZM3.75 12a1.875 1.875 0 1 1-3.75 0 1.875 1.875 0 0 1 3.75 0ZM3.75 18a1.875 1.875 0 1 1-3.75 0 1.875 1.875 0 0 1 3.75 0Z" />
     </svg>
 );
 
@@ -58,6 +58,13 @@ export const FolderIcon = (props: React.SVGProps<SVGSVGElement>) => (
 export const LightbulbIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" {...props}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-11.25 6.01 6.01 0 00-1.5-11.25m-1.5 11.25a6.01 6.01 0 01-1.5 11.25m1.5-11.25a6.01 6.01 0 011.5 11.25M9 21a3 3 0 013-3h.008a3 3 0 013 3M12 3v9.75m0 0a2.25 2.25 0 012.25 2.25 2.25 2.25 0 01-4.5 0 2.25 2.25 0 012.25-2.25z" />
+    </svg>
+);
+
+export const QuillPenIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" {...props}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 20l10 -10a2.828 2.828 0 1 0 -4 -4l-10 10v4h4z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6.5l4 4" />
     </svg>
 );
 
