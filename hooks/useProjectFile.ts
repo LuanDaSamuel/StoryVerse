@@ -74,6 +74,10 @@ export function useProjectFile() {
   const lastSavedVersion = useRef(0);
   const projectDataRef = useRef(projectData);
 
+  // Create a ref to hold the latest saveStatus to prevent stale closures in callbacks.
+  const saveStatusRef = useRef(saveStatus);
+  saveStatusRef.current = saveStatus;
+
   // Effect to load data from local backup on initial load
   useEffect(() => {
     const init = async () => {
@@ -135,6 +139,17 @@ export function useProjectFile() {
     projectDataRef.current = newData;
     setProjectData(newData);
   };
+  
+  const saveNow = useCallback(async () => {
+    if (saveTimeout.current) {
+        clearTimeout(saveTimeout.current);
+        saveTimeout.current = null;
+    }
+    // Read from the ref to ensure we have the most up-to-date status.
+    if (status === 'ready' && projectDataRef.current && saveStatusRef.current === 'unsaved') {
+        await saveProjectToLocal(projectDataRef.current, dataVersion.current);
+    }
+  }, [status, saveProjectToLocal]);
 
   const createProject = useCallback(async () => {
     const newProjectData = { ...defaultProjectData };
@@ -174,7 +189,9 @@ export function useProjectFile() {
     input.click();
   }, []);
 
-  const downloadProject = useCallback(() => {
+  const downloadProject = useCallback(async () => {
+    await saveNow();
+
     const dataToSave = projectDataRef.current;
     if (!dataToSave) return;
 
@@ -187,16 +204,16 @@ export function useProjectFile() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    setSaveStatus('saved'); // Downloading is a form of saving
-  }, []);
+  }, [saveNow]);
 
   const closeProject = useCallback(async () => {
-    if (saveTimeout.current) clearTimeout(saveTimeout.current);
+    await saveNow();
+    
     await del(LOCAL_BACKUP_KEY);
     projectDataRef.current = null;
     setProjectData(null);
     setStatus('welcome');
-  }, []);
+  }, [saveNow]);
 
   return { 
     projectData, 

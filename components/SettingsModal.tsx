@@ -33,9 +33,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
     });
   };
 
-  const handleCloseProject = () => {
-    onClose();
-    closeProject();
+  const handleCloseProject = async () => {
+    await closeProject();
   };
 
   // Logic to handle the 'book' theme's inverted text color on light backgrounds

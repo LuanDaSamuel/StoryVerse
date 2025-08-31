@@ -113,7 +113,7 @@ const NovelDetailPage: React.FC = () => {
                 // Clean the HTML by removing empty paragraphs which can mess with styling.
                 const cleanedHtml = html.replace(/<p>(\s|&nbsp;|<br\s*\/?>)*<\/p>/gi, '');
 
-                const headingRegex = /<h[23][^>]*>.*?<\/h[23]>/g;
+                const headingRegex = /<h[123][^>]*>.*?<\/h[123]>/g;
                 const matches = [...cleanedHtml.matchAll(headingRegex)];
 
                 if (matches.length === 0) {

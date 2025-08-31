@@ -6,7 +6,7 @@ import { enhancePlainText } from '../constants';
 interface ConfirmModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
   title: string;
   message: string;
   confirmButtonClass?: string;
@@ -17,8 +17,8 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({ isOpen, onClose, onConfirm,
 
     if (!isOpen) return null;
 
-    const handleConfirm = () => {
-        onConfirm();
+    const handleConfirm = async () => {
+        await onConfirm();
         onClose();
     };
 
