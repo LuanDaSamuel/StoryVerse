@@ -347,7 +347,7 @@ const FindReplaceModal: React.FC<{
             </div>
             <div className="flex items-center space-x-2">
                 <button onClick={handleReplace} disabled={currentIndex === -1} className={`px-4 py-2 font-semibold rounded-lg ${themeClasses.bgTertiary} disabled:opacity-50`}>Replace</button>
-                <button onClick={handleReplaceAll} disabled={!findText || matches.length === 0} className={`px-4 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} disabled:opacity-50`}>Replace All</button>
+                <button onClick={handleReplaceAll} disabled={!findText} className={`px-4 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} disabled:opacity-50`}>Replace All</button>
             </div>
         </div>
         
