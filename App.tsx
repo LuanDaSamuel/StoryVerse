@@ -45,14 +45,11 @@ const AppContent = () => {
         setProjectData,
         status,
         saveStatus,
-        isBackupLinked,
-        linkedBackupName,
+        projectName,
         createProject,
         openProject,
         downloadProject,
         closeProject,
-        linkBackupDirectory,
-        unlinkBackupDirectory,
     } = useProjectFile();
     
     const navigate = useNavigate();
@@ -84,11 +81,8 @@ const AppContent = () => {
         theme,
         themeClasses,
         saveStatus,
-        isBackupLinked,
-        linkedBackupName,
-        linkBackupDirectory,
-        unlinkBackupDirectory,
-    }), [projectData, setProjectData, downloadProject, closeProject, theme, themeClasses, saveStatus, isBackupLinked, linkedBackupName, linkBackupDirectory, unlinkBackupDirectory]);
+        projectName,
+    }), [projectData, setProjectData, downloadProject, closeProject, theme, themeClasses, saveStatus, projectName]);
 
     const onEditPage = useMatch('/novel/:novelId/edit/:chapterId');
     const onReadPage = useMatch('/novel/:novelId/read/:chapterId?');

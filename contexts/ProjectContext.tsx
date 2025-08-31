@@ -10,10 +10,7 @@ interface ProjectContextType {
   theme: Theme;
   themeClasses: ThemeConfig;
   saveStatus: SaveStatus;
-  isBackupLinked: boolean;
-  linkedBackupName: string;
-  linkBackupDirectory: () => Promise<void>;
-  unlinkBackupDirectory: () => Promise<void>;
+  projectName: string;
 }
 
 export const ProjectContext = createContext<ProjectContextType>({
@@ -36,8 +33,5 @@ export const ProjectContext = createContext<ProjectContextType>({
     logoColor: '',
   },
   saveStatus: 'saved',
-  isBackupLinked: false,
-  linkedBackupName: '',
-  linkBackupDirectory: async () => {},
-  unlinkBackupDirectory: async () => {},
+  projectName: '',
 });

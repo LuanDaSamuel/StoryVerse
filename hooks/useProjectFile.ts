@@ -3,9 +3,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { ProjectData, FileStatus, SaveStatus, Theme } from '../types';
 import { get, set, del } from 'idb-keyval';
 
-const LOCAL_BACKUP_KEY = 'storyverse-local-backup';
-const AUTO_BACKUP_DIR_HANDLE_KEY = 'storyverse-auto-backup-dir-handle';
-const AUTO_BACKUP_FILENAME = 'StoryVerse-AutoBackup.json';
+const LOCAL_BACKUP_KEY = 'storyverse-local-backup'; // Used for caching
+const PROJECT_FILE_HANDLE_KEY = 'storyverse-project-file-handle'; // Used for the main file
 
 const defaultProjectData: ProjectData = {
   settings: {
@@ -68,9 +67,8 @@ export function useProjectFile() {
   const [projectData, setProjectData] = useState<ProjectData | null>(null);
   const [status, setStatus] = useState<FileStatus>('loading');
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
-  const [autoBackupDirHandle, setAutoBackupDirHandle] = useState<FileSystemDirectoryHandle | null>(null);
-  const [isBackupLinked, setIsBackupLinked] = useState(false);
-  const [linkedBackupName, setLinkedBackupName] = useState('');
+  const [projectFileHandle, setProjectFileHandle] = useState<FileSystemFileHandle | null>(null);
+  const [projectName, setProjectName] = useState('');
   
   const saveTimeout = useRef<number | null>(null);
   const dataVersion = useRef(0);
@@ -78,67 +76,71 @@ export function useProjectFile() {
 
   const projectDataRef = useRef(projectData);
   projectDataRef.current = projectData;
-  const autoBackupDirHandleRef = useRef(autoBackupDirHandle);
-  autoBackupDirHandleRef.current = autoBackupDirHandle;
+  const projectFileHandleRef = useRef(projectFileHandle);
+  projectFileHandleRef.current = projectFileHandle;
   const saveStatusRef = useRef(saveStatus);
   saveStatusRef.current = saveStatus;
 
   useEffect(() => {
     const init = async () => {
       try {
-        const rawData: any | undefined = await get(LOCAL_BACKUP_KEY);
-        if (rawData) {
-          const data = sanitizeProjectData(rawData);
-          projectDataRef.current = data;
-          setProjectData(data);
-          setStatus('ready');
-        } else {
-          setStatus('welcome');
-        }
-        
-        const handle: FileSystemDirectoryHandle | undefined = await get(AUTO_BACKUP_DIR_HANDLE_KEY);
+        const handle: FileSystemFileHandle | undefined = await get(PROJECT_FILE_HANDLE_KEY);
         if (handle && await verifyPermission(handle)) {
-            setAutoBackupDirHandle(handle);
-            setIsBackupLinked(true);
-            setLinkedBackupName(handle.name);
+            setProjectFileHandle(handle);
+            setProjectName(handle.name);
+            const file = await handle.getFile();
+            const fileContent = await file.text();
+            const rawData = JSON.parse(fileContent);
+            const data = sanitizeProjectData(rawData);
+            
+            projectDataRef.current = data;
+            setProjectData(data);
+            await set(LOCAL_BACKUP_KEY, data); // Update cache
+            setStatus('ready');
         } else {
-            await del(AUTO_BACKUP_DIR_HANDLE_KEY);
+            // If no handle or permission, clear stored handle and go to welcome
+            await del(PROJECT_FILE_HANDLE_KEY);
+            setStatus('welcome');
         }
       } catch (error) {
-        console.error('Error loading from local backup:', error);
+        console.error('Error loading project from file handle:', error);
+        // Fallback to welcome screen on any error
         setStatus('welcome');
       }
     };
     init();
   }, []);
 
-  const saveProjectToLocal = useCallback(async (data: ProjectData, version: number) => {
+  const saveProject = useCallback(async (data: ProjectData, version: number) => {
     setSaveStatus('saving');
     try {
-      await set(LOCAL_BACKUP_KEY, data);
-      lastSavedVersion.current = version;
+      await set(LOCAL_BACKUP_KEY, data); // Save to cache first for speed and resilience
 
-      if (autoBackupDirHandleRef.current) {
+      if (projectFileHandleRef.current) {
           try {
-              const fileHandle = await autoBackupDirHandleRef.current.getFileHandle(AUTO_BACKUP_FILENAME, { create: true });
-              const writable = await fileHandle.createWritable();
+              const writable = await projectFileHandleRef.current.createWritable();
               await writable.write(JSON.stringify(data, null, 2));
               await writable.close();
           } catch (error) {
-              console.error('Auto-backup to file system failed:', error);
+              console.error('Saving to project file failed:', error);
               if (error instanceof DOMException && error.name === 'NotAllowedError') {
-                  await del(AUTO_BACKUP_DIR_HANDLE_KEY);
-                  setAutoBackupDirHandle(null);
-                  setIsBackupLinked(false);
-                  setLinkedBackupName('');
+                  // User revoked permission. Clear handle and treat as closed project.
+                  await del(PROJECT_FILE_HANDLE_KEY);
+                  setProjectFileHandle(null);
+                  setProjectName('');
+                  projectDataRef.current = null;
+                  setProjectData(null);
+                  setStatus('welcome');
+                  alert('Permission to save the file was denied. The project has been closed.');
               }
           }
       }
+      lastSavedVersion.current = version;
       if (dataVersion.current === lastSavedVersion.current) {
         setSaveStatus('saved');
       }
     } catch (error) {
-      console.error('Error saving to local backup:', error);
+      console.error('Error saving project:', error);
       setSaveStatus('unsaved');
     }
   }, []);
@@ -150,14 +152,14 @@ export function useProjectFile() {
       const versionToSave = dataVersion.current;
       saveTimeout.current = window.setTimeout(() => {
         if (projectDataRef.current) {
-            saveProjectToLocal(projectDataRef.current, versionToSave);
+            saveProject(projectDataRef.current, versionToSave);
         }
       }, 1000);
     }
     return () => {
       if (saveTimeout.current) clearTimeout(saveTimeout.current);
     };
-  }, [projectData, status, saveStatus, saveProjectToLocal]);
+  }, [projectData, status, saveStatus, saveProject]);
 
   const setProjectDataWithSave = (updater: React.SetStateAction<ProjectData | null>) => {
     dataVersion.current++;
@@ -175,20 +177,35 @@ export function useProjectFile() {
         saveTimeout.current = null;
     }
     if (status === 'ready' && projectDataRef.current && saveStatusRef.current === 'unsaved') {
-        await saveProjectToLocal(projectDataRef.current, dataVersion.current);
+        await saveProject(projectDataRef.current, dataVersion.current);
     }
-  }, [status, saveProjectToLocal]);
+  }, [status, saveProject]);
 
   const createProject = useCallback(async () => {
-    await set(LOCAL_BACKUP_KEY, defaultProjectData);
-    await del(AUTO_BACKUP_DIR_HANDLE_KEY);
-    projectDataRef.current = defaultProjectData;
-    setProjectData(defaultProjectData);
-    setAutoBackupDirHandle(null);
-    setIsBackupLinked(false);
-    setLinkedBackupName('');
-    setStatus('ready');
-    setSaveStatus('saved');
+    try {
+        const newHandle = await window.showSaveFilePicker({
+            suggestedName: 'StoryVerse-Project.json',
+            types: [{ description: 'StoryVerse Projects', accept: { 'application/json': ['.json'] } }],
+        });
+
+        const writable = await newHandle.createWritable();
+        await writable.write(JSON.stringify(defaultProjectData, null, 2));
+        await writable.close();
+        
+        await set(PROJECT_FILE_HANDLE_KEY, newHandle);
+        await set(LOCAL_BACKUP_KEY, defaultProjectData);
+        
+        setProjectFileHandle(newHandle);
+        setProjectName(newHandle.name);
+        projectDataRef.current = defaultProjectData;
+        setProjectData(defaultProjectData);
+        setStatus('ready');
+        setSaveStatus('saved');
+    } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+        console.error('Error creating new project file:', error);
+        alert('Failed to create new project file.');
+    }
   }, []);
 
   const openProject = useCallback(async () => {
@@ -202,7 +219,11 @@ export function useProjectFile() {
 
         if (rawData && rawData.settings && Array.isArray(rawData.novels)) {
             const data = sanitizeProjectData(rawData);
+            await set(PROJECT_FILE_HANDLE_KEY, fileHandle);
             await set(LOCAL_BACKUP_KEY, data);
+
+            setProjectFileHandle(fileHandle);
+            setProjectName(fileHandle.name);
             projectDataRef.current = data;
             setProjectData(data);
             setStatus('ready');
@@ -244,54 +265,23 @@ export function useProjectFile() {
   const closeProject = useCallback(async () => {
     await saveNow();
     await del(LOCAL_BACKUP_KEY);
-    await del(AUTO_BACKUP_DIR_HANDLE_KEY);
+    await del(PROJECT_FILE_HANDLE_KEY);
     projectDataRef.current = null;
     setProjectData(null);
-    setAutoBackupDirHandle(null);
-    setIsBackupLinked(false);
-    setLinkedBackupName('');
+    setProjectFileHandle(null);
+    setProjectName('');
     setStatus('welcome');
   }, [saveNow]);
   
-  const linkBackupDirectory = useCallback(async () => {
-      try {
-          const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-          if (await verifyPermission(dirHandle)) {
-              await set(AUTO_BACKUP_DIR_HANDLE_KEY, dirHandle);
-              setAutoBackupDirHandle(dirHandle);
-              setIsBackupLinked(true);
-              setLinkedBackupName(dirHandle.name);
-              // Trigger a save immediately to create the backup file
-              if (projectDataRef.current) {
-                  await saveProjectToLocal(projectDataRef.current, dataVersion.current);
-              }
-          }
-      } catch (error) {
-          if (error instanceof DOMException && error.name === 'AbortError') return;
-          console.error('Error linking backup directory:', error);
-          alert('Could not link directory. Please ensure you grant permission.');
-      }
-  }, [saveProjectToLocal]);
-  
-  const unlinkBackupDirectory = useCallback(async () => {
-      await del(AUTO_BACKUP_DIR_HANDLE_KEY);
-      setAutoBackupDirHandle(null);
-      setIsBackupLinked(false);
-      setLinkedBackupName('');
-  }, []);
-
   return { 
     projectData, 
     setProjectData: setProjectDataWithSave, 
     status, 
     saveStatus,
-    isBackupLinked,
-    linkedBackupName,
+    projectName,
     createProject, 
     openProject, 
     downloadProject, 
     closeProject,
-    linkBackupDirectory,
-    unlinkBackupDirectory,
   };
 }
