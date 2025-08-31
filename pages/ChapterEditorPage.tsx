@@ -337,11 +337,6 @@ const ChapterEditorPage: React.FC = () => {
         paragraphSpacing: '1em',
     });
 
-    const langCode = useMemo(() => {
-        const lang = projectData?.settings?.spellcheckLanguage;
-        return lang === 'browser-default' ? undefined : lang;
-    }, [projectData?.settings?.spellcheckLanguage]);
-
     const handleLanguageChange = (lang: SpellcheckLang) => {
         setProjectData(currentData => {
             if (!currentData) return null;
@@ -350,13 +345,31 @@ const ChapterEditorPage: React.FC = () => {
                 settings: { ...currentData.settings, spellcheckLanguage: lang },
             };
         });
+
+        if (editorRef.current) {
+            // This "kick" forces the browser to re-evaluate spelling.
+            // We store the current selection to restore it after the re-focus.
+            const selection = window.getSelection();
+            const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0).cloneRange() : null;
+
+            editorRef.current.blur();
+
+            setTimeout(() => {
+                editorRef.current?.focus();
+                // Restore the user's cursor position.
+                if (range && selection) {
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                }
+            }, 100);
+        }
     };
 
     const cleanupEditor = useCallback(() => {
         if (!editorRef.current) return;
         const editor = editorRef.current;
-
-        // Remove empty inline elements that cause deletion issues.
+    
+        // 1. Remove empty inline elements that can cause bugs.
         // Run multiple passes to handle nested empty elements.
         for (let i = 0; i < 3; i++) {
             let changed = false;
@@ -368,8 +381,40 @@ const ChapterEditorPage: React.FC = () => {
             });
             if (!changed) break;
         }
-
-        // Merge adjacent text nodes. This is the key fix for "stuck word" issues.
+    
+        // 2. Merge adjacent sibling elements with identical styles/tags.
+        // This is crucial for fixing DOM fragmentation after multiple format applications.
+        const mergeAdjacentSiblings = (parent: HTMLElement) => {
+            let child = parent.firstChild;
+            while (child) {
+                const next = child.nextSibling;
+                if (next && child.nodeType === Node.ELEMENT_NODE && next.nodeType === Node.ELEMENT_NODE) {
+                    const el1 = child as HTMLElement;
+                    const el2 = next as HTMLElement;
+    
+                    const areMergable = 
+                        el1.tagName === el2.tagName &&
+                        el1.className === el2.className &&
+                        el1.style.cssText === el2.style.cssText;
+    
+                    if (areMergable) {
+                        while (el2.firstChild) {
+                            el1.appendChild(el2.firstChild);
+                        }
+                        parent.removeChild(el2);
+                        // Do not advance child; check the new next sibling
+                        continue;
+                    }
+                }
+                child = next;
+            }
+        };
+    
+        editor.querySelectorAll('p, h1, h2, h3, blockquote, li, div').forEach(block => {
+            mergeAdjacentSiblings(block as HTMLElement);
+        });
+    
+        // 3. Merge adjacent text nodes. This fixes "stuck word" issues.
         editor.normalize();
     }, []);
 
@@ -1121,7 +1166,6 @@ const ChapterEditorPage: React.FC = () => {
                             contentEditable
                             spellCheck={true}
                             suppressContentEditableWarning
-                            lang={langCode}
                             onInput={(e) => updateChapterField('content', e.currentTarget.innerHTML)}
                             onKeyDown={handleKeyDown}
                             onKeyUp={handleKeyUp}
@@ -1202,6 +1246,9 @@ const ChapterEditorPage: React.FC = () => {
                                     <option value="vi">Vietnamese (Tiếng Việt)</option>
                                     <option value="browser-default">Browser Default</option>
                                 </select>
+                                <p className={`mt-2 text-xs ${themeClasses.textSecondary}`}>
+                                    Note: Uses your browser's dictionary. You may need to install language packs in your browser or OS settings.
+                                </p>
                             </div>
                         </div>
                     </div>

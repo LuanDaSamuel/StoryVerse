@@ -41,6 +41,7 @@ export interface ProjectData {
   settings: {
     theme: Theme;
     spellcheckLanguage: SpellcheckLang;
+    customDictionary: string[];
   };
   novels: Novel[];
   sketches: Sketch[];

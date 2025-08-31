@@ -238,11 +238,6 @@ const DemosPage: React.FC = () => {
     const [activeFormats, setActiveFormats] = useState({ isBold: false, isItalic: false, isUL: false, isOL: false });
     const [currentFormat, setCurrentFormat] = useState({ paragraphStyle: 'p', font: fontOptions[0].value, size: '18px', paragraphSpacing: '1em' });
 
-    const langCode = useMemo(() => {
-        const lang = projectData?.settings?.spellcheckLanguage;
-        return lang === 'browser-default' ? undefined : lang;
-    }, [projectData?.settings?.spellcheckLanguage]);
-
     const handleLanguageChange = (lang: SpellcheckLang) => {
         setProjectData(currentData => {
             if (!currentData) return null;
@@ -251,12 +246,32 @@ const DemosPage: React.FC = () => {
                 settings: { ...currentData.settings, spellcheckLanguage: lang },
             };
         });
+
+        if (editorRef.current) {
+            // This "kick" forces the browser to re-evaluate spelling.
+            // We store the current selection to restore it after the re-focus.
+            const selection = window.getSelection();
+            const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0).cloneRange() : null;
+
+            editorRef.current.blur();
+
+            setTimeout(() => {
+                editorRef.current?.focus();
+                // Restore the user's cursor position.
+                if (range && selection) {
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                }
+            }, 100);
+        }
     };
 
     const cleanupEditor = useCallback(() => {
         if (!editorRef.current) return;
         const editor = editorRef.current;
-
+    
+        // 1. Remove empty inline elements that can cause bugs.
+        // Run multiple passes to handle nested empty elements.
         for (let i = 0; i < 3; i++) {
             let changed = false;
             editor.querySelectorAll('span, strong, em, i, b').forEach(el => {
@@ -267,7 +282,40 @@ const DemosPage: React.FC = () => {
             });
             if (!changed) break;
         }
-
+    
+        // 2. Merge adjacent sibling elements with identical styles/tags.
+        // This is crucial for fixing DOM fragmentation after multiple format applications.
+        const mergeAdjacentSiblings = (parent: HTMLElement) => {
+            let child = parent.firstChild;
+            while (child) {
+                const next = child.nextSibling;
+                if (next && child.nodeType === Node.ELEMENT_NODE && next.nodeType === Node.ELEMENT_NODE) {
+                    const el1 = child as HTMLElement;
+                    const el2 = next as HTMLElement;
+    
+                    const areMergable = 
+                        el1.tagName === el2.tagName &&
+                        el1.className === el2.className &&
+                        el1.style.cssText === el2.style.cssText;
+    
+                    if (areMergable) {
+                        while (el2.firstChild) {
+                            el1.appendChild(el2.firstChild);
+                        }
+                        parent.removeChild(el2);
+                        // Do not advance child; check the new next sibling
+                        continue;
+                    }
+                }
+                child = next;
+            }
+        };
+    
+        editor.querySelectorAll('p, h1, h2, h3, blockquote, li, div').forEach(block => {
+            mergeAdjacentSiblings(block as HTMLElement);
+        });
+    
+        // 3. Merge adjacent text nodes. This fixes "stuck word" issues.
         editor.normalize();
     }, []);
 
@@ -758,6 +806,9 @@ const DemosPage: React.FC = () => {
                             <option value="vi">Vietnamese (Tiếng Việt)</option>
                             <option value="browser-default">Browser Default</option>
                         </select>
+                        <p className="mt-2 text-xs text-white/50">
+                            Note: Uses your browser's dictionary. You may need to install language packs in your browser or OS settings.
+                        </p>
                     </div>
                 </div>
             </div>
@@ -772,7 +823,7 @@ const DemosPage: React.FC = () => {
             
             <main className="flex-1 overflow-y-auto" ref={scrollContainerRef}>
                 <div className={`p-8 md:p-12 font-serif min-h-full max-w-4xl mx-auto ${isDistractionFree ? 'pt-24' : ''}`}>
-                    {selectedSketch ? (<div ref={editorRef} key={`${selectedSketch.id}-content`} contentEditable spellCheck={true} suppressContentEditableWarning lang={langCode} onInput={(e) => handleUpdateSketch('content', e.currentTarget.innerHTML)} onKeyDown={handleKeyDown} onKeyUp={handleKeyUp} onPaste={handlePaste} onBlur={cleanupEditor} className={`w-full text-lg leading-relaxed outline-none story-content ${themeClasses.text}`} style={editorStyle} />) : (<div className="flex flex-col items-center justify-center h-full text-center mt-[-4rem]"><LightbulbIcon className={`w-16 h-16 mb-4 ${themeClasses.textSecondary}`} /><h2 className={`text-2xl font-bold ${themeClasses.accentText}`}>Welcome to Demos</h2><p className={`mt-2 max-w-md ${themeClasses.textSecondary}`}>This is your space for ideas and notes. Create a new sketch to get started.</p><button onClick={handleCreateSketch} className={`mt-8 flex items-center justify-center space-x-2 px-6 py-3 text-lg font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}><PlusIcon className="w-6 h-6" /><span>Create First Sketch</span></button></div>)}
+                    {selectedSketch ? (<div ref={editorRef} key={`${selectedSketch.id}-content`} contentEditable spellCheck={true} suppressContentEditableWarning onInput={(e) => handleUpdateSketch('content', e.currentTarget.innerHTML)} onKeyDown={handleKeyDown} onKeyUp={handleKeyUp} onPaste={handlePaste} onBlur={cleanupEditor} className={`w-full text-lg leading-relaxed outline-none story-content ${themeClasses.text}`} style={editorStyle} />) : (<div className="flex flex-col items-center justify-center h-full text-center mt-[-4rem]"><LightbulbIcon className={`w-16 h-16 mb-4 ${themeClasses.textSecondary}`} /><h2 className={`text-2xl font-bold ${themeClasses.accentText}`}>Welcome to Demos</h2><p className={`mt-2 max-w-md ${themeClasses.textSecondary}`}>This is your space for ideas and notes. Create a new sketch to get started.</p><button onClick={handleCreateSketch} className={`mt-8 flex items-center justify-center space-x-2 px-6 py-3 text-lg font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}><PlusIcon className="w-6 h-6" /><span>Create First Sketch</span></button></div>)}
                 </div>
             </main>
 

@@ -11,6 +11,7 @@ const defaultProjectData: ProjectData = {
   settings: {
     theme: 'book',
     spellcheckLanguage: 'en',
+    customDictionary: [],
   },
   novels: [],
   sketches: [],

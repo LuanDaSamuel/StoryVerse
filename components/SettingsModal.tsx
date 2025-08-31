@@ -4,7 +4,7 @@ import React, { useContext, useState } from 'react';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { Theme, SpellcheckLang } from '../types';
 import { THEME_CONFIG } from '../constants';
-import { CloseIcon, DownloadIcon, TrashIcon } from './Icons';
+import { CloseIcon, DownloadIcon, TrashIcon, PlusIcon } from './Icons';
 import ConfirmModal from './ConfirmModal';
 
 interface SettingsModalProps {
@@ -20,8 +20,9 @@ const themeOptions: { name: Theme; label: string; colors: string[] }[] = [
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const { projectData, theme, setProjectData, saveProjectAs, unlinkFile, themeClasses } = useContext(ProjectContext);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [newWord, setNewWord] = useState('');
 
-  if (!isOpen) return null;
+  if (!isOpen || !projectData) return null;
 
   const handleThemeChange = (newTheme: Theme) => {
     setProjectData(currentData => {
@@ -39,6 +40,36 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
         return {
             ...currentData,
             settings: { ...currentData.settings, spellcheckLanguage: lang },
+        };
+    });
+  };
+
+  const handleAddWord = () => {
+    const wordToAdd = newWord.trim();
+    if (wordToAdd && !projectData.settings.customDictionary.includes(wordToAdd)) {
+        setProjectData(currentData => {
+            if (!currentData) return null;
+            return {
+                ...currentData,
+                settings: {
+                    ...currentData.settings,
+                    customDictionary: [...currentData.settings.customDictionary, wordToAdd].sort(),
+                },
+            };
+        });
+        setNewWord('');
+    }
+  };
+
+  const handleRemoveWord = (wordToRemove: string) => {
+    setProjectData(currentData => {
+        if (!currentData) return null;
+        return {
+            ...currentData,
+            settings: {
+                ...currentData.settings,
+                customDictionary: currentData.settings.customDictionary.filter(w => w !== wordToRemove),
+            },
         };
     });
   };
@@ -63,74 +94,110 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   return (
     <>
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 transition-opacity">
-        <div className={`p-8 rounded-lg shadow-2xl w-full max-w-lg m-4 ${themeClasses.bgSecondary} ${modalTextColor} border ${themeClasses.border}`}>
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold">Settings</h2>
-            <button onClick={onClose} className={`p-1 rounded-full hover:${themeClasses.bgTertiary}`}>
-              <CloseIcon className="w-6 h-6" />
-            </button>
-          </div>
-          <hr className={`mb-6 ${themeClasses.border}`} />
-
-          <div className="mb-8">
-            <h3 className={`text-lg mb-2 ${subHeadingStyle}`}>Appearance</h3>
-            <p className={`${descriptionColor} mb-4`}>Choose a color theme that suits your mood.</p>
-            <div className="flex justify-center space-x-8">
-              {themeOptions.map(opt => (
-                <div key={opt.name} className="text-center">
-                  <button
-                    onClick={() => handleThemeChange(opt.name)}
-                    className={`w-16 h-12 md:w-20 md:h-14 rounded-lg flex items-center justify-center border-2 transition-all ${getActiveThemeBorderStyle(opt.name)}`}
-                    style={{ backgroundColor: opt.colors[1] }}
-                  >
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full overflow-hidden" style={{ backgroundColor: opt.colors[1] }}>
-                        <div className="w-4 h-8" style={{backgroundColor: opt.colors[0]}}></div>
-                        <div className="w-4 h-8" style={{backgroundColor: opt.colors[1]}}></div>
-                    </div>
-                  </button>
-                  <span className={`mt-2 block text-sm ${themeClasses.textSecondary}`}>{opt.label}</span>
-                </div>
-              ))}
+        <div className={`p-8 rounded-lg shadow-2xl w-full max-w-lg m-4 ${themeClasses.bgSecondary} ${modalTextColor} border ${themeClasses.border} flex flex-col max-h-[90vh]`}>
+          <div className="flex-shrink-0">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold">Settings</h2>
+              <button onClick={onClose} className={`p-1 rounded-full hover:${themeClasses.bgTertiary}`}>
+                <CloseIcon className="w-6 h-6" />
+              </button>
             </div>
+            <hr className={`mb-6 ${themeClasses.border}`} />
           </div>
 
-          <div className="mb-8">
-            <h3 className={`text-lg mb-2 ${subHeadingStyle}`}>Language & Spelling</h3>
-            <p className={`${descriptionColor} mb-4`}>
-              Set the primary language for spellchecking. Your browser must have the corresponding dictionary installed.
-            </p>
-            <select
-              value={projectData?.settings.spellcheckLanguage || 'en'}
-              onChange={(e) => handleLanguageChange(e.target.value as SpellcheckLang)}
-              className={`w-full px-3 py-2 rounded-md ${themeClasses.input} border ${themeClasses.border}`}
-            >
-              <option value="en">English</option>
-              <option value="fi">Finnish (Suomi)</option>
-              <option value="vi">Vietnamese (Tiếng Việt)</option>
-              <option value="browser-default">Browser Default</option>
-            </select>
-          </div>
+          <div className="flex-grow overflow-y-auto pr-2 -mr-4">
+            <div className="mb-8">
+              <h3 className={`text-lg mb-2 ${subHeadingStyle}`}>Appearance</h3>
+              <p className={`${descriptionColor} mb-4`}>Choose a color theme that suits your mood.</p>
+              <div className="flex justify-center space-x-8">
+                {themeOptions.map(opt => (
+                  <div key={opt.name} className="text-center">
+                    <button
+                      onClick={() => handleThemeChange(opt.name)}
+                      className={`w-16 h-12 md:w-20 md:h-14 rounded-lg flex items-center justify-center border-2 transition-all ${getActiveThemeBorderStyle(opt.name)}`}
+                      style={{ backgroundColor: opt.colors[1] }}
+                    >
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full overflow-hidden" style={{ backgroundColor: opt.colors[1] }}>
+                          <div className="w-4 h-8" style={{backgroundColor: opt.colors[0]}}></div>
+                          <div className="w-4 h-8" style={{backgroundColor: opt.colors[1]}}></div>
+                      </div>
+                    </button>
+                    <span className={`mt-2 block text-sm ${themeClasses.textSecondary}`}>{opt.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-          <div>
-            <h3 className={`text-lg mb-2 ${subHeadingStyle}`}>Project Data</h3>
-            <p className={`${descriptionColor} mb-4`}>
-              Your project is saved directly to a file on your computer. You can save a copy to a different location.
-            </p>
-            <div className="flex space-x-4">
-              <button
-                onClick={saveProjectAs}
-                className={`flex items-center space-x-2 px-4 py-2 font-semibold rounded-lg ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-80 transition-opacity`}
+            <div className="mb-8">
+              <h3 className={`text-lg mb-2 ${subHeadingStyle}`}>Language & Spelling</h3>
+              <p className={`${descriptionColor} mb-4 text-sm`}>
+                Select the language for spellchecking.
+              </p>
+              <select
+                value={projectData?.settings.spellcheckLanguage || 'en'}
+                onChange={(e) => handleLanguageChange(e.target.value as SpellcheckLang)}
+                className={`w-full px-3 py-2 rounded-md ${themeClasses.input} border ${themeClasses.border}`}
               >
-                <DownloadIcon className="w-5 h-5" />
-                <span>Save As...</span>
-              </button>
-              <button
-                onClick={() => setIsConfirmOpen(true)}
-                className={`flex items-center space-x-2 px-4 py-2 font-semibold rounded-lg ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-80 transition-opacity`}
-              >
-                <TrashIcon className="w-5 h-5" />
-                <span>Unlink File</span>
-              </button>
+                <option value="en">English</option>
+                <option value="fi">Finnish (Suomi)</option>
+                <option value="vi">Vietnamese (Tiếng Việt)</option>
+                <option value="browser-default">Browser Default</option>
+              </select>
+            </div>
+            
+            <div className="mb-8">
+                <h3 className={`text-lg mb-2 ${subHeadingStyle}`}>Custom Dictionary</h3>
+                <p className={`${descriptionColor} mb-4 text-sm`}>
+                    Add words like character names or places to prevent them from being flagged as spelling errors.
+                </p>
+                <div className="flex space-x-2 mb-4">
+                    <input
+                        type="text"
+                        value={newWord}
+                        onChange={(e) => setNewWord(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleAddWord()}
+                        placeholder="Add a word..."
+                        className={`flex-grow px-3 py-2 rounded-md ${themeClasses.input} border ${themeClasses.border}`}
+                    />
+                    <button onClick={handleAddWord} className={`px-4 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90 transition-opacity`}><PlusIcon className="w-5 h-5"/></button>
+                </div>
+                <div className={`max-h-48 overflow-y-auto rounded-md p-2 border ${themeClasses.border} ${themeClasses.bgTertiary}`}>
+                    {projectData.settings.customDictionary.length > 0 ? (
+                        <ul className="divide-y divide-white/10">
+                            {projectData.settings.customDictionary.map(word => (
+                                <li key={word} className="flex justify-between items-center py-2 px-2">
+                                    <span>{word}</span>
+                                    <button onClick={() => handleRemoveWord(word)} className="p-1 rounded-full text-red-500 hover:bg-red-500/10"><TrashIcon className="w-4 h-4"/></button>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <p className={`text-center py-4 text-sm ${themeClasses.textSecondary}`}>Your dictionary is empty.</p>
+                    )}
+                </div>
+            </div>
+
+            <div>
+              <h3 className={`text-lg mb-2 ${subHeadingStyle}`}>Project Data</h3>
+              <p className={`${descriptionColor} mb-4`}>
+                Your project is saved directly to a file on your computer. You can save a copy to a different location.
+              </p>
+              <div className="flex space-x-4">
+                <button
+                  onClick={saveProjectAs}
+                  className={`flex items-center space-x-2 px-4 py-2 font-semibold rounded-lg ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-80 transition-opacity`}
+                >
+                  <DownloadIcon className="w-5 h-5" />
+                  <span>Save As...</span>
+                </button>
+                <button
+                  onClick={() => setIsConfirmOpen(true)}
+                  className={`flex items-center space-x-2 px-4 py-2 font-semibold rounded-lg ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-80 transition-opacity`}
+                >
+                  <TrashIcon className="w-5 h-5" />
+                  <span>Unlink File</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
