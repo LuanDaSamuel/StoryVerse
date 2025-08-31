@@ -1,4 +1,5 @@
 
+
 import React, { useMemo, useContext, useEffect, useRef } from 'react';
 import { HashRouter, Routes, Route, Navigate, useParams, useMatch, useNavigate } from 'react-router-dom';
 import { useProjectFile } from './hooks/useProjectFile';
@@ -72,6 +73,10 @@ const AppContent = () => {
             } else {
                 document.documentElement.lang = lang;
             }
+        } else {
+            // When projectData is null (no project open), or if the setting is missing,
+            // reset the lang attribute to avoid incorrect spellchecking from a previous session.
+            document.documentElement.removeAttribute('lang');
         }
     }, [projectData?.settings?.spellcheckLanguage]);
 
