@@ -1,5 +1,4 @@
 
-
 import React, { useMemo, useContext, useEffect, useRef } from 'react';
 import { HashRouter, Routes, Route, Navigate, useParams, useMatch, useNavigate } from 'react-router-dom';
 import { useProjectFile } from './hooks/useProjectFile';
@@ -14,9 +13,10 @@ import ReadNovelPage from './pages/ReadNovelPage';
 import DemosPage from './pages/DemosPage';
 import { THEME_CONFIG } from './constants';
 import { LoadingIcon } from './components/Icons';
+import { Theme } from './types';
 
 const NovelEditRedirect = () => {
-    const { novelId } = useParams<{ novelId: string; }>();
+    const { novelId } = useParams<{ novelId: string }>();
     const { projectData } = useContext(ProjectContext);
 
     if (!projectData || !novelId) {
@@ -63,26 +63,26 @@ const AppContent = () => {
         }
     }, [status, navigate]);
 
-    const themeClasses = useMemo(() => {
-        if (status === 'welcome') {
-            return THEME_CONFIG['light'];
-        }
-        const theme = projectData?.settings?.theme || 'book';
-        return THEME_CONFIG[theme];
-    }, [projectData, status]);
+    const theme = useMemo(() => {
+        const projectTheme = projectData?.settings?.theme || 'book';
+        // Fallback to 'book' theme if the saved theme from a project file is no longer valid.
+        return (projectTheme in THEME_CONFIG) ? projectTheme as Theme : 'book';
+    }, [projectData]);
 
-    // FIX: Moved the closing parenthesis to correctly wrap the factory function of useMemo.
-    // The previous code had the dependency array inside the factory function, causing a comma operator expression.
+    const themeClasses = useMemo(() => {
+        return THEME_CONFIG[theme];
+    }, [theme]);
+
     const contextValue = useMemo(() => ({
         projectData,
         setProjectData,
         saveProjectAs,
         unlinkFile,
         saveProject,
-        theme: projectData?.settings?.theme || 'book',
+        theme,
         themeClasses,
         saveStatus,
-    }), [projectData, setProjectData, saveProjectAs, unlinkFile, saveProject, themeClasses, saveStatus]);
+    }), [projectData, setProjectData, saveProjectAs, unlinkFile, saveProject, theme, themeClasses, saveStatus]);
 
     const onEditPage = useMatch('/novel/:novelId/edit/:chapterId');
     const onReadPage = useMatch('/novel/:novelId/read/:chapterId?');

@@ -13,10 +13,7 @@ interface SettingsModalProps {
 
 const themeOptions: { name: Theme; label: string; colors: string[] }[] = [
   { name: 'dark', label: 'Dark', colors: ['#4F46E5', '#1F2937'] },
-  { name: 'light', label: 'Light', colors: ['#4F46E5', '#F3F4F6'] },
-  { name: 'sakura', label: 'Sakura', colors: ['#EC4899', '#FFF1F2'] },
-  { name: 'book', label: 'Book', colors: ['#A0522D', '#FDF6E3'] }, // Using a browner color for book
-  { name: 'jungle', label: 'Jungle', colors: ['#84CC16', '#14532D'] },
+  { name: 'book', label: 'Book', colors: ['#A0522D', '#FDF6E3'] },
 ];
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
@@ -67,7 +64,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
           <div className="mb-8">
             <h3 className={`text-lg mb-2 ${subHeadingStyle}`}>Appearance</h3>
             <p className={`${descriptionColor} mb-4`}>Choose a color theme that suits your mood.</p>
-            <div className="flex justify-between">
+            <div className="flex justify-center space-x-8">
               {themeOptions.map(opt => (
                 <div key={opt.name} className="text-center">
                   <button

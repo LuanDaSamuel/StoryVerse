@@ -76,8 +76,6 @@ const FindReplaceDialog: React.FC<{
     const { themeClasses } = useContext(ProjectContext);
     const [findText, setFindText] = useState('');
     const [replaceText, setReplaceText] = useState('');
-    const [isCaseSensitive, setIsCaseSensitive] = useState(false);
-    const [isWholeWord, setIsWholeWord] = useState(false);
     const [matches, setMatches] = useState<HTMLElement[]>([]);
     const [currentIndex, setCurrentIndex] = useState(-1);
 
@@ -105,13 +103,7 @@ const FindReplaceDialog: React.FC<{
         const walker = document.createTreeWalker(editorRef.current, NodeFilter.SHOW_TEXT);
         const textNodes: Text[] = [];
         while (walker.nextNode()) textNodes.push(walker.currentNode as Text);
-        
-        const flags = isCaseSensitive ? 'g' : 'gi';
-        const pattern = isWholeWord
-            ? `\\b${findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`
-            : findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex = new RegExp(pattern, flags);
-
+        const regex = new RegExp(findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
         textNodes.forEach(node => {
             if (!node.textContent) return;
             const matchesInNode = [...node.textContent.matchAll(regex)];
@@ -134,7 +126,7 @@ const FindReplaceDialog: React.FC<{
         });
         setMatches(newMatches);
         setCurrentIndex(newMatches.length > 0 ? 0 : -1);
-    }, [findText, editorRef, clearHighlights, isCaseSensitive, isWholeWord]);
+    }, [findText, editorRef, clearHighlights]);
 
     useEffect(() => {
         if (isOpen) highlightMatches();
@@ -184,24 +176,6 @@ const FindReplaceDialog: React.FC<{
                 <div className="flex justify-between items-center mb-4"><h2 className="text-lg font-bold">Find & Replace</h2><button onClick={handleClose} className={`p-1 rounded-full hover:${themeClasses.bgTertiary}`}><CloseIcon className="w-5 h-5" /></button></div>
                 <div className="space-y-3">
                     <div className="relative"><input type="text" placeholder="Find..." value={findText} onChange={(e) => setFindText(e.target.value)} className={`w-full px-3 py-2 rounded-md text-sm ${themeClasses.input} border ${themeClasses.border}`} />{findText && <div className={`absolute right-3 top-1/2 -translate-y-1/2 text-xs ${themeClasses.textSecondary}`}>{matches.length > 0 ? `${currentIndex + 1}/${matches.length}` : '0/0'}</div>}</div>
-                    <div className="flex items-center space-x-2">
-                        <button
-                            onClick={() => setIsCaseSensitive(p => !p)}
-                            className={`px-2 py-1 text-xs rounded-md font-semibold transition-colors ${isCaseSensitive ? `${themeClasses.accent} ${themeClasses.accentText}` : themeClasses.bgTertiary}`}
-                            title="Case Sensitive"
-                            aria-pressed={isCaseSensitive}
-                        >
-                            Aa
-                        </button>
-                        <button
-                            onClick={() => setIsWholeWord(p => !p)}
-                            className={`px-2 py-1 text-xs rounded-md font-semibold transition-colors ${isWholeWord ? `${themeClasses.accent} ${themeClasses.accentText}` : themeClasses.bgTertiary}`}
-                            title="Match Whole Word"
-                            aria-pressed={isWholeWord}
-                        >
-                           " "
-                        </button>
-                    </div>
                     <input type="text" placeholder="Replace..." value={replaceText} onChange={(e) => setReplaceText(e.target.value)} className={`w-full px-3 py-2 rounded-md text-sm ${themeClasses.input} border ${themeClasses.border}`} />
                 </div>
                 <div className="flex justify-between items-center mt-3"><div className="flex items-center space-x-1"><button onClick={() => handleNavigate('prev')} disabled={matches.length < 2} className={`px-2 py-1 rounded text-xs font-semibold ${themeClasses.bgTertiary} disabled:opacity-50`}>Prev</button><button onClick={() => handleNavigate('next')} disabled={matches.length < 2} className={`px-2 py-1 rounded text-xs font-semibold ${themeClasses.bgTertiary} disabled:opacity-50`}>Next</button></div><div className="flex items-center space-x-1"><button onClick={handleReplace} disabled={currentIndex === -1} className={`px-2 py-1 text-xs rounded font-semibold ${themeClasses.bgTertiary} disabled:opacity-50`}>Replace</button><button onClick={handleReplaceAll} disabled={matches.length === 0} className={`px-2 py-1 text-xs rounded font-semibold ${themeClasses.accent} ${themeClasses.accentText} disabled:opacity-50`}>All</button></div></div>
@@ -556,57 +530,6 @@ const DemosPage: React.FC = () => {
         }
     };
 
-    const handleKeyUp = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
-        if (e.key !== ' ' || !editorRef.current) return;
-
-        const selection = window.getSelection();
-        if (!selection || !selection.rangeCount) return;
-
-        const range = selection.getRangeAt(0);
-        if (!range.collapsed) return;
-
-        let node = range.startContainer;
-        let blockElement: Node | null = node;
-
-        while (blockElement && blockElement.parentNode !== editorRef.current) {
-            blockElement = blockElement.parentNode;
-        }
-
-        if (!blockElement || !(blockElement instanceof HTMLElement)) return;
-
-        const text = blockElement.textContent || '';
-        let format: 'h1' | 'h2' | 'h3' | null = null;
-        let markdownLength = 0;
-
-        if (text.startsWith('# ')) {
-            format = 'h1';
-            markdownLength = 2;
-        } else if (text.startsWith('## ')) {
-            format = 'h2';
-            markdownLength = 3;
-        } else if (text.startsWith('### ')) {
-            format = 'h3';
-            markdownLength = 4;
-        }
-        
-        if (format) {
-            const textNode = blockElement.firstChild;
-            if (textNode && textNode.nodeType === Node.TEXT_NODE && (textNode.textContent?.length ?? 0) >= markdownLength) {
-                const markdownRange = document.createRange();
-                markdownRange.setStart(textNode, 0);
-                markdownRange.setEnd(textNode, markdownLength);
-                selection.removeAllRanges();
-                selection.addRange(markdownRange);
-                
-                document.execCommand('delete', false);
-                
-                document.execCommand('formatBlock', false, format);
-                
-                editorRef.current.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
-            }
-        }
-    }, []);
-
     const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
         e.preventDefault();
         
@@ -686,101 +609,18 @@ const DemosPage: React.FC = () => {
         updateCurrentFormat();
     }, [updateActiveFormats, updateCurrentFormat]);
 
-    const applyAndSaveFormat = useCallback((formatAction: () => void) => {
-        if (!editorRef.current) return;
-        
-        formatAction();
-        
-        cleanupEditor();
-
-        const event = new Event('input', { bubbles: true, cancelable: true });
-        editorRef.current.dispatchEvent(event);
-        
-        editorRef.current.focus();
-        
-        handleSelectionChange();
-
-    }, [handleSelectionChange, cleanupEditor]);
-
     const applyCommand = (cmd: string, value?: string) => {
-        applyAndSaveFormat(() => document.execCommand(cmd, false, value));
+        if (!editorRef.current) return;
+        document.execCommand(cmd, false, value);
+        editorRef.current.dispatchEvent(new Event('input', { bubbles: true }));
+        cleanupEditor();
+        editorRef.current.focus();
+        handleSelectionChange();
     };
 
     const applyParagraphStyle = (style: string) => applyCommand('formatBlock', style);
     const applyFont = (fontValue: string) => applyCommand('fontName', fontOptions.find(f => f.value === fontValue)?.name || 'serif');
     const applyColor = (color: string) => applyCommand('foreColor', color);
-    
-    const applyFontSize = (size: string) => {
-        applyAndSaveFormat(() => {
-            if (!editorRef.current) return;
-            editorRef.current.focus();
-            const selection = window.getSelection();
-            if (!selection?.rangeCount) return;
-
-            if (selection.isCollapsed) {
-                const range = selection.getRangeAt(0);
-                const span = document.createElement('span');
-                span.style.fontSize = size;
-                span.textContent = '\u200B'; // Zero-width space
-                range.insertNode(span);
-                
-                range.selectNodeContents(span);
-                range.collapse(false);
-                selection.removeAllRanges();
-                selection.addRange(range);
-                return;
-            }
-
-            const DUMMY_COLOR_RGB = 'rgb(1, 2, 3)';
-            document.execCommand('styleWithCSS', false, 'true');
-            document.execCommand('hiliteColor', false, DUMMY_COLOR_RGB);
-
-            const tempSpans = Array.from(editorRef.current.querySelectorAll<HTMLElement>(`span[style*="background-color: ${DUMMY_COLOR_RGB}"]`));
-            
-            const parentsToClean = new Set<Node>();
-
-            tempSpans.forEach(span => {
-                if (span.parentElement) {
-                    parentsToClean.add(span.parentElement);
-                }
-
-                span.style.backgroundColor = '';
-                span.style.fontSize = size;
-                
-                if (!span.getAttribute('style')?.trim()) {
-                    const parent = span.parentNode;
-                    if (parent) {
-                        while (span.firstChild) {
-                            parent.insertBefore(span.firstChild, span);
-                        }
-                        parent.removeChild(span);
-                    }
-                }
-            });
-
-            parentsToClean.forEach(parent => {
-                let child = parent.firstChild;
-                while (child) {
-                    const next = child.nextSibling;
-                    if (
-                        next &&
-                        child instanceof HTMLSpanElement &&
-                        next instanceof HTMLSpanElement &&
-                        child.style.cssText === next.style.cssText
-                    ) {
-                        while (next.firstChild) {
-                            child.appendChild(next.firstChild);
-                        }
-                        parent.removeChild(next);
-                    } else {
-                        child = next;
-                    }
-                }
-                parent.normalize();
-            });
-        });
-    };
-
     const applyParagraphSpacing = (spacing: string) => {
         const selection = window.getSelection();
         if (!selection?.rangeCount) return;
@@ -899,7 +739,6 @@ const DemosPage: React.FC = () => {
                             suppressContentEditableWarning 
                             onInput={(e) => handleUpdateSketch('content', e.currentTarget.innerHTML)} 
                             onKeyDown={handleKeyDown}
-                            onKeyUp={handleKeyUp}
                             onPaste={handlePaste}
                             onBlur={cleanupEditor}
                             className={`w-full text-lg leading-relaxed outline-none story-content ${themeClasses.text}`} 
@@ -919,7 +758,7 @@ const DemosPage: React.FC = () => {
             {/* Floating Toolbar */}
             <div className={`absolute bottom-0 left-0 w-full flex justify-center pb-4 z-20 pointer-events-none transition-opacity duration-300 ${isDistractionFree ? 'opacity-0' : 'opacity-100'}`}>
                 <div ref={toolbarRef} className="relative pointer-events-auto">
-                    {isFormatPanelOpen && (<div className="absolute bottom-full mb-2 p-4 rounded-lg shadow-lg bg-stone-900/80 border border-white/10 backdrop-blur-sm w-[320px]"><div className="space-y-4"><ToolbarDropdown label="Paragraph Style" value={currentFormat.paragraphStyle} onChange={(e) => applyParagraphStyle(e.target.value)}><option value="p">Paragraph</option><option value="h1">Heading 1</option><option value="h2">Heading 2</option><option value="h3">Heading 3</option><option value="blockquote">Blockquote</option></ToolbarDropdown><ToolbarDropdown label="Font" value={currentFormat.font} onChange={(e) => applyFont(e.target.value)}>{fontOptions.map(f => <option key={f.name} value={f.value}>{f.name}</option>)}</ToolbarDropdown><div className="grid grid-cols-2 gap-4"><ToolbarDropdown label="Size" value={currentFormat.size} onChange={(e) => applyFontSize(e.target.value)}><option value="14px">14</option><option value="16px">16</option><option value="18px">18</option><option value="20px">20</option><option value="24px">24</option></ToolbarDropdown><ToolbarDropdown label="Paragraph Spacing" value={currentFormat.paragraphSpacing} onChange={(e) => applyParagraphSpacing(e.target.value)}><option value="0.5em">0.5</option><option value="1em">1.0</option><option value="1.5em">1.5</option><option value="2em">2.0</option></ToolbarDropdown></div><div><label className="block text-xs font-semibold mb-2 text-white/70">Color</label><div className="flex space-x-2">{colorPalette.map(c => (<button key={c} onClick={() => applyColor(c)} className="w-6 h-6 rounded-full border border-gray-400" style={{backgroundColor: c}}></button>))}</div></div></div></div>)}
+                    {isFormatPanelOpen && (<div className="absolute bottom-full mb-2 p-4 rounded-lg shadow-lg bg-stone-900/80 border border-white/10 backdrop-blur-sm w-[320px]"><div className="space-y-4"><ToolbarDropdown label="Paragraph Style" value={currentFormat.paragraphStyle} onChange={(e) => applyParagraphStyle(e.target.value)}><option value="p">Paragraph</option><option value="h1">Heading 1</option><option value="h2">Heading 2</option><option value="h3">Heading 3</option><option value="blockquote">Blockquote</option></ToolbarDropdown><ToolbarDropdown label="Font" value={currentFormat.font} onChange={(e) => applyFont(e.target.value)}>{fontOptions.map(f => <option key={f.name} value={f.value}>{f.name}</option>)}</ToolbarDropdown><div className="grid grid-cols-2 gap-4"><ToolbarDropdown label="Size" value={currentFormat.size} onChange={(e) => console.log('Size change not implemented yet')}><option value="14px">14</option><option value="16px">16</option><option value="18px">18</option><option value="20px">20</option><option value="24px">24</option></ToolbarDropdown><ToolbarDropdown label="Paragraph Spacing" value={currentFormat.paragraphSpacing} onChange={(e) => applyParagraphSpacing(e.target.value)}><option value="0.5em">0.5</option><option value="1em">1.0</option><option value="1.5em">1.5</option><option value="2em">2.0</option></ToolbarDropdown></div><div><label className="block text-xs font-semibold mb-2 text-white/70">Color</label><div className="flex space-x-2">{colorPalette.map(c => (<button key={c} onClick={() => applyColor(c)} className="w-6 h-6 rounded-full border border-gray-400" style={{backgroundColor: c}}></button>))}</div></div></div></div>)}
                     <div className="flex items-center space-x-1 p-1 rounded-full shadow-lg bg-stone-900/70 border border-white/10 backdrop-blur-sm" onMouseDown={(e) => e.preventDefault()}>
                         <button onClick={() => setIsFormatPanelOpen(p => !p)} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${isFormatPanelOpen ? 'bg-white/20' : ''}`}><TextIcon className="w-5 h-5"/></button>
                         <button onClick={() => applyCommand('bold')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.isBold ? 'bg-white/20' : ''}`}><BoldIcon className="w-5 h-5"/></button>

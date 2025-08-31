@@ -1,4 +1,4 @@
-export type Theme = 'dark' | 'light' | 'sakura' | 'book' | 'jungle';
+export type Theme = 'dark' | 'book';
 
 export type SaveStatus = 'saved' | 'saving' | 'unsaved';
 
