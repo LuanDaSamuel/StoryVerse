@@ -3,12 +3,70 @@
 import React, { useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
-import { BackIcon, BookOpenIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, TextIcon, SearchIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, CloseIcon, Bars3Icon, DownloadIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, H1Icon, H2Icon, H3Icon } from '../components/Icons';
+import { BackIcon, BookOpenIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, TextIcon, SearchIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, CloseIcon, Bars3Icon, DownloadIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, H1Icon, H2Icon, H3Icon, SpellcheckIcon } from '../components/Icons';
 import { enhancePlainText, enhanceHtml, THEME_CONFIG } from '../constants';
 import ExportModal from '../components/ExportModal';
 import { SpellcheckLang } from '../types';
 
+declare var Typo: any;
+
+interface SpellcheckError {
+    word: string;
+    suggestions: string[];
+    context: { before: string; after: string; };
+    node: Text;
+    startOffset: number;
+    endOffset: number;
+}
+
 // --- Reusable Components ---
+
+const SpellCheckPanel: React.FC<{
+    error: SpellcheckError;
+    onClose: () => void;
+    onNext: () => void;
+    onIgnore: (word: string) => void;
+    onChange: (newWord: string) => void;
+    onAddToDictionary: (word: string) => void;
+    themeClasses: any;
+    isLast: boolean;
+}> = ({ error, onClose, onNext, onIgnore, onChange, onAddToDictionary, themeClasses, isLast }) => (
+    <div className={`fixed top-4 right-4 z-50 w-80 p-4 rounded-lg shadow-2xl font-sans ${themeClasses.bgSecondary} ${themeClasses.accentText} border ${themeClasses.border}`}>
+        <div className="flex justify-between items-center mb-2">
+            <h3 className="font-bold text-lg">Spell Check</h3>
+            <button onClick={onClose} className={`p-1 rounded-full hover:${themeClasses.bgTertiary}`}><CloseIcon className="w-5 h-5"/></button>
+        </div>
+        <div className={`p-3 rounded-md ${themeClasses.bgTertiary} text-sm mb-3`}>
+            <p className={themeClasses.textSecondary}>
+                {error.context.before}
+                <span className="font-bold text-red-400">{error.word}</span>
+                {error.context.after}
+            </p>
+        </div>
+        <div className="space-y-2 max-h-32 overflow-y-auto mb-3">
+            {error.suggestions.length > 0 ? (
+                error.suggestions.slice(0, 5).map(sugg => (
+                    <button key={sugg} onClick={() => onChange(sugg)} className={`block w-full text-left px-3 py-1.5 rounded-md text-sm hover:${themeClasses.bgTertiary}`}>
+                        {sugg}
+                    </button>
+                ))
+            ) : (
+                <p className={`text-sm px-3 py-2 ${themeClasses.textSecondary}`}>No suggestions found.</p>
+            )}
+        </div>
+        <div className="flex justify-between items-center pt-2 border-t border-white/10">
+            <div className="space-x-1">
+                <button onClick={() => onIgnore(error.word)} className={`px-3 py-1 text-xs font-semibold rounded-md hover:opacity-80 ${themeClasses.bgTertiary}`}>Ignore</button>
+                <button onClick={() => onAddToDictionary(error.word)} className={`px-3 py-1 text-xs font-semibold rounded-md hover:opacity-80 ${themeClasses.bgTertiary}`}>Add Word</button>
+            </div>
+            <button onClick={onNext} className={`px-4 py-2 text-sm font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}>
+                {isLast ? 'Finish' : 'Next'}
+            </button>
+        </div>
+    </div>
+);
+
+
 const ChapterListModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
@@ -107,12 +165,14 @@ const FindReplaceModal: React.FC<{
 
   const clearHighlights = useCallback(() => {
     if (!editorRef.current) return;
-    const highlights = Array.from(editorRef.current.querySelectorAll('.search-highlight'));
+    const highlights = Array.from(editorRef.current.querySelectorAll('.search-highlight, .current-match'));
     highlights.forEach(node => {
         const parent = node.parentNode;
         if (parent) {
-            const text = document.createTextNode(node.textContent || '');
-            parent.replaceChild(text, node);
+            while(node.firstChild) {
+                parent.insertBefore(node.firstChild, node);
+            }
+            parent.removeChild(node);
         }
     });
     // Normalizing after all unwraps is more efficient
@@ -337,6 +397,178 @@ const ChapterEditorPage: React.FC = () => {
         paragraphSpacing: '1em',
     });
 
+    // --- Spellcheck State and Logic ---
+    const [spellchecker, setSpellchecker] = useState<any>(null);
+    const [isSpellcheckPanelOpen, setIsSpellcheckPanelOpen] = useState(false);
+    const [spellcheckErrors, setSpellcheckErrors] = useState<SpellcheckError[]>([]);
+    const [currentErrorIndex, setCurrentErrorIndex] = useState(0);
+    const sessionIgnoredWords = useRef(new Set<string>());
+
+    useEffect(() => {
+        const lang = projectData?.settings?.spellcheckLanguage;
+        if (lang && lang !== 'browser-default' && typeof Typo !== 'undefined') {
+            const dictionaryId = lang === 'en' ? 'en_US' : lang;
+            const affUrl = `https://cdn.jsdelivr.net/npm/typo-js@1.2.1/dictionaries/${dictionaryId}/${dictionaryId}.aff`;
+            const dicUrl = `https://cdn.jsdelivr.net/npm/typo-js@1.2.1/dictionaries/${dictionaryId}/${dictionaryId}.dic`;
+
+            Promise.all([fetch(affUrl).then(r => r.text()), fetch(dicUrl).then(r => r.text())])
+              .then(([affData, dicData]) => {
+                const typo = new Typo(dictionaryId, affData, dicData);
+                setSpellchecker(typo);
+              })
+              .catch(err => {
+                console.error(`Could not load dictionary for ${lang}`, err);
+                setSpellchecker(null);
+              });
+        } else {
+            setSpellchecker(null);
+        }
+    }, [projectData?.settings?.spellcheckLanguage]);
+
+    const cleanupSpellcheckHighlight = () => {
+        const existingHighlight = editorRef.current?.querySelector('.spell-error-current');
+        if (existingHighlight) {
+            const parent = existingHighlight.parentNode;
+            while (existingHighlight.firstChild) {
+                parent?.insertBefore(existingHighlight.firstChild, existingHighlight);
+            }
+            parent?.removeChild(existingHighlight);
+            parent?.normalize();
+        }
+    };
+
+    const startSpellcheck = () => {
+        if (!spellchecker || !editorRef.current) {
+            alert('Spellchecker dictionary is not loaded or editor is not available.');
+            return;
+        }
+
+        sessionIgnoredWords.current.clear();
+        const errors: SpellcheckError[] = [];
+        const customDictionary = new Set(projectData?.settings?.customDictionary || []);
+        
+        const walker = document.createTreeWalker(editorRef.current, NodeFilter.SHOW_TEXT);
+        let node;
+        while (node = walker.nextNode()) {
+            const textNode = node as Text;
+            const text = textNode.textContent || '';
+            const wordRegex = /\b[a-zA-Z']+\b/g;
+            let match;
+            while ((match = wordRegex.exec(text)) !== null) {
+                const word = match[0];
+                if (!customDictionary.has(word.toLowerCase()) && !spellchecker.check(word)) {
+                    const suggestions = spellchecker.suggest(word);
+                    const contextWindow = 15;
+                    const context = {
+                        before: text.substring(Math.max(0, match.index - contextWindow), match.index),
+                        after: text.substring(match.index + word.length, match.index + word.length + contextWindow),
+                    };
+                    errors.push({
+                        word, suggestions, context, node: textNode,
+                        startOffset: match.index,
+                        endOffset: match.index + word.length
+                    });
+                }
+            }
+        }
+
+        setSpellcheckErrors(errors);
+        setCurrentErrorIndex(0);
+        setIsSpellcheckPanelOpen(errors.length > 0);
+        if (errors.length === 0) {
+            alert('No spelling errors found!');
+        }
+    };
+
+    const handleCloseSpellcheck = () => {
+        cleanupSpellcheckHighlight();
+        setIsSpellcheckPanelOpen(false);
+        setSpellcheckErrors([]);
+        setCurrentErrorIndex(0);
+    };
+    
+    const handleSpellcheckNext = () => {
+        if (currentErrorIndex >= spellcheckErrors.length - 1) {
+            handleCloseSpellcheck();
+        } else {
+            setCurrentErrorIndex(prev => prev + 1);
+        }
+    };
+    
+    const handleSpellcheckIgnore = (word: string) => {
+        sessionIgnoredWords.current.add(word.toLowerCase());
+        const remainingErrors = spellcheckErrors.filter((e, idx) => idx > currentErrorIndex && e.word.toLowerCase() !== word.toLowerCase());
+        
+        if (remainingErrors.length > 0) {
+            const nextError = remainingErrors[0];
+            const nextIndex = spellcheckErrors.indexOf(nextError);
+            cleanupSpellcheckHighlight(); // manually clean before jumping index
+            setCurrentErrorIndex(nextIndex);
+        } else {
+            handleCloseSpellcheck();
+        }
+    };
+
+    const handleSpellcheckChange = (newWord: string) => {
+        const error = spellcheckErrors[currentErrorIndex];
+        if (!error) return;
+
+        const range = document.createRange();
+        range.setStart(error.node, error.startOffset);
+        range.setEnd(error.node, error.endOffset);
+        range.deleteContents();
+        range.insertNode(document.createTextNode(newWord));
+        
+        editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+
+        handleSpellcheckNext();
+    };
+
+    const handleAddToDictionary = (word: string) => {
+        const lowerWord = word.toLowerCase();
+        setProjectData(currentData => {
+            if (!currentData || currentData.settings.customDictionary.includes(lowerWord)) return currentData;
+            return {
+                ...currentData,
+                settings: {
+                    ...currentData.settings,
+                    customDictionary: [...currentData.settings.customDictionary, lowerWord].sort(),
+                },
+            };
+        });
+        handleSpellcheckIgnore(word);
+    };
+
+    useEffect(() => {
+        cleanupSpellcheckHighlight();
+        if (isSpellcheckPanelOpen && spellcheckErrors.length > 0 && currentErrorIndex < spellcheckErrors.length) {
+            const error = spellcheckErrors[currentErrorIndex];
+            const range = document.createRange();
+            range.setStart(error.node, error.startOffset);
+            range.setEnd(error.node, error.endOffset);
+
+            // Check if the range is still valid before trying to surround it
+            if (error.node.parentNode && editorRef.current?.contains(error.node)) {
+                const span = document.createElement('span');
+                span.className = 'spell-error-current';
+                try {
+                    range.surroundContents(span);
+                    span.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                } catch (e) {
+                    console.error("Could not highlight spellcheck error:", e);
+                    // If surroundContents fails, it means the range crosses element boundaries.
+                    // We just move to the next error in this case.
+                    handleSpellcheckNext();
+                }
+            } else {
+                 // Node is no longer in the document, skip to the next error
+                 handleSpellcheckNext();
+            }
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isSpellcheckPanelOpen, currentErrorIndex]);
+
+
     const handleLanguageChange = (lang: SpellcheckLang) => {
         setProjectData(currentData => {
             if (!currentData) return null;
@@ -345,24 +577,6 @@ const ChapterEditorPage: React.FC = () => {
                 settings: { ...currentData.settings, spellcheckLanguage: lang },
             };
         });
-
-        if (editorRef.current) {
-            // This "kick" forces the browser to re-evaluate spelling.
-            // We store the current selection to restore it after the re-focus.
-            const selection = window.getSelection();
-            const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0).cloneRange() : null;
-
-            editorRef.current.blur();
-
-            setTimeout(() => {
-                editorRef.current?.focus();
-                // Restore the user's cursor position.
-                if (range && selection) {
-                    selection.removeAllRanges();
-                    selection.addRange(range);
-                }
-            }, 100);
-        }
     };
 
     const cleanupEditor = useCallback(() => {
@@ -419,25 +633,19 @@ const ChapterEditorPage: React.FC = () => {
     }, []);
 
     const editorStyle = useMemo(() => {
-        // For the book theme, we need to explicitly set the color because
-        // contentEditable's default styling can interfere with inheritance on a dark background.
         if (theme === 'book') {
             const colorClass = THEME_CONFIG.book.text;
-            // Extracts the hex code from the Tailwind class, e.g., 'text-[#F5EADD]' -> '#F5EADD'
             const colorValue = colorClass.match(/\[(.*?)\]/)?.[1] || '#F5EADD';
             return { color: colorValue };
         }
-        // For other themes, 'inherit' works fine and is more flexible.
         return { color: 'inherit' };
     }, [theme]);
     
     const colorPalette = useMemo(() => {
         if (theme === 'book') {
             const textColor = THEME_CONFIG.book.text.match(/\[(.*?)\]/)?.[1] || '#F5EADD';
-            // For the book theme, replace the dark brown with the theme's main text color (off-white).
             return [textColor, '#3B82F6', '#FBBF24', '#22C55E', '#EC4899'];
         }
-        // Default palette for other themes.
         return ['#3B2F27', '#3B82F6', '#FBBF24', '#22C55E', '#EC4899'];
     }, [theme]);
     
@@ -1136,6 +1344,19 @@ const ChapterEditorPage: React.FC = () => {
     return (
         <>
             <div className={`flex h-screen font-serif ${themeClasses.bg} ${themeClasses.text}`}>
+                {isSpellcheckPanelOpen && spellcheckErrors.length > 0 && (
+                    <SpellCheckPanel 
+                        error={spellcheckErrors[currentErrorIndex]}
+                        onClose={handleCloseSpellcheck}
+                        onNext={handleSpellcheckNext}
+                        onIgnore={handleSpellcheckIgnore}
+                        onChange={handleSpellcheckChange}
+                        onAddToDictionary={handleAddToDictionary}
+                        themeClasses={themeClasses}
+                        isLast={currentErrorIndex >= spellcheckErrors.length - 1}
+                    />
+                )}
+
                 {/* Backdrop for sidebar */}
                 {isSidebarOpen && (
                     <div
@@ -1164,7 +1385,7 @@ const ChapterEditorPage: React.FC = () => {
                         <div
                             ref={editorRef}
                             contentEditable
-                            spellCheck={true}
+                            spellCheck={false} // Disable native spellcheck in favor of custom one
                             suppressContentEditableWarning
                             onInput={(e) => updateChapterField('content', e.currentTarget.innerHTML)}
                             onKeyDown={handleKeyDown}
@@ -1247,7 +1468,7 @@ const ChapterEditorPage: React.FC = () => {
                                     <option value="browser-default">Browser Default</option>
                                 </select>
                                 <p className={`mt-2 text-xs ${themeClasses.textSecondary}`}>
-                                    Note: Uses your browser's dictionary. You may need to install language packs in your browser or OS settings.
+                                    Note: Custom spellchecker requires a dictionary. May not be available for all languages.
                                 </p>
                             </div>
                         </div>
@@ -1315,6 +1536,7 @@ const ChapterEditorPage: React.FC = () => {
                             <button onClick={() => applyParagraphStyle('h3')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${currentFormat.paragraphStyle === 'h3' ? 'bg-white/20' : ''}`}><H3Icon className="w-5 h-5"/></button>
                             <div className="w-px h-5 bg-white/20 mx-1"></div>
                             <button onClick={() => setIsFindReplaceOpen(true)} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors`}><SearchIcon className="w-5 h-5"/></button>
+                            <button onClick={startSpellcheck} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors`} disabled={!spellchecker}><SpellcheckIcon className="w-5 h-5"/></button>
                             <div className="w-px h-5 bg-white/20 mx-1"></div>
                             <button onClick={() => applyCommand('undo')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors`}><UndoIcon className="w-5 h-5"/></button>
                             <button onClick={() => applyCommand('redo')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors`}><RedoIcon className="w-5 h-5"/></button>

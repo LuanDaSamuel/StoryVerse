@@ -1,13 +1,13 @@
 
+
 import React, { createContext } from 'react';
 import { ProjectData, Theme, ThemeConfig, SaveStatus } from '../types';
 
 interface ProjectContextType {
   projectData: ProjectData | null;
   setProjectData: React.Dispatch<React.SetStateAction<ProjectData | null>>;
-  saveProjectAs: () => void;
-  unlinkFile: () => void;
-  saveProject: (data: ProjectData, version: number) => Promise<void>;
+  downloadProject: () => void;
+  closeProject: () => void;
   theme: Theme;
   themeClasses: ThemeConfig;
   saveStatus: SaveStatus;
@@ -16,9 +16,8 @@ interface ProjectContextType {
 export const ProjectContext = createContext<ProjectContextType>({
   projectData: null,
   setProjectData: () => {},
-  saveProjectAs: () => {},
-  unlinkFile: () => {},
-  saveProject: async () => {},
+  downloadProject: () => {},
+  closeProject: () => {},
   theme: 'dark',
   themeClasses: {
     bg: '',

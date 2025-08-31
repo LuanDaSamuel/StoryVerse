@@ -18,7 +18,7 @@ const themeOptions: { name: Theme; label: string; colors: string[] }[] = [
 ];
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
-  const { projectData, theme, setProjectData, saveProjectAs, unlinkFile, themeClasses } = useContext(ProjectContext);
+  const { projectData, theme, setProjectData, downloadProject, closeProject, themeClasses } = useContext(ProjectContext);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [newWord, setNewWord] = useState('');
 
@@ -45,7 +45,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   };
 
   const handleAddWord = () => {
-    const wordToAdd = newWord.trim();
+    const wordToAdd = newWord.trim().toLowerCase();
     if (wordToAdd && !projectData.settings.customDictionary.includes(wordToAdd)) {
         setProjectData(currentData => {
             if (!currentData) return null;
@@ -74,9 +74,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
     });
   };
 
-  const handleUnlinkProject = () => {
+  const handleCloseProject = () => {
     onClose();
-    unlinkFile();
+    closeProject();
   };
 
   // Logic to handle the 'book' theme's inverted text color on light backgrounds
@@ -131,7 +131,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
             <div className="mb-8">
               <h3 className={`text-lg mb-2 ${subHeadingStyle}`}>Language & Spelling</h3>
               <p className={`${descriptionColor} mb-4 text-sm`}>
-                Select the language for spellchecking.
+                Select the language for spellchecking. This feature uses your browser's dictionary. For some languages, you may need to install a language pack in your OS or browser settings.
               </p>
               <select
                 value={projectData?.settings.spellcheckLanguage || 'en'}
@@ -180,22 +180,22 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
             <div>
               <h3 className={`text-lg mb-2 ${subHeadingStyle}`}>Project Data</h3>
               <p className={`${descriptionColor} mb-4`}>
-                Your project is saved directly to a file on your computer. You can save a copy to a different location.
+                Your work is auto-saved to your browser. You can download a project file to create a backup or move to another computer.
               </p>
               <div className="flex space-x-4">
                 <button
-                  onClick={saveProjectAs}
+                  onClick={downloadProject}
                   className={`flex items-center space-x-2 px-4 py-2 font-semibold rounded-lg ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-80 transition-opacity`}
                 >
                   <DownloadIcon className="w-5 h-5" />
-                  <span>Save As...</span>
+                  <span>Download Project</span>
                 </button>
                 <button
                   onClick={() => setIsConfirmOpen(true)}
                   className={`flex items-center space-x-2 px-4 py-2 font-semibold rounded-lg ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-80 transition-opacity`}
                 >
                   <TrashIcon className="w-5 h-5" />
-                  <span>Unlink File</span>
+                  <span>Close Project</span>
                 </button>
               </div>
             </div>
@@ -205,9 +205,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
       <ConfirmModal
         isOpen={isConfirmOpen}
         onClose={() => setIsConfirmOpen(false)}
-        onConfirm={handleUnlinkProject}
-        title="Unlink Project?"
-        message="Are you sure you want to unlink this project? This will remove it from the browser and return you to the welcome screen. Your downloaded backup files will not be affected."
+        onConfirm={handleCloseProject}
+        title="Close Project?"
+        message="Are you sure you want to close this project? This will clear it from the browser and return you to the welcome screen. Your downloaded project files will not be affected."
         confirmButtonClass={`px-6 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90 transition-opacity`}
       />
     </>

@@ -48,9 +48,8 @@ const AppContent = () => {
         saveStatus,
         createProject,
         openProject,
-        saveProjectAs,
-        unlinkFile,
-        saveProject,
+        downloadProject,
+        closeProject,
     } = useProjectFile();
     
     const navigate = useNavigate();
@@ -93,13 +92,12 @@ const AppContent = () => {
     const contextValue = useMemo(() => ({
         projectData,
         setProjectData,
-        saveProjectAs,
-        unlinkFile,
-        saveProject,
+        downloadProject,
+        closeProject,
         theme,
         themeClasses,
         saveStatus,
-    }), [projectData, setProjectData, saveProjectAs, unlinkFile, saveProject, theme, themeClasses, saveStatus]);
+    }), [projectData, setProjectData, downloadProject, closeProject, theme, themeClasses, saveStatus]);
 
     const onEditPage = useMatch('/novel/:novelId/edit/:chapterId');
     const onReadPage = useMatch('/novel/:novelId/read/:chapterId?');
