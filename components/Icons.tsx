@@ -142,14 +142,14 @@ export const SearchIcon = (props: React.SVGProps<SVGSVGElement>) => (
 );
 
 export const BoldIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props} >
-        <path d="M15.6 10.79c.97-1.07 1.45-2.39 1.45-3.96 0-1.55-.47-2.88-1.41-3.98S13.15 1.75 11.5 1.75H6v19.5h6.25c1.55 0 2.89-.48 4.02-1.44s1.7-2.22 1.7-3.78c0-1.18-.35-2.24-1.04-3.18-.7-.93-1.64-1.52-2.83-1.77zM9 4.75h2.5c.82 0 1.5.26 2.03.77.53.52.8 1.21.8 2.06 0 .88-.27 1.6-.82 2.14-.55.54-1.25.81-2.1.81H9V4.75zm3.1 14.5H9v-5.75h3.1c.95 0 1.75.31 2.39.94.64.63.96 1.44.96 2.43 0 1.03-.32 1.86-.95 2.49-.63.63-1.43.94-2.4.94z"/>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
+        <path d="M8 4h4.5a4.5 4.5 0 1 1 0 9H8V4zm2 2v5h2.5a2.5 2.5 0 0 0 0-5H10zm-2 7h5.5a4.5 4.5 0 1 1 0 9H8v-9zm2 2v5h3.5a2.5 2.5 0 0 0 0-5H10z" />
     </svg>
 );
 
 export const ItalicIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-        <path d="M10 5.25h8.25a.75.75 0 000-1.5H10a.75.75 0 000 1.5zM5.75 20.25h8.25a.75.75 0 000-1.5H5.75a.75.75 0 000 1.5zM12.219 4.312a.75.75 0 00-1.438-.437L5.43 19.562a.75.75 0 001.438.437L12.22 4.312z" />
+        <path d="M10 5v3h2.21l-3.42 8H6v3h8v-3h-2.21l3.42-8H18V5h-8z" />
     </svg>
 );
 
@@ -185,25 +185,25 @@ export const OrderedListIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 export const BlockquoteIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-        <path d="M12.25 4.5a.75.75 0 00-1.5 0v15a.75.75 0 001.5 0v-15zM4.5 6.75a.75.75 0 000 1.5h3a.75.75 0 000-1.5h-3zM4.5 11.25a.75.75 0 000 1.5h3a.75.75 0 000-1.5h-3zM4.5 15.75a.75.75 0 000 1.5h3a.75.75 0 000-1.5h-3z" />
+        <path d="M6 17h3l2-4V7H5v6h3l-2 4zm8 0h3l2-4V7h-6v6h3l-2 4z" />
     </svg>
 );
 
 export const H1Icon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-        <path d="M4.5 4.5a.75.75 0 00-1.5 0v15a.75.75 0 001.5 0V4.5zM7.5 4.5a.75.75 0 00-1.5 0v15a.75.75 0 001.5 0V4.5zM12 11.25a.75.75 0 000 1.5h-1.5a.75.75 0 000-1.5H12zM15.75 4.5a.75.75 0 01.75.75v13.5a.75.75 0 01-1.5 0V9.31l-3.22 3.22a.75.75 0 11-1.06-1.06l4.5-4.5a.75.75 0 011.06 0l.001.001z" />
+        <path d="M3 5h2v14H3V5zm4 0h2v5h4V5h2v14h-2v-7H9v7H7V5zm12 0h-2l-2 4h2v10h2V5z" />
     </svg>
 );
 
 export const H2Icon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-        <path d="M4.5 4.5a.75.75 0 00-1.5 0v15a.75.75 0 001.5 0V4.5zM7.5 4.5a.75.75 0 00-1.5 0v15a.75.75 0 001.5 0V4.5zM12 11.25a.75.75 0 000 1.5h-1.5a.75.75 0 000-1.5H12zM15 5.25a.75.75 0 00-1.5 0v1.5c0 .414.336.75.75.75h1.5a.75.75 0 00.75-.75V6a2.25 2.25 0 00-2.25-2.25h-1.5a2.25 2.25 0 00-2.25 2.25v.75a.75.75 0 001.5 0V6A.75.75 0 0112.75 5.25h1.5a.75.75 0 01.75.75v.75h3.75a.75.75 0 000-1.5H15V5.25zM12.75 19.5a.75.75 0 001.5 0v-6a.75.75 0 00-1.5 0v6z" />
+        <path d="M3 5h2v14H3V5zm4 0h2v5h4V5h2v14h-2v-7H9v7H7V5zm12 14v-2c0-1.11-.9-2-2-2h-2v4h4zm-2-4h-2V9c0-1.1.9-2 2-2s2 .9 2 2v2h2V9c0-2.2-1.8-4-4-4h-4v2h4v2h-2c-1.1 0-2 .9-2 2v2c0 1.1.9 2 2 2h2z" />
     </svg>
 );
 
 export const H3Icon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-        <path d="M4.5 4.5a.75.75 0 00-1.5 0v15a.75.75 0 001.5 0V4.5zM7.5 4.5a.75.75 0 00-1.5 0v15a.75.75 0 001.5 0V4.5zM12 11.25a.75.75 0 000 1.5h-1.5a.75.75 0 000-1.5H12zM19.5 7.5a.75.75 0 00-1.5 0v1.5a.75.75 0 01-.75.75h-3a.75.75 0 01-.75-.75V8.25a.75.75 0 00-1.5 0v.75a2.25 2.25 0 002.25 2.25h1.5a.75.75 0 00.75-.75v-.75a.75.75 0 01.75-.75h.75a.75.75 0 01.75.75v3.75a.75.75 0 001.5 0V8.25a2.25 2.25 0 00-2.25-2.25h-1.5a.75.75 0 00-.75.75v.75h.75a.75.75 0 01.75.75v.75a.75.75 0 001.5 0v-1.5z" />
+        <path d="M3 5h2v14H3V5zm4 0h2v5h4V5h2v14h-2v-7H9v7H7V5zm10 1c1.1 0 2 .9 2 2v2c0 1.1-.9 2-2 2h-2v2h4v2h-4c-1.1 0-2-.9-2-2v-2c0-1.1.9-2 2-2h2V8h-4V6h4zm-2 2h-2v2h2V8z" />
     </svg>
 );
 
