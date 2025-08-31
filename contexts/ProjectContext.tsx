@@ -1,18 +1,17 @@
 
-
 import React, { createContext } from 'react';
 import { ProjectData, Theme, ThemeConfig, SaveStatus } from '../types';
 
 interface ProjectContextType {
   projectData: ProjectData | null;
   setProjectData: React.Dispatch<React.SetStateAction<ProjectData | null>>;
-  downloadProject: () => void;
+  downloadProject: () => Promise<void>;
   closeProject: () => void;
   theme: Theme;
   themeClasses: ThemeConfig;
   saveStatus: SaveStatus;
   isBackupLinked: boolean;
-  backupDirName: string;
+  linkedBackupName: string;
   linkBackupDirectory: () => Promise<void>;
   unlinkBackupDirectory: () => Promise<void>;
 }
@@ -20,7 +19,7 @@ interface ProjectContextType {
 export const ProjectContext = createContext<ProjectContextType>({
   projectData: null,
   setProjectData: () => {},
-  downloadProject: () => {},
+  downloadProject: async () => {},
   closeProject: () => {},
   theme: 'dark',
   themeClasses: {
@@ -38,7 +37,7 @@ export const ProjectContext = createContext<ProjectContextType>({
   },
   saveStatus: 'saved',
   isBackupLinked: false,
-  backupDirName: '',
+  linkedBackupName: '',
   linkBackupDirectory: async () => {},
   unlinkBackupDirectory: async () => {},
 });

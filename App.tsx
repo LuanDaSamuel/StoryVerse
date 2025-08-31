@@ -1,5 +1,4 @@
 
-
 import React, { useMemo, useContext, useEffect, useRef } from 'react';
 import { HashRouter, Routes, Route, Navigate, useParams, useMatch, useNavigate } from 'react-router-dom';
 import { useProjectFile } from './hooks/useProjectFile';
@@ -46,12 +45,12 @@ const AppContent = () => {
         setProjectData,
         status,
         saveStatus,
+        isBackupLinked,
+        linkedBackupName,
         createProject,
         openProject,
         downloadProject,
         closeProject,
-        isBackupLinked,
-        backupDirName,
         linkBackupDirectory,
         unlinkBackupDirectory,
     } = useProjectFile();
@@ -86,10 +85,10 @@ const AppContent = () => {
         themeClasses,
         saveStatus,
         isBackupLinked,
-        backupDirName,
+        linkedBackupName,
         linkBackupDirectory,
         unlinkBackupDirectory,
-    }), [projectData, setProjectData, downloadProject, closeProject, theme, themeClasses, saveStatus, isBackupLinked, backupDirName, linkBackupDirectory, unlinkBackupDirectory]);
+    }), [projectData, setProjectData, downloadProject, closeProject, theme, themeClasses, saveStatus, isBackupLinked, linkedBackupName, linkBackupDirectory, unlinkBackupDirectory]);
 
     const onEditPage = useMatch('/novel/:novelId/edit/:chapterId');
     const onReadPage = useMatch('/novel/:novelId/read/:chapterId?');

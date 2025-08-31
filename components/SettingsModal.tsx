@@ -1,5 +1,4 @@
 
-
 import React, { useContext, useState } from 'react';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { Theme } from '../types';
@@ -20,7 +19,7 @@ const themeOptions: { name: Theme; label: string; colors: string[] }[] = [
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const { 
       projectData, theme, setProjectData, downloadProject, closeProject, themeClasses, 
-      isBackupLinked, backupDirName, linkBackupDirectory, unlinkBackupDirectory 
+      isBackupLinked, linkedBackupName, linkBackupDirectory, unlinkBackupDirectory
   } = useContext(ProjectContext);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
@@ -40,7 +39,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
     await closeProject();
   };
 
-  // Logic to handle the 'book' theme's inverted text color on light backgrounds
   const modalTextColor = theme === 'book' ? themeClasses.accentText : themeClasses.text;
   const descriptionColor = theme === 'book' ? 'text-amber-900' : themeClasses.textSecondary;
   const subHeadingStyle = theme === 'book' ? 'font-normal text-amber-800 opacity-60' : 'font-semibold';
@@ -90,35 +88,33 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
 
             {/* Project management */}
             <div>
-              <h3 className={`text-lg mb-3 ${subHeadingStyle}`}>Project Management</h3>
+              <h3 className={`text-lg mb-3 ${subHeadingStyle}`}>Project Data</h3>
+               <div className={`p-3 rounded-lg ${themeClasses.bgTertiary} mb-3`}>
+                  {isBackupLinked ? (
+                      <p className={`text-sm ${descriptionColor}`}>Auto-backup linked to folder: <span className="font-semibold">{linkedBackupName}</span></p>
+                  ) : (
+                      <p className={`text-sm ${descriptionColor}`}>Auto-backup not linked. Your project is only saved in your browser.</p>
+                  )}
+              </div>
               <div className="space-y-3">
+                {isBackupLinked ? (
+                    <button onClick={unlinkBackupDirectory} className={`w-full text-left px-4 py-3 rounded-lg font-semibold transition-colors ${themeClasses.bgTertiary} hover:opacity-80`}>
+                        Unlink Backup Folder
+                    </button>
+                ) : (
+                    <button onClick={linkBackupDirectory} className={`w-full text-left px-4 py-3 rounded-lg font-semibold transition-colors ${themeClasses.bgTertiary} hover:opacity-80`}>
+                        Link Backup Folder
+                    </button>
+                )}
                 <button onClick={downloadProject} className={`w-full flex items-center space-x-3 text-left px-4 py-3 rounded-lg font-semibold transition-colors ${themeClasses.bgTertiary} hover:opacity-80`}>
                   <DownloadIcon className="w-5 h-5"/>
-                  <span>Download Project File</span>
+                  <span>Download Project Backup</span>
                 </button>
                 <button onClick={() => setIsConfirmOpen(true)} className="w-full flex items-center space-x-3 text-left px-4 py-3 rounded-lg font-semibold transition-colors bg-red-700 text-red-100 hover:bg-red-800">
                   <TrashIcon className="w-5 h-5"/>
                   <span>Close Project</span>
                 </button>
               </div>
-            </div>
-
-            {/* Backup */}
-            <div>
-                <h3 className={`text-lg mb-3 ${subHeadingStyle}`}>Auto-Backup to Folder</h3>
-                {isBackupLinked ? (
-                    <div className={`p-3 rounded-lg ${themeClasses.bgTertiary}`}>
-                        <p className={`text-sm ${descriptionColor}`}>Backing up to: <span className="font-semibold">{backupDirName}</span></p>
-                        <button onClick={unlinkBackupDirectory} className="mt-2 text-sm text-red-500 hover:underline">Unlink directory</button>
-                    </div>
-                ) : (
-                    <>
-                        <p className={`text-sm mb-3 ${descriptionColor}`}>Link a directory on your computer for automatic backups of your project file.</p>
-                        <button onClick={linkBackupDirectory} className={`w-full flex items-center justify-center space-x-3 text-left px-4 py-3 rounded-lg font-semibold transition-colors ${themeClasses.bgTertiary} hover:opacity-80`}>
-                            <span>Link Backup Directory</span>
-                        </button>
-                    </>
-                )}
             </div>
           </div>
         </div>
@@ -128,7 +124,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
         onClose={() => setIsConfirmOpen(false)}
         onConfirm={handleCloseProject}
         title="Close Project?"
-        message="Are you sure you want to close this project? Any unsaved changes will be saved before closing. You can open it again later from the file."
+        message="Are you sure you want to close this project? Any unsaved changes will be saved before closing. You can open it again later from a file."
       />
     </>
   );
