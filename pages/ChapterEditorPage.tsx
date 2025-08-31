@@ -450,7 +450,7 @@ const ChapterEditorPage: React.FC = () => {
                 textNodes.push(walker.currentNode as Text);
             }
         }
-        const wordRegex = /\b[a-zA-Z']+\b/g;
+        const wordRegex = /\b[\p{L}']+\b/gu;
 
         textNodes.forEach(node => {
             const text = node.textContent || '';

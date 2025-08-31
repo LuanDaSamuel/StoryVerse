@@ -1,6 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { NavLink } from 'react-router-dom';
-import { AppLogoIcon, HomeIcon, PlusIcon, SettingsIcon, LightbulbIcon, EyeIcon } from './Icons';
+import { AppLogoIcon, HomeIcon, PlusIcon, SettingsIcon, LightbulbIcon } from './Icons';
 import SettingsModal from './SettingsModal';
 import { ProjectContext } from '../contexts/ProjectContext';
 
@@ -24,8 +24,6 @@ const Sidebar: React.FC = () => {
     
     // For the book theme, the text on the light sidebar should be dark.
     const sidebarTextColor = theme === 'book' ? themeClasses.accentText : themeClasses.text;
-    const placeholderLinkClasses = `flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors`;
-    const defaultText = theme === 'book' ? themeClasses.accentText : themeClasses.text;
 
     return (
         <>
@@ -47,10 +45,6 @@ const Sidebar: React.FC = () => {
                         <LightbulbIcon className="w-5 h-5" />
                         <span>Demos</span>
                     </NavLink>
-                    <div className={`${placeholderLinkClasses} ${defaultText} hover:${themeClasses.bgTertiary}`}>
-                        <EyeIcon className="w-5 h-5" />
-                        <span>Image to Text</span>
-                    </div>
                 </nav>
                 <div className="p-4 border-t border-inherit">
                     <button onClick={() => setIsSettingsOpen(true)} className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${sidebarTextColor} hover:${themeClasses.bgTertiary}`}>

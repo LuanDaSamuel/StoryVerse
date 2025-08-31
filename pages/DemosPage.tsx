@@ -354,7 +354,7 @@ const DemosPage: React.FC = () => {
         while (node = walker.nextNode()) {
             const textNode = node as Text;
             const text = textNode.textContent || '';
-            const wordRegex = /\b[a-zA-Z']+\b/g;
+            const wordRegex = /\b[\p{L}']+\b/gu;
             let match;
             while ((match = wordRegex.exec(text)) !== null) {
                 const word = match[0];
