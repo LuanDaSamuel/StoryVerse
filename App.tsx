@@ -1,4 +1,5 @@
 
+
 import React, { useMemo, useContext, useEffect, useRef } from 'react';
 import { HashRouter, Routes, Route, Navigate, useParams, useMatch, useNavigate } from 'react-router-dom';
 import { useProjectFile } from './hooks/useProjectFile';
@@ -15,7 +16,7 @@ import { THEME_CONFIG } from './constants';
 import { LoadingIcon } from './components/Icons';
 
 const NovelEditRedirect = () => {
-    const { novelId } = useParams<{ novelId: string }>();
+    const { novelId } = useParams<{ novelId: string; }>();
     const { projectData } = useContext(ProjectContext);
 
     if (!projectData || !novelId) {
@@ -63,10 +64,15 @@ const AppContent = () => {
     }, [status, navigate]);
 
     const themeClasses = useMemo(() => {
+        if (status === 'welcome') {
+            return THEME_CONFIG['light'];
+        }
         const theme = projectData?.settings?.theme || 'book';
         return THEME_CONFIG[theme];
-    }, [projectData]);
+    }, [projectData, status]);
 
+    // FIX: Moved the closing parenthesis to correctly wrap the factory function of useMemo.
+    // The previous code had the dependency array inside the factory function, causing a comma operator expression.
     const contextValue = useMemo(() => ({
         projectData,
         setProjectData,
