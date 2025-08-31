@@ -1,4 +1,3 @@
-
 import React, { useState, useContext, useRef, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
@@ -9,6 +8,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import NovelHistoryPage from '../components/NovelHistoryPage';
 import ExportModal from '../components/ExportModal';
 import SketchEditorModal from '../components/SketchEditorModal';
+import SketchViewerModal from '../components/SketchViewerModal';
 import * as mammoth from 'mammoth';
 
 const NovelDetailPage: React.FC = () => {
@@ -28,6 +28,7 @@ const NovelDetailPage: React.FC = () => {
 
     const [editingSketch, setEditingSketch] = useState<NovelSketch | 'new' | null>(null);
     const [sketchToDelete, setSketchToDelete] = useState<NovelSketch | null>(null);
+    const [viewingSketch, setViewingSketch] = useState<NovelSketch | null>(null);
 
 
     const { novel, novelIndex } = useMemo(() => {
@@ -353,7 +354,11 @@ const NovelDetailPage: React.FC = () => {
                                 <p className={themeClasses.textSecondary}>No sketches yet. Click the button above to add one!</p>
                             </div>
                         ) : novel.sketches.map(sketch => (
-                            <div key={sketch.id} className={`group relative p-4 rounded-lg ${themeClasses.bgTertiary}`}>
+                            <div 
+                                key={sketch.id} 
+                                className="group relative p-4 rounded-lg cursor-pointer"
+                                onClick={() => setViewingSketch(sketch)}
+                            >
                                 <h3 className={`font-bold text-lg ${themeClasses.accentText}`}>{enhancePlainText(sketch.title) || 'Untitled Sketch'}</h3>
                                 <div className="flex flex-wrap gap-2 my-2">
                                     {sketch.tags.map(tag => (
@@ -362,8 +367,8 @@ const NovelDetailPage: React.FC = () => {
                                 </div>
                                 <p className={`text-sm ${themeClasses.textSecondary}`}>{enhancePlainText(getSnippet(sketch.content))}</p>
                                 <div className="absolute top-3 right-3 flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onClick={() => setEditingSketch(sketch)} className={`px-3 py-1 text-sm rounded-md font-semibold ${themeClasses.bg} ${themeClasses.text} hover:opacity-80`}>Edit</button>
-                                    <button onClick={() => setSketchToDelete(sketch)} className="p-2 rounded-full text-red-500 hover:bg-red-500/10"><TrashIcon className="w-5 h-5" /></button>
+                                    <button onClick={(e) => { e.stopPropagation(); setEditingSketch(sketch); }} className={`px-3 py-1 text-sm rounded-md font-semibold ${themeClasses.bg} ${themeClasses.text} hover:opacity-80`}>Edit</button>
+                                    <button onClick={(e) => { e.stopPropagation(); setSketchToDelete(sketch); }} className="p-2 rounded-full text-red-500 hover:bg-red-500/10"><TrashIcon className="w-5 h-5" /></button>
                                 </div>
                             </div>
                         ))}
@@ -540,6 +545,10 @@ const NovelDetailPage: React.FC = () => {
                     novelId={novel.id}
                 />
             )}
+            <SketchViewerModal
+                sketch={viewingSketch ? { ...viewingSketch, novelId: novel.id, novelTitle: novel.title } : null}
+                onClose={() => setViewingSketch(null)}
+            />
             <ConfirmModal
                 isOpen={isDeleteConfirmOpen}
                 onClose={() => setIsDeleteConfirmOpen(false)}

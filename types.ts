@@ -26,6 +26,11 @@ export interface NovelSketch {
   updatedAt: string;
 }
 
+export type AggregatedSketch = NovelSketch & {
+    novelId: string;
+    novelTitle: string;
+};
+
 export interface Novel {
   id:string;
   title: string;

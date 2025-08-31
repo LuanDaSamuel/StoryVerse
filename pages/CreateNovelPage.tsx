@@ -1,7 +1,7 @@
 
 
 
-import React, { useState, useContext, useRef, useEffect } from 'react';
+import React, { useState, useContext, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { TAG_OPTIONS } from '../constants';
@@ -17,6 +17,8 @@ const CreateNovelPage: React.FC = () => {
     const [description, setDescription] = useState('');
     const [coverImage, setCoverImage] = useState<string | null>(null);
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
+    const [tagFilter, setTagFilter] = useState('');
+    const [tagSort, setTagSort] = useState<'default' | 'alpha'>('default');
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Load draft from session storage on component mount
@@ -48,6 +50,18 @@ const CreateNovelPage: React.FC = () => {
 
 
     const placeholderClass = themeClasses.input.split(' ').find(c => c.startsWith('placeholder-')) || 'placeholder-gray-400';
+    
+    const filteredAndSortedTags = useMemo(() => {
+        const filtered = TAG_OPTIONS.filter(tag =>
+            tag.toLowerCase().includes(tagFilter.toLowerCase())
+        );
+
+        if (tagSort === 'alpha') {
+            return filtered.sort((a, b) => a.localeCompare(b));
+        }
+
+        return filtered;
+    }, [tagFilter, tagSort]);
 
     const handleTagClick = (tag: string) => {
         setSelectedTags(prev => {
@@ -158,9 +172,26 @@ const CreateNovelPage: React.FC = () => {
                         />
                     </div>
                     <div className={`p-6 mt-6 rounded-lg ${themeClasses.bgTertiary}`}>
-                        <h3 className={`font-bold mb-3 ${themeClasses.accentText}`}>Tags (up to 6)</h3>
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
+                            <h3 className={`font-bold ${themeClasses.accentText}`}>Tags (up to 6)</h3>
+                            <div className="flex items-center space-x-2 w-full sm:w-auto">
+                                <input
+                                    type="text"
+                                    placeholder="Filter tags..."
+                                    value={tagFilter}
+                                    onChange={(e) => setTagFilter(e.target.value)}
+                                    className={`w-full sm:w-48 px-3 py-1.5 text-sm rounded-md ${themeClasses.input} border ${themeClasses.border}`}
+                                />
+                                <button
+                                    onClick={() => setTagSort(prev => prev === 'default' ? 'alpha' : 'default')}
+                                    className={`px-3 py-1.5 text-sm font-semibold rounded-md whitespace-nowrap transition-colors ${themeClasses.bgSecondary} ${themeClasses.accentText} hover:opacity-80`}
+                                >
+                                    {tagSort === 'default' ? 'Sort A-Z' : 'Default Order'}
+                                </button>
+                            </div>
+                        </div>
                         <div className="flex flex-wrap gap-2">
-                            {TAG_OPTIONS.map(tag => (
+                            {filteredAndSortedTags.map(tag => (
                                 <button
                                     key={tag}
                                     onClick={() => handleTagClick(tag)}

@@ -1,25 +1,21 @@
-
 import React, { useState, useContext, useMemo } from 'react';
 import { ProjectContext } from '../contexts/ProjectContext';
-import { NovelSketch } from '../types';
+import { NovelSketch, AggregatedSketch } from '../types';
 import { enhancePlainText } from '../constants';
 import { PlusIcon, TrashIcon } from '../components/Icons';
 import SketchEditorModal from '../components/SketchEditorModal';
 import ConfirmModal from '../components/ConfirmModal';
-
-type AggregatedSketch = NovelSketch & {
-    novelId: string;
-    novelTitle: string;
-};
+import SketchViewerModal from '../components/SketchViewerModal';
 
 const SketchesPage: React.FC = () => {
     const { projectData, setProjectData, themeClasses } = useContext(ProjectContext);
     const [editingSketch, setEditingSketch] = useState<AggregatedSketch | 'new' | null>(null);
     const [sketchToDelete, setSketchToDelete] = useState<AggregatedSketch | null>(null);
+    const [viewingSketch, setViewingSketch] = useState<AggregatedSketch | null>(null);
 
     const novels = useMemo(() => projectData?.novels || [], [projectData]);
     
-    const allSketches = useMemo(() => {
+    const allSketches: AggregatedSketch[] = useMemo(() => {
         return novels.flatMap(novel => 
             novel.sketches.map(sketch => ({
                 ...sketch,
@@ -102,7 +98,11 @@ const SketchesPage: React.FC = () => {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {allSketches.map(sketch => (
-                        <div key={sketch.id} className={`group relative p-4 rounded-lg flex flex-col ${themeClasses.bgSecondary}`}>
+                        <div 
+                            key={sketch.id} 
+                            className={`group relative p-4 rounded-lg flex flex-col cursor-pointer ${themeClasses.bgSecondary}`}
+                            onClick={() => setViewingSketch(sketch)}
+                        >
                             <div className="flex-grow">
                                 <p className={`text-xs font-semibold uppercase tracking-wider mb-1 ${themeClasses.textSecondary}`}>{enhancePlainText(sketch.novelTitle)}</p>
                                 <h3 className={`font-bold text-xl mb-2 ${themeClasses.accentText}`}>{enhancePlainText(sketch.title) || 'Untitled Sketch'}</h3>
@@ -116,8 +116,8 @@ const SketchesPage: React.FC = () => {
                                 </p>
                             </div>
                              <div className="absolute top-3 right-3 flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={() => setEditingSketch(sketch)} className={`px-3 py-1 text-sm rounded-md font-semibold ${themeClasses.bg} ${themeClasses.text} hover:opacity-80`}>Edit</button>
-                                <button onClick={() => setSketchToDelete(sketch)} className="p-2 rounded-full text-red-500 hover:bg-red-500/10"><TrashIcon className="w-5 h-5" /></button>
+                                <button onClick={(e) => { e.stopPropagation(); setEditingSketch(sketch); }} className={`px-3 py-1 text-sm rounded-md font-semibold ${themeClasses.bg} ${themeClasses.text} hover:opacity-80`}>Edit</button>
+                                <button onClick={(e) => { e.stopPropagation(); setSketchToDelete(sketch); }} className="p-2 rounded-full text-red-500 hover:bg-red-500/10"><TrashIcon className="w-5 h-5" /></button>
                             </div>
                         </div>
                     ))}
@@ -133,6 +133,10 @@ const SketchesPage: React.FC = () => {
                     novelId={editingSketch !== 'new' ? editingSketch.novelId : undefined}
                 />
             )}
+            <SketchViewerModal
+                sketch={viewingSketch}
+                onClose={() => setViewingSketch(null)}
+            />
             <ConfirmModal
                 isOpen={!!sketchToDelete}
                 onClose={() => setSketchToDelete(null)}
