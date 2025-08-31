@@ -381,6 +381,7 @@ const ChapterEditorPage: React.FC = () => {
     const { projectData, setProjectData, theme, themeClasses } = useContext(ProjectContext);
     
     const editorRef = useRef<HTMLDivElement>(null);
+    const editorContentRef = useRef<string>("");
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const toolbarRef = useRef<HTMLDivElement>(null);
     
@@ -1211,17 +1212,17 @@ const ChapterEditorPage: React.FC = () => {
     }, []);
 
     // --- Effects ---
+    // This effect handles loading content when the chapter is switched.
     useEffect(() => {
         if (editorRef.current && chapter) {
             const initialContent = chapter.content || '<p><br></p>';
             const enhancedContent = enhanceHtml(initialContent);
 
-            if (editorRef.current.innerHTML !== enhancedContent) {
-                editorRef.current.innerHTML = enhancedContent;
-            }
+            // Directly set content and sync the tracking ref
+            editorRef.current.innerHTML = enhancedContent;
+            editorContentRef.current = initialContent;
 
             // After loading a new chapter, focus the editor and move cursor to the end.
-            // This is reasonable behavior for chapter navigation.
             editorRef.current.focus();
             const selection = window.getSelection();
             if (selection) {
@@ -1233,13 +1234,32 @@ const ChapterEditorPage: React.FC = () => {
             }
         }
         handleSelectionChange();
-    // This effect is for loading content when the chapter is switched. It should only run
-    // when chapterId changes. Disabling the lint rule is safe because `chapter` and
-    // `handleSelectionChange` will be up-to-date from the component's render scope
-    // whenever this effect is triggered.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [chapterId]);
 
+    // This effect handles programmatic content changes (like "Replace All in Novel").
+    useEffect(() => {
+        if (chapter && editorRef.current) {
+            const contentFromState = chapter.content || '<p><br></p>';
+            // If state content diverges from our tracked editor content, it was a programmatic change.
+            if (contentFromState !== editorContentRef.current) {
+                const enhancedContent = enhanceHtml(contentFromState);
+                editorRef.current.innerHTML = enhancedContent;
+                editorContentRef.current = contentFromState; // Re-sync the ref
+
+                // After a programmatic change, moving cursor to the end is a sensible default.
+                const selection = window.getSelection();
+                if (selection) {
+                    const range = document.createRange();
+                    range.selectNodeContents(editorRef.current);
+                    range.collapse(false);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                }
+            }
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [chapter?.content]);
 
     useEffect(() => {
         const editorEl = editorRef.current;
@@ -1408,7 +1428,11 @@ const ChapterEditorPage: React.FC = () => {
                             contentEditable
                             spellCheck={false} // Disable native spellcheck in favor of custom one
                             suppressContentEditableWarning
-                            onInput={(e) => updateChapterField('content', e.currentTarget.innerHTML)}
+                            onInput={(e) => {
+                                const newHTML = e.currentTarget.innerHTML;
+                                editorContentRef.current = newHTML;
+                                updateChapterField('content', newHTML);
+                            }}
                             onKeyDown={handleKeyDown}
                             onKeyUp={handleKeyUp}
                             onPaste={handlePaste}
