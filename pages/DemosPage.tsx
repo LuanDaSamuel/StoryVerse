@@ -461,17 +461,43 @@ const DemosPage: React.FC = () => {
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+        const selection = window.getSelection();
+        if (!selection || !selection.rangeCount) {
+            return;
+        }
+
+        const range = selection.getRangeAt(0);
+        
         if (e.key === 'Tab') {
             e.preventDefault();
             document.execCommand('insertText', false, '    ');
             return;
         }
 
-        const selection = window.getSelection();
-        if (!selection || !selection.rangeCount) {
-            return;
+        if (e.key === 'Backspace' || e.key === 'Delete') {
+            if (range.collapsed && range.startContainer.nodeType === Node.TEXT_NODE) {
+                const textNode = range.startContainer as Text;
+                const offset = range.startOffset;
+                const text = textNode.textContent || '';
+                
+                if (e.key === 'Backspace' && offset >= 4 && text.substring(offset - 4, offset) === '    ') {
+                    e.preventDefault();
+                    range.setStart(textNode, offset - 4);
+                    range.deleteContents();
+                    editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+                    return;
+                }
+                
+                if (e.key === 'Delete' && text.length - offset >= 4 && text.substring(offset, offset + 4) === '    ') {
+                    e.preventDefault();
+                    range.setEnd(textNode, offset + 4);
+                    range.deleteContents();
+                    editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+                    return;
+                }
+            }
         }
-        const range = selection.getRangeAt(0);
+
 
         if (e.key === '"' || e.key === "'") {
             e.preventDefault();
@@ -479,6 +505,7 @@ const DemosPage: React.FC = () => {
             const closeQuote = e.key === '"' ? '”' : '’';
 
             if (!range.collapsed) {
+                // If text is selected, wrap it with smart quotes
                 const selectedContent = range.extractContents();
                 const fragment = document.createDocumentFragment();
                 fragment.appendChild(document.createTextNode(openQuote));
@@ -545,12 +572,47 @@ const DemosPage: React.FC = () => {
             return;
         }
 
+        if (['.', '-'].includes(e.key)) {
+            if (range.collapsed && range.startContainer.nodeType === Node.TEXT_NODE) {
+                const textNode = range.startContainer as Text;
+                const offset = range.startOffset;
+
+                if (e.key === '.' && textNode.textContent?.substring(offset - 2, offset) === '..') {
+                    e.preventDefault();
+                    range.setStart(textNode, offset - 2);
+                    range.deleteContents();
+                    range.insertNode(document.createTextNode('…'));
+                    range.collapse(false);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                    editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+                    return;
+                }
+
+                if (e.key === '-' && textNode.textContent?.substring(offset - 1, offset) === '-') {
+                    e.preventDefault();
+                    range.setStart(textNode, offset - 1);
+                    range.deleteContents();
+                    range.insertNode(document.createTextNode('—'));
+                    range.collapse(false);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                    editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+                    return;
+                }
+            }
+        }
+    
         if (e.key === 'Enter') {
             setTimeout(() => {
-                const sel = window.getSelection();
-                if (!sel?.rangeCount || !editorRef.current) return;
-                let currentBlock = sel.getRangeAt(0).startContainer;
-                while (currentBlock && currentBlock.parentNode !== editorRef.current) currentBlock = currentBlock.parentNode;
+                const newSelection = window.getSelection();
+                if (!newSelection?.rangeCount || !editorRef.current) return;
+                
+                let currentBlock = newSelection.getRangeAt(0).startContainer;
+                while (currentBlock && currentBlock.parentNode !== editorRef.current) {
+                    currentBlock = currentBlock.parentNode;
+                }
+        
                 if (currentBlock instanceof HTMLElement) {
                     const isNewBlockEmpty = (currentBlock.textContent?.trim() === '' && currentBlock.children.length === 0) || currentBlock.innerHTML === '<br>';
                     if (isNewBlockEmpty) {
@@ -558,24 +620,69 @@ const DemosPage: React.FC = () => {
                         if (previousBlock instanceof HTMLElement) {
                             let styleSource: Element = previousBlock;
                             let lastNode: Node | null = previousBlock;
-                            while (lastNode && lastNode.lastChild) lastNode = lastNode.lastChild;
-                            if (lastNode) styleSource = lastNode.nodeType === Node.TEXT_NODE ? lastNode.parentElement! : lastNode as Element;
+                            while (lastNode && lastNode.lastChild) {
+                                lastNode = lastNode.lastChild;
+                            }
+                            
+                            if (lastNode) {
+                                styleSource = lastNode.nodeType === Node.TEXT_NODE ? lastNode.parentElement! : lastNode as Element;
+                            }
+                            
                             const computedStyle = window.getComputedStyle(styleSource);
+                            const stylesToCopy = {
+                                fontSize: computedStyle.fontSize,
+                                fontFamily: computedStyle.fontFamily,
+                                color: computedStyle.color,
+                            };
+                            
                             const editorStyles = window.getComputedStyle(editorRef.current!);
-                            if (computedStyle.fontFamily !== editorStyles.fontFamily) {
+                            const styleCarrier = document.createElement('span');
+                            let styleApplied = false;
+                            
+                            if (stylesToCopy.fontSize !== editorStyles.fontSize) {
+                                styleCarrier.style.fontSize = stylesToCopy.fontSize;
+                                styleApplied = true;
+                            }
+                            if (stylesToCopy.fontFamily !== editorStyles.fontFamily) {
+                                styleCarrier.style.fontFamily = stylesToCopy.fontFamily;
+                                styleApplied = true;
+                            }
+                            if (stylesToCopy.color !== editorStyles.color) {
+                                styleCarrier.style.color = stylesToCopy.color;
+                                styleApplied = true;
+                            }
+                            
+                            if (styleApplied) {
                                 currentBlock.innerHTML = '';
-                                const styleCarrier = document.createElement('span');
-                                styleCarrier.style.fontFamily = computedStyle.fontFamily;
                                 styleCarrier.innerHTML = '&#8203;';
                                 currentBlock.appendChild(styleCarrier);
-                                const newRange = document.createRange();
-                                newRange.setStart(styleCarrier, 1);
-                                newRange.collapse(true);
-                                sel.removeAllRanges();
-                                sel.addRange(newRange);
+                                
+                                const range = document.createRange();
+                                range.setStart(styleCarrier, 1);
+                                range.collapse(true);
+                                newSelection.removeAllRanges();
+                                newSelection.addRange(range);
                             }
                         }
                     }
+                }
+        
+                // Adjust Scroll Position
+                let element = newSelection.getRangeAt(0).startContainer;
+                if (element.nodeType === Node.TEXT_NODE) element = element.parentElement!;
+                if (!(element instanceof HTMLElement)) return;
+
+                const toolbarEl = toolbarRef.current;
+                const scrollContainerEl = scrollContainerRef.current;
+                if (!toolbarEl || !scrollContainerEl) return;
+                
+                const elementRect = element.getBoundingClientRect();
+                const toolbarRect = toolbarEl.getBoundingClientRect();
+                const buffer = 20; 
+
+                if (elementRect.bottom > toolbarRect.top - buffer) {
+                    const scrollAmount = elementRect.bottom - (toolbarRect.top - buffer);
+                    scrollContainerEl.scrollBy({ top: scrollAmount, behavior: 'smooth' });
                 }
             }, 0);
             setTimeout(cleanupEditor, 10);
