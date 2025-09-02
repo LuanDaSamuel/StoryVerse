@@ -220,23 +220,24 @@ export function useProjectFile() {
             setProjectData(defaultProjectData);
             setStatus('ready');
             setSaveStatus('saved');
+            return; // Exit on success
         } catch (error) {
             if (error instanceof DOMException && error.name === 'AbortError') return;
-            console.error('Error creating new project file:', error);
-            alert('Failed to create new project file.');
+            console.warn('showSaveFilePicker failed for create, falling back to in-memory.', error);
+            // Fall-through to the fallback logic
         }
-    } else {
-        // Fallback: create in memory, user must download to save.
-        await del(PROJECT_FILE_HANDLE_KEY);
-        await set(LOCAL_BACKUP_KEY, defaultProjectData);
-        
-        setProjectFileHandle(null);
-        setProjectName('Untitled Project.json');
-        projectDataRef.current = defaultProjectData;
-        setProjectData(defaultProjectData);
-        setStatus('ready');
-        setSaveStatus('saved');
     }
+
+    // Fallback: create in memory, user must download to save.
+    await del(PROJECT_FILE_HANDLE_KEY);
+    await set(LOCAL_BACKUP_KEY, defaultProjectData);
+    
+    setProjectFileHandle(null);
+    setProjectName('Untitled Project.json');
+    projectDataRef.current = defaultProjectData;
+    setProjectData(defaultProjectData);
+    setStatus('ready');
+    setSaveStatus('saved');
   }, []);
 
   const openProject = useCallback(async () => {
@@ -260,47 +261,53 @@ export function useProjectFile() {
                 setProjectData(data);
                 setStatus('ready');
                 setSaveStatus('saved');
+                return; // Exit on success
             } else {
                 throw new Error('Invalid project file format.');
             }
         } catch (error) {
             if (error instanceof DOMException && error.name === 'AbortError') return;
-            console.error('Error opening project file:', error);
+            // If the error is about invalid format, show alert and stop.
+            if (error instanceof Error && error.message.includes('Invalid project file format')) {
+                 alert('Failed to open file: Invalid project file format.');
+                 return;
+            }
+            console.warn('showOpenFilePicker failed, falling back to input.', error);
+            // Fall-through to the fallback logic for other errors (like SecurityError)
+        }
+    }
+
+    // Fallback for browsers without File System Access API or when it fails
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json,.json';
+    input.onchange = async (event) => {
+        const file = (event.target as HTMLInputElement).files?.[0];
+        if (!file) return;
+
+        try {
+            const fileContent = await file.text();
+            const rawData = JSON.parse(fileContent);
+            if (rawData && rawData.settings && Array.isArray(rawData.novels)) {
+                const data = sanitizeProjectData(rawData);
+                await del(PROJECT_FILE_HANDLE_KEY); 
+                await set(LOCAL_BACKUP_KEY, data);
+
+                setProjectFileHandle(null);
+                setProjectName(file.name);
+                projectDataRef.current = data;
+                setProjectData(data);
+                setStatus('ready');
+                setSaveStatus('saved');
+            } else {
+                throw new Error('Invalid project file format.');
+            }
+        } catch (error) {
+            console.error('Error opening project file from input:', error);
             alert('Failed to open file.');
         }
-    } else {
-        // Fallback for browsers without File System Access API
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'application/json,.json';
-        input.onchange = async (event) => {
-            const file = (event.target as HTMLInputElement).files?.[0];
-            if (!file) return;
-
-            try {
-                const fileContent = await file.text();
-                const rawData = JSON.parse(fileContent);
-                if (rawData && rawData.settings && Array.isArray(rawData.novels)) {
-                    const data = sanitizeProjectData(rawData);
-                    await del(PROJECT_FILE_HANDLE_KEY); 
-                    await set(LOCAL_BACKUP_KEY, data);
-
-                    setProjectFileHandle(null);
-                    setProjectName(file.name);
-                    projectDataRef.current = data;
-                    setProjectData(data);
-                    setStatus('ready');
-                    setSaveStatus('saved');
-                } else {
-                    throw new Error('Invalid project file format.');
-                }
-            } catch (error) {
-                console.error('Error opening project file from input:', error);
-                alert('Failed to open file.');
-            }
-        };
-        input.click();
-    }
+    };
+    input.click();
   }, []);
   
   const downloadProject = useCallback(async () => {
@@ -321,22 +328,24 @@ export function useProjectFile() {
             const writable = await newHandle.createWritable();
             await writable.write(JSON.stringify(dataToSave, null, 2));
             await writable.close();
+            return; // Exit on success
         } catch (error) {
             if (error instanceof DOMException && error.name === 'AbortError') return;
-            console.error('Error saving project file:', error);
-            alert('Failed to save file.');
+            console.warn('showSaveFilePicker failed for download, falling back to anchor.', error);
+            // Fall-through to fallback logic
         }
-    } else {
-        const blob = new Blob([JSON.stringify(dataToSave, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = suggestedName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
     }
+
+    // Fallback logic
+    const blob = new Blob([JSON.stringify(dataToSave, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = suggestedName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }, [saveNow, projectName]);
 
   const closeProject = useCallback(async () => {
