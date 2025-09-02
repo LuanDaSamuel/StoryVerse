@@ -6,6 +6,8 @@ import { get, set, del } from 'idb-keyval';
 const LOCAL_BACKUP_KEY = 'storyverse-local-backup'; // Used for caching
 const PROJECT_FILE_HANDLE_KEY = 'storyverse-project-file-handle'; // Used for the main file
 
+const isFileSystemAccessAPISupported = 'showOpenFilePicker' in window;
+
 const defaultProjectData: ProjectData = {
   settings: {
     theme: 'book',
@@ -93,6 +95,12 @@ export function useProjectFile() {
 
   useEffect(() => {
     const init = async () => {
+      // Don't even try to load from a handle if the API isn't supported.
+      if (!isFileSystemAccessAPISupported) {
+          setStatus('welcome');
+          return;
+      }
+
       try {
         const handle: FileSystemFileHandle | undefined = await get(PROJECT_FILE_HANDLE_KEY);
         if (handle && await verifyPermission(handle)) {
@@ -192,59 +200,106 @@ export function useProjectFile() {
   }, [status, saveProject]);
 
   const createProject = useCallback(async () => {
-    try {
-        const newHandle = await window.showSaveFilePicker({
-            suggestedName: 'StoryVerse-Project.json',
-            types: [{ description: 'StoryVerse Projects', accept: { 'application/json': ['.json'] } }],
-        });
+    if (isFileSystemAccessAPISupported) {
+        try {
+            const newHandle = await window.showSaveFilePicker({
+                suggestedName: 'StoryVerse-Project.json',
+                types: [{ description: 'StoryVerse Projects', accept: { 'application/json': ['.json'] } }],
+            });
 
-        const writable = await newHandle.createWritable();
-        await writable.write(JSON.stringify(defaultProjectData, null, 2));
-        await writable.close();
-        
-        await set(PROJECT_FILE_HANDLE_KEY, newHandle);
+            const writable = await newHandle.createWritable();
+            await writable.write(JSON.stringify(defaultProjectData, null, 2));
+            await writable.close();
+            
+            await set(PROJECT_FILE_HANDLE_KEY, newHandle);
+            await set(LOCAL_BACKUP_KEY, defaultProjectData);
+            
+            setProjectFileHandle(newHandle);
+            setProjectName(newHandle.name);
+            projectDataRef.current = defaultProjectData;
+            setProjectData(defaultProjectData);
+            setStatus('ready');
+            setSaveStatus('saved');
+        } catch (error) {
+            if (error instanceof DOMException && error.name === 'AbortError') return;
+            console.error('Error creating new project file:', error);
+            alert('Failed to create new project file.');
+        }
+    } else {
+        // Fallback: create in memory, user must download to save.
+        await del(PROJECT_FILE_HANDLE_KEY);
         await set(LOCAL_BACKUP_KEY, defaultProjectData);
         
-        setProjectFileHandle(newHandle);
-        setProjectName(newHandle.name);
+        setProjectFileHandle(null);
+        setProjectName('Untitled Project.json');
         projectDataRef.current = defaultProjectData;
         setProjectData(defaultProjectData);
         setStatus('ready');
         setSaveStatus('saved');
-    } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') return;
-        console.error('Error creating new project file:', error);
-        alert('Failed to create new project file.');
     }
   }, []);
 
   const openProject = useCallback(async () => {
-    try {
-        const [fileHandle] = await window.showOpenFilePicker({
-            types: [{ description: 'StoryVerse Projects', accept: { 'application/json': ['.json'] } }],
-        });
-        const file = await fileHandle.getFile();
-        const fileContent = await file.text();
-        const rawData = JSON.parse(fileContent);
+    if (isFileSystemAccessAPISupported) {
+        try {
+            const [fileHandle] = await window.showOpenFilePicker({
+                types: [{ description: 'StoryVerse Projects', accept: { 'application/json': ['.json'] } }],
+            });
+            const file = await fileHandle.getFile();
+            const fileContent = await file.text();
+            const rawData = JSON.parse(fileContent);
 
-        if (rawData && rawData.settings && Array.isArray(rawData.novels)) {
-            const data = sanitizeProjectData(rawData);
-            await set(PROJECT_FILE_HANDLE_KEY, fileHandle);
-            await set(LOCAL_BACKUP_KEY, data);
+            if (rawData && rawData.settings && Array.isArray(rawData.novels)) {
+                const data = sanitizeProjectData(rawData);
+                await set(PROJECT_FILE_HANDLE_KEY, fileHandle);
+                await set(LOCAL_BACKUP_KEY, data);
 
-            setProjectFileHandle(fileHandle);
-            setProjectName(fileHandle.name);
-            projectDataRef.current = data;
-            setProjectData(data);
-            setStatus('ready');
-            setSaveStatus('saved');
-        } else {
-            throw new Error('Invalid project file format.');
+                setProjectFileHandle(fileHandle);
+                setProjectName(fileHandle.name);
+                projectDataRef.current = data;
+                setProjectData(data);
+                setStatus('ready');
+                setSaveStatus('saved');
+            } else {
+                throw new Error('Invalid project file format.');
+            }
+        } catch (error) {
+            if (error instanceof DOMException && error.name === 'AbortError') return;
+            console.error('Error opening project file:', error);
+            alert('Failed to open file.');
         }
-    } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') return;
-        console.error('Error opening project file:', error);
-        alert('Failed to open file.');
+    } else {
+        // Fallback for browsers without File System Access API
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'application/json,.json';
+        input.onchange = async (event) => {
+            const file = (event.target as HTMLInputElement).files?.[0];
+            if (!file) return;
+
+            try {
+                const fileContent = await file.text();
+                const rawData = JSON.parse(fileContent);
+                if (rawData && rawData.settings && Array.isArray(rawData.novels)) {
+                    const data = sanitizeProjectData(rawData);
+                    await del(PROJECT_FILE_HANDLE_KEY); 
+                    await set(LOCAL_BACKUP_KEY, data);
+
+                    setProjectFileHandle(null);
+                    setProjectName(file.name);
+                    projectDataRef.current = data;
+                    setProjectData(data);
+                    setStatus('ready');
+                    setSaveStatus('saved');
+                } else {
+                    throw new Error('Invalid project file format.');
+                }
+            } catch (error) {
+                console.error('Error opening project file from input:', error);
+                alert('Failed to open file.');
+            }
+        };
+        input.click();
     }
   }, []);
   
@@ -253,24 +308,36 @@ export function useProjectFile() {
     const dataToSave = projectDataRef.current;
     if (!dataToSave) return;
 
-    try {
-        const now = new Date();
-        const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}`;
-        const suggestedName = `StoryVerse-Backup-${timestamp}.json`;
+    const now = new Date();
+    const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}`;
+    const suggestedName = `StoryVerse-Backup-${timestamp}.json`;
 
-        const newHandle = await window.showSaveFilePicker({
-            suggestedName,
-            types: [{ description: 'StoryVerse Projects', accept: { 'application/json': ['.json'] } }],
-        });
-        const writable = await newHandle.createWritable();
-        await writable.write(JSON.stringify(dataToSave, null, 2));
-        await writable.close();
-    } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') return;
-        console.error('Error saving project file:', error);
-        alert('Failed to save file.');
+    if (isFileSystemAccessAPISupported) {
+        try {
+            const newHandle = await window.showSaveFilePicker({
+                suggestedName,
+                types: [{ description: 'StoryVerse Projects', accept: { 'application/json': ['.json'] } }],
+            });
+            const writable = await newHandle.createWritable();
+            await writable.write(JSON.stringify(dataToSave, null, 2));
+            await writable.close();
+        } catch (error) {
+            if (error instanceof DOMException && error.name === 'AbortError') return;
+            console.error('Error saving project file:', error);
+            alert('Failed to save file.');
+        }
+    } else {
+        const blob = new Blob([JSON.stringify(dataToSave, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = suggestedName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     }
-  }, [saveNow]);
+  }, [saveNow, projectName]);
 
   const closeProject = useCallback(async () => {
     await saveNow();
