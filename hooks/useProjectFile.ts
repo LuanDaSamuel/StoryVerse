@@ -1,6 +1,5 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ProjectData, FileStatus, SaveStatus, Theme } from '../types';
+import { ProjectData, FileStatus, SaveStatus, Theme, StoryIdeaStatus } from '../types';
 import { get, set, del } from 'idb-keyval';
 
 const LOCAL_BACKUP_KEY = 'storyverse-local-backup'; // Used for caching
@@ -14,6 +13,7 @@ const defaultProjectData: ProjectData = {
   },
   novels: [],
   sketches: [],
+  storyIdeas: [],
 };
 
 const sanitizeProjectData = (data: any): ProjectData => {
@@ -43,7 +43,7 @@ const sanitizeProjectData = (data: any): ProjectData => {
         ? novel.sketches.map((sketch: any) => ({
             id: sketch.id || crypto.randomUUID(),
             title: sketch.title || "Untitled Sketch",
-            content: sketch.content || "",
+            content: sketch.content || '',
             tags: Array.isArray(sketch.tags) ? sketch.tags : [],
             createdAt: sketch.createdAt || new Date().toISOString(),
             updatedAt: sketch.updatedAt || new Date().toISOString(),
@@ -53,13 +53,30 @@ const sanitizeProjectData = (data: any): ProjectData => {
     }));
   }
   if (Array.isArray(data?.sketches)) {
-    sanitized.sketches = data.sketches.map((sketch: any) => ({
-      id: sketch.id || crypto.randomUUID(),
-      title: sketch.title || 'Untitled Sketch',
-      content: sketch.content || '',
-      createdAt: sketch.createdAt || new Date().toISOString(),
-      updatedAt: sketch.updatedAt || new Date().toISOString(),
-    }));
+    sanitized.sketches = data.sketches.map((sketch: any) => {
+      return {
+        id: sketch.id || crypto.randomUUID(),
+        title: sketch.title || 'Untitled Sketch',
+        content: sketch.content || '',
+        createdAt: sketch.createdAt || new Date().toISOString(),
+        updatedAt: sketch.updatedAt || new Date().toISOString(),
+      };
+    });
+  }
+  if (Array.isArray(data?.storyIdeas)) {
+    sanitized.storyIdeas = data.storyIdeas.map((idea: any) => {
+      const validStatuses: StoryIdeaStatus[] = ['Seedling', 'Developing', 'Archived'];
+      const status = validStatuses.includes(idea.status) ? idea.status : 'Seedling';
+      return {
+        id: idea.id || crypto.randomUUID(),
+        title: idea.title || 'Untitled Idea',
+        synopsis: idea.synopsis || '',
+        tags: Array.isArray(idea.tags) ? idea.tags : [],
+        status: status,
+        createdAt: idea.createdAt || new Date().toISOString(),
+        updatedAt: idea.updatedAt || new Date().toISOString(),
+      };
+    });
   }
   return sanitized;
 };

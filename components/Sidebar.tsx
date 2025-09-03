@@ -1,7 +1,6 @@
-
 import React, { useState, useContext } from 'react';
 import { NavLink } from 'react-router-dom';
-import { AppLogoIcon, HomeIcon, PlusIcon, SettingsIcon, QuillPenIcon, LightbulbIcon } from './Icons';
+import { AppLogoIcon, HomeIcon, PlusIcon, SettingsIcon, LightbulbIcon, QuillPenIcon } from './Icons';
 import SettingsModal from './SettingsModal';
 import { ProjectContext } from '../contexts/ProjectContext';
 
@@ -43,12 +42,12 @@ const Sidebar: React.FC = () => {
                         <span>Create Novel</span>
                     </NavLink>
                     <NavLink to="/sketches" className={navLinkClasses}>
-                        <LightbulbIcon className="w-5 h-5" />
+                        <QuillPenIcon className="w-5 h-5" />
                         <span>Sketches</span>
                     </NavLink>
                     <NavLink to="/demos" className={navLinkClasses}>
-                        <QuillPenIcon className="w-5 h-5" />
-                        <span>Demos</span>
+                        <LightbulbIcon className="w-5 h-5" />
+                        <span>Idea Box</span>
                     </NavLink>
                 </nav>
                 <div className="p-4 border-t border-inherit">

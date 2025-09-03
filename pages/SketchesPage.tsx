@@ -64,11 +64,12 @@ const SketchesPage: React.FC = () => {
         setSketchToDelete(null);
     };
     
-    const tempDiv = document.createElement('div');
     const getSnippet = (html: string) => {
+        const tempDiv = document.createElement('div');
         tempDiv.innerHTML = html;
-        const text = tempDiv.textContent || "";
-        return text.length > 200 ? text.substring(0, 200) + '...' : text;
+        const text = tempDiv.textContent || '';
+        if (!text.trim()) return 'Empty sketch.';
+        return text.trim().substring(0, 100) + (text.length > 100 ? '...' : '');
     };
 
     return (
@@ -112,7 +113,7 @@ const SketchesPage: React.FC = () => {
                                     ))}
                                 </div>
                                 <p className={`text-sm mt-3 ${themeClasses.textSecondary}`}>
-                                    {getSnippet(sketch.content) || <span className="italic">No content.</span>}
+                                    {getSnippet(sketch.content)}
                                 </p>
                             </div>
                              <div className="absolute top-3 right-3 flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">

@@ -1,4 +1,3 @@
-
 import React, { useState, useContext, useRef, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
@@ -334,11 +333,12 @@ const NovelDetailPage: React.FC = () => {
         }
 
         if (activeTab === 'Sketches') {
-             const tempDiv = document.createElement('div');
             const getSnippet = (html: string) => {
+                const tempDiv = document.createElement('div');
                 tempDiv.innerHTML = html;
-                const text = tempDiv.textContent || "";
-                return text.length > 150 ? text.substring(0, 150) + '...' : text;
+                const text = tempDiv.textContent || '';
+                if (!text.trim()) return 'Empty sketch.';
+                return text.trim().substring(0, 100) + (text.length > 100 ? '...' : '');
             };
 
             return (
@@ -365,7 +365,7 @@ const NovelDetailPage: React.FC = () => {
                                         <span key={tag} className={`px-2 py-0.5 text-xs rounded-full font-semibold ${themeClasses.accent} ${themeClasses.accentText}`}>{tag}</span>
                                     ))}
                                 </div>
-                                <p className={`text-sm ${themeClasses.textSecondary}`}>{enhancePlainText(getSnippet(sketch.content))}</p>
+                                <p className={`text-sm ${themeClasses.textSecondary}`}>{getSnippet(sketch.content)}</p>
                                 <div className="absolute top-3 right-3 flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <button onClick={(e) => { e.stopPropagation(); setEditingSketch(sketch); }} className={`px-3 py-1 text-sm rounded-md font-semibold ${themeClasses.bg} ${themeClasses.text} hover:opacity-80`}>Edit</button>
                                     <button onClick={(e) => { e.stopPropagation(); setSketchToDelete(sketch); }} className="p-2 rounded-full text-red-500 hover:bg-red-500/10"><TrashIcon className="w-5 h-5" /></button>

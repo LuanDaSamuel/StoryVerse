@@ -50,12 +50,25 @@ export interface Sketch {
   updatedAt: string;
 }
 
+export type StoryIdeaStatus = 'Seedling' | 'Developing' | 'Archived';
+
+export interface StoryIdea {
+  id: string;
+  title: string;
+  synopsis: string; // HTML content
+  tags: string[];
+  status: StoryIdeaStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ProjectData {
   settings: {
     theme: Theme;
   };
   novels: Novel[];
   sketches: Sketch[];
+  storyIdeas: StoryIdea[];
 }
 
 export type FileStatus = 'loading' | 'welcome' | 'ready' | 'error';

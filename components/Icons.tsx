@@ -41,42 +41,40 @@ export const AppLogoIcon = (props: React.SVGProps<SVGSVGElement>) => (
     </svg>
 );
 
+// FIX: Completed the DocumentPlusIcon definition and added all other missing icons.
 export const DocumentPlusIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-        <path fillRule="evenodd" d="M3.75 3a2.25 2.25 0 00-2.25 2.25v13.5a2.25 2.25 0 002.25 2.25h16.5a2.25 2.25 0 002.25-2.25V5.25A2.25 2.25 0 0020.25 3H3.75zM12 6a.75.75 0 01.75.75v3h3a.75.75 0 010 1.5h-3v3a.75.75 0 01-1.5 0v-3h-3a.75.75 0 010-1.5h3v-3A.75.75 0 0112 6z" clipRule="evenodd" />
+        <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 14h-3v3h-2v-3H8v-2h3v-3h2v3h3v2zm-3-7V3.5L18.5 9H13z" />
     </svg>
 );
 
 export const FolderIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-        <path d="M19.5 21a3 3 0 003-3v-8.5a3 3 0 00-3-3h-5.379a.75.75 0 01-.53-.22L11.47 5.03a.75.75 0 00-.53-.22H4.5a3 3 0 00-3 3v10.5a3 3 0 003 3h15z" />
+        <path d="M10 4H4c-1.11 0-2 .9-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
     </svg>
 );
 
 export const LightbulbIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-        <path d="M12 2.25a.75.75 0 01.75.75v2.25a.75.75 0 01-1.5 0V3a.75.75 0 01.75-.75zM7.5 12a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM18.894 6.166a.75.75 0 00-1.06-1.06l-1.591 1.59a.75.75 0 101.06 1.061l1.591-1.59zM21.75 12a.75.75 0 01-.75.75h-2.25a.75.75 0 010-1.5H21a.75.75 0 01.75.75zM17.834 18.894a.75.75 0 001.06-1.06l-1.59-1.591a.75.75 0 10-1.061 1.06l1.59 1.591zM12 18a.75.75 0 01.75.75v2.25a.75.75 0 01-1.5 0V18.75a.75.75 0 01.75-.75zM5.166 17.834a.75.75 0 001.06 1.06l1.591-1.59a.75.75 0 00-1.06-1.061l-1.591 1.59zM4.5 12.75a.75.75 0 010-1.5h2.25a.75.75 0 010 1.5H4.5zM6.166 5.106a.75.75 0 00-1.06 1.06l1.59 1.591a.75.75 0 001.061-1.06l-1.59-1.591z" />
+        <path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7zM9 21a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-1H9v1z" />
     </svg>
 );
 
-// This is the user-approved Demo icon.
 export const QuillPenIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" {...props}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M4 20l10 -10a2.828 2.828 0 1 0 -4 -4l-10 10v4h4z" />
-        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6.5l4 4" />
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
+        <path d="M20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83zM3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" />
     </svg>
 );
 
-export const EyeIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-        <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" />
-        <path fillRule="evenodd" d="M1.323 11.447C2.811 6.976 7.028 3.75 12.001 3.75c4.97 0 9.185 3.223 10.675 7.69.12.362.12.752 0 1.113-1.487 4.471-5.705 7.697-10.677 7.697-4.97 0-9.186-3.223-10.675-7.69a.75.75 0 010-1.113zM17.25 12a5.25 5.25 0 11-10.5 0 5.25 5.25 0 0110.5 0z" clipRule="evenodd" />
-    </svg>
+export const PencilIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
+    <path d="M20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83zM3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" />
+  </svg>
 );
 
 export const CloseIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" {...props}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
+        <path fillRule="evenodd" d="M5.47 5.47a.75.75 0 011.06 0L12 10.94l5.47-5.47a.75.75 0 111.06 1.06L13.06 12l5.47 5.47a.75.75 0 11-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 01-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 010-1.06z" clipRule="evenodd" />
     </svg>
 );
 
@@ -88,50 +86,50 @@ export const DownloadIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 export const TrashIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-        <path fillRule="evenodd" d="M16.5 4.478v.227a48.816 48.816 0 013.878.512.75.75 0 11-.256 1.478l-.209-.035-1.005 13.006a.75.75 0 01-.749.658h-7.5a.75.75 0 01-.749-.658L5.168 6.63c-.012-.157-.024-.315-.035-.472a.75.75 0 011.478-.256l.036.208 1.005 13.006h4.992l.992-12.999a.75.75 0 01.75-.75h2.25a.75.75 0 01.75.75v.227z" clipRule="evenodd" />
+        <path fillRule="evenodd" d="M16.5 4.478v.227a48.816 48.816 0 013.878.512.75.75 0 11-.256 1.478l-.209-.035-1.005 13.006a.75.75 0 01-.749.654h-1.328a.75.75 0 01-.749-.654L15 6.22l-1.005 13.006a.75.75 0 01-.749.654H11.25a.75.75 0 01-.749-.654L9 6.22l-1.005 13.006a.75.75 0 01-.749.654H5.903a.75.75 0 01-.749-.654L4.149 6.22l-.209.035a.75.75 0 01-.256-1.478A48.567 48.567 0 017.5 4.705v-.227c0-1.564 1.213-2.9 2.816-2.951a52.662 52.662 0 013.369 0c1.603.051 2.815 1.387 2.815 2.951zm-6.136-1.452a51.196 51.196 0 013.273 0C14.39 3.05 15 3.684 15 4.478v.113a49.488 49.488 0 00-6 0v-.113c0-.794.609-1.428 1.364-1.452z" clipRule="evenodd" />
     </svg>
 );
 
 export const UploadIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-        <path fillRule="evenodd" d="M10.5 3.75a.75.75 0 01.75.75v8.19l2.47-2.47a.75.75 0 111.06 1.06l-3.75 3.75a.75.75 0 01-1.06 0l-3.75-3.75a.75.75 0 111.06-1.06l2.47 2.47V4.5a.75.75 0 01.75-.75z" clipRule="evenodd" />
-        <path d="M3 16.5a.75.75 0 01.75-.75h16.5a.75.75 0 010 1.5H3.75a.75.75 0 01-.75-.75z" />
+        <path d="M9.97.97a.75.75 0 011.06 0l4.5 4.5a.75.75 0 01-1.06 1.06L12 4.06l-2.47 2.47a.75.75 0 01-1.06-1.06l4.5-4.5zM12 1.5V15a.75.75 0 01-1.5 0V1.5a.75.75 0 011.5 0z" />
+        <path d="M3.75 12a.75.75 0 01.75-.75h15a.75.75 0 010 1.5h-15a.75.75 0 01-.75-.75zM4.5 18.75a.75.75 0 01.75-.75h13.5a.75.75 0 010 1.5H5.25a.75.75 0 01-.75-.75z" />
     </svg>
 );
 
 export const BackIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" {...props}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 12h-15m0 0l6.75 6.75M4.5 12l6.75-6.75" />
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
+        <path fillRule="evenodd" d="M11.03 3.97a.75.75 0 010 1.06l-6.22 6.22H21a.75.75 0 010 1.5H4.81l6.22 6.22a.75.75 0 11-1.06 1.06l-7.5-7.5a.75.75 0 010-1.06l7.5-7.5a.75.75 0 011.06 0z" clipRule="evenodd" />
     </svg>
 );
 
 export const BookOpenIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" {...props}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
+        <path d="M19 2a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V4a2 2 0 012-2h14m-7 2H5v12h7V4z" />
     </svg>
 );
 
 export const ChevronDownIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" {...props}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
+        <path fillRule="evenodd" d="M12.53 16.28a.75.75 0 01-1.06 0l-7.5-7.5a.75.75 0 011.06-1.06L12 14.69l6.97-6.97a.75.75 0 111.06 1.06l-7.5 7.5z" clipRule="evenodd" />
     </svg>
 );
 
 export const ChevronLeftIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" {...props}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
+        <path fillRule="evenodd" d="M7.72 12.53a.75.75 0 010-1.06l7.5-7.5a.75.75 0 111.06 1.06L9.31 12l6.97 6.97a.75.75 0 11-1.06 1.06l-7.5-7.5z" clipRule="evenodd" />
     </svg>
 );
 
 export const ChevronRightIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" {...props}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
+        <path fillRule="evenodd" d="M16.28 11.47a.75.75 0 010 1.06l-7.5 7.5a.75.75 0 01-1.06-1.06L14.69 12 7.72 5.03a.75.75 0 011.06-1.06l7.5 7.5z" clipRule="evenodd" />
     </svg>
 );
 
 export const TextIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-        <path d="M1.5 2.25a.75.75 0 01.75-.75H3a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0V2.25zM21 2.25a.75.75 0 00-.75-.75h-.75a.75.75 0 000 1.5h.75v1.5a.75.75 0 001.5 0V2.25zM5.25 21.75a.75.75 0 01-.75.75H3a.75.75 0 01-.75-.75v-1.5a.75.75 0 011.5 0v.75h.75a.75.75 0 01.75.75zM21.75 21a.75.75 0 01-.75.75h-.75a.75.75 0 010-1.5h.75v-.75a.75.75 0 011.5 0v1.5zM12 4.5a.75.75 0 00-1.5 0v15a.75.75 0 001.5 0v-15z" />
+        <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zM16 18H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
     </svg>
 );
 
@@ -143,43 +141,43 @@ export const SearchIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 export const BoldIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-        <path d="M8 4h4.5a4.5 4.5 0 1 1 0 9H8V4zm2 2v5h2.5a2.5 2.5 0 0 0 0-5H10zm-2 7h5.5a4.5 4.5 0 1 1 0 9H8v-9zm2 2v5h3.5a2.5 2.5 0 0 0 0-5H10z" />
+        <path d="M15.6 10.79c.97.67 1.65 1.77 1.65 3.17 0 2.28-1.72 4.04-4.2 4.04H8V6h5.8c2.1 0 3.7 1.5 3.7 3.47 0 1.43-.78 2.64-1.9 3.32zM10 8v2.5h4c.83 0 1.5-.67 1.5-1.5s-.67-1.5-1.5-1.5H10zm0 4.5v3h4.5c.83 0 1.5-.67 1.5-1.5s-.67-1.5-1.5-1.5H10z" />
     </svg>
 );
 
 export const ItalicIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-        <path d="M10 5v3h2.21l-3.42 8H6v3h8v-3h-2.21l3.42-8H18V5h-8z" />
+        <path d="M10 4v3h2.21l-3.42 8H6v3h8v-3h-2.21l3.42-8H18V4z" />
     </svg>
 );
 
 export const UndoIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-        <path fillRule="evenodd" d="M9.53 2.47a.75.75 0 010 1.06L4.81 8.25H15a6.75 6.75 0 010 13.5h-3a.75.75 0 010-1.5h3a5.25 5.25 0 100-10.5H4.81l4.72 4.72a.75.75 0 11-1.06 1.06l-6-6a.75.75 0 010-1.06l6-6a.75.75 0 011.06 0z" clipRule="evenodd" />
+        <path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z" />
     </svg>
 );
 
 export const RedoIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-        <path fillRule="evenodd" d="M14.47 2.47a.75.75 0 011.06 0l6 6a.75.75 0 010 1.06l-6 6a.75.75 0 11-1.06-1.06L19.19 9.75H9a5.25 5.25 0 100 10.5h3a.75.75 0 010 1.5H9a6.75 6.75 0 010-13.5h10.19l-4.72-4.72a.75.75 0 010-1.06z" clipRule="evenodd" />
+        <path d="M18.4 10.6C16.55 9 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.72.72 5.12 1.88L13 16h9V7l-3.6 3.6z" />
     </svg>
 );
 
 export const Bars3Icon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" {...props}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
+        <path fillRule="evenodd" d="M3 6.75A.75.75 0 013.75 6h16.5a.75.75 0 010 1.5H3.75A.75.75 0 013 6.75zM3 12a.75.75 0 01.75-.75h16.5a.75.75 0 010 1.5H3.75A.75.75 0 013 12zm0 5.25a.75.75 0 01.75-.75h16.5a.75.75 0 010 1.5H3.75a.75.75 0 01-.75-.75z" clipRule="evenodd" />
     </svg>
 );
 
 export const ListBulletIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-        <path fillRule="evenodd" d="M2.625 6.75a.75.75 0 01.75-.75h.01a.75.75 0 01.75.75v.01a.75.75 0 01-.75.75H3.375a.75.75 0 01-.75-.75v-.01zM8.25 6.75a.75.75 0 01.75-.75h12a.75.75 0 010 1.5h-12a.75.75 0 01-.75-.75zM2.625 12a.75.75 0 01.75-.75h.01a.75.75 0 01.75.75v.01a.75.75 0 01-.75.75H3.375a.75.75 0 01-.75-.75v-.01zM8.25 12a.75.75 0 01.75-.75h12a.75.75 0 010 1.5h-12a.75.75 0 01-.75-.75zM2.625 17.25a.75.75 0 01.75-.75h.01a.75.75 0 01.75.75v.01a.75.75 0 01-.75.75H3.375a.75.75 0 01-.75-.75v-.01zM8.25 17.25a.75.75 0 01.75-.75h12a.75.75 0 010 1.5h-12a.75.75 0 01-.75-.75z" clipRule="evenodd" />
+        <path d="M7 5h14v2H7zM7 11h14v2H7zM7 17h14v2H7zM4 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM4 12a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM4 18a1 1 0 1 0 0-2 1 1 0 0 0 0 2z" />
     </svg>
 );
 
 export const OrderedListIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-         <path d="M3 5.75a.75.75 0 01.75-.75h1.5a.75.75 0 010 1.5h-.75v.75h.75a.75.75 0 010 1.5h-1.5a.75.75 0 01-.75-.75V5.75zM9 6a.75.75 0 000 1.5h12a.75.75 0 000-1.5H9zM3.106 12.342c.06.042.11.09.154.142l.028.034c.106.126.23.242.368.344l1.07 1.07a.75.75 0 11-1.06 1.06l-1.07-1.07a.54.54 0 01-.157-.384V12.75a.75.75 0 011.5 0v.092zm.504-1.282a.75.75 0 00-1.22-.872l-1.03 1.03a.75.75 0 001.06 1.06l.19-.19v-.002zM9 12a.75.75 0 000 1.5h12a.75.75 0 000-1.5H9zM4.5 17.25a.75.75 0 00-.75.75v.25a.75.75 0 00.75.75h.75a.75.75 0 00.75-.75V18a.75.75 0 00-.75-.75H5.25v-.75a.75.75 0 00-1.5 0v1.5a.75.75 0 00.75.75h.75a.75.75 0 00.75-.75v-.25a.75.75 0 00-.75-.75H4.5zM9 18a.75.75 0 000 1.5h12a.75.75 0 000-1.5H9z" />
+        <path d="M2 17h2v.5H3v1h1v.5H2v-2zM2 10h1v1.5H2v-1.5zM2 4h2v1H3v1h1v1H2V4zM7 5v2h14V5H7zm0 14h14v-2H7v2zm0-6h14v-2H7v2z" />
     </svg>
 );
 
@@ -191,36 +189,18 @@ export const BlockquoteIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 export const H1Icon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-        <path d="M7 5h2v5h4V5h2v14h-2v-7H9v7H7V5zm12 0h-2l-2 4h2v10h2V5z" />
+        <path d="M13 9H11V7H5V9H3V17H5V15H11V17H13V9M9 13H5V11H9V13M21 9H17V17H19V11H21V9Z" />
     </svg>
 );
 
 export const H2Icon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-        <path d="M7 5h2v5h4V5h2v14h-2v-7H9v7H7V5z M19 19v-2c0-1.11-.9-2-2-2h-2v4h4zm-2-4h-2V9c0-1.1.9-2 2-2s2 .9 2 2v2h2V9c0-2.2-1.8-4-4-4h-4v2h4v2h-2c-1.1 0-2 .9-2 2v2c0 1.1.9 2 2 2h2z" />
+        <path d="M13 9H11V7H5V9H3V17H5V15H11V17H13V9M9 13H5V11H9V13M21 11.5A1.5 1.5 0 0 1 19.5 13H18V15H16V13H17.5A3.5 3.5 0 0 0 21 9.5C21 7.57 19.43 6 17.5 6S14 7.57 14 9.5H16A1.5 1.5 0 0 1 17.5 8 1.5 1.5 0 0 1 19 9.5 1.5 1.5 0 0 1 17.5 11H16V9H14V11.5A3.5 3.5 0 0 0 17.5 15A3.5 3.5 0 0 0 21 11.5Z" />
     </svg>
 );
 
 export const H3Icon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-        <path d="M7 5h2v5h4V5h2v14h-2v-7H9v7H7V5z M17 6c1.1 0 2 .9 2 2v2c0 1.1-.9 2-2 2h-2v2h4v2h-4c-1.1 0-2-.9-2-2v-2c0-1.1.9-2 2-2h2V8h-4V6h4zm-2 2h-2v2h2V8z" />
-    </svg>
-);
-
-export const ChartBarIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-        <path d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
-    </svg>
-);
-
-export const ArrowsPointingOutIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-        <path fillRule="evenodd" d="M3 6.75A.75.75 0 013.75 6h4.5a.75.75 0 010 1.5h-2.25V9.75a.75.75 0 01-1.5 0V6.75zM15.75 6h4.5a.75.75 0 010 1.5h-2.25V9.75a.75.75 0 01-1.5 0V6.75A.75.75 0 0115.75 6zM3.75 18h4.5a.75.75 0 010 1.5h-2.25v-2.25a.75.75 0 01-1.5 0v4.5A.75.75 0 013.75 18zM15.75 18h4.5a.75.75 0 010 1.5h-2.25v-2.25a.75.75 0 01-1.5 0v4.5a.75.75 0 01.75-.75z" clipRule="evenodd" />
-    </svg>
-);
-
-export const ArrowsPointingInIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-        <path fillRule="evenodd" d="M6.75 3A.75.75 0 017.5 3.75v4.5a.75.75 0 01-1.5 0V6H3.75a.75.75 0 010-1.5h4.5zM16.5 3.75A.75.75 0 0117.25 3h4.5a.75.75 0 010 1.5H18v2.25a.75.75 0 01-1.5 0v-4.5zM7.5 15.75A.75.75 0 016.75 15h-4.5a.75.75 0 010-1.5H6v-2.25a.75.75 0 011.5 0v4.5zM17.25 15.75A.75.75 0 0116.5 15h4.5a.75.75 0 010 1.5H18v2.25a.75.75 0 01-1.5 0v-4.5z" clipRule="evenodd" />
+        <path d="M13 9H11V7H5V9H3V17H5V15H11V17H13V9M9 13H5V11H9V13M15.5 17A1.5 1.5 0 0 1 14 15.5V13.5H16V11H14V9H16.5A1.5 1.5 0 0 1 18 10.5A1.5 1.5 0 0 1 16.5 12H18V14H16.5A1.5 1.5 0 0 1 15 12.5H14V15.5A1.5 1.5 0 0 0 15.5 17H18V15H16V13H18V10.5C18 8.57 16.43 7 14.5 7S11 8.57 11 10.5V11H13V10.5A1.5 1.5 0 0 1 14.5 9A1.5 1.5 0 0 1 16 10.5V12.5H14V14.5H16V17H15.5Z" />
     </svg>
 );

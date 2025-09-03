@@ -1,7 +1,7 @@
 import React, { useState, useContext, useEffect, useRef, useCallback } from 'react';
 import { ProjectContext } from '../contexts/ProjectContext';
-import { NovelSketch } from '../types';
-import { SKETCH_TAG_OPTIONS, enhancePlainText, enhanceHtml } from '../constants';
+import { StoryIdea, StoryIdeaStatus } from '../types';
+import { SKETCH_TAG_OPTIONS, enhanceHtml } from '../constants';
 import { CloseIcon, BoldIcon, ItalicIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, H1Icon, H2Icon, H3Icon } from './Icons';
 
 const ToolbarButton = ({
@@ -13,7 +13,6 @@ const ToolbarButton = ({
   isActive: boolean;
   children: React.ReactNode;
 }) => {
-    const { themeClasses } = useContext(ProjectContext);
     const activeClass = `bg-gray-600 text-white`;
     const inactiveClass = `hover:bg-gray-700 text-gray-300`;
 
@@ -27,49 +26,45 @@ const ToolbarButton = ({
     );
 };
 
-interface SketchEditorModalProps {
-  sketch: NovelSketch | null;
+interface StoryIdeaEditorModalProps {
+  idea: StoryIdea | null;
   onClose: () => void;
-  onSave: (sketch: NovelSketch, novelId: string) => void;
-  novels?: { id: string, title: string }[];
-  novelId?: string;
+  onSave: (idea: StoryIdea) => void;
 }
 
-const SketchEditorModal: React.FC<SketchEditorModalProps> = ({ sketch, onClose, onSave, novels, novelId: contextualNovelId }) => {
+const statusOptions: StoryIdeaStatus[] = ['Seedling', 'Developing', 'Archived'];
+
+const StoryIdeaEditorModal: React.FC<StoryIdeaEditorModalProps> = ({ idea, onClose, onSave }) => {
     const { themeClasses } = useContext(ProjectContext);
-    const isNew = sketch === null;
+    const isNew = idea === null;
     
     const [title, setTitle] = useState('');
-    const [content, setContent] = useState('');
+    const [synopsis, setSynopsis] = useState('');
     const [tags, setTags] = useState<string[]>([]);
-    const [selectedNovelId, setSelectedNovelId] = useState<string>('');
+    const [status, setStatus] = useState<StoryIdeaStatus>('Seedling');
     const [activeFormats, setActiveFormats] = useState({ isBold: false, isItalic: false, isUL: false, isOL: false, currentBlock: 'p' });
     
     const editorRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        if (sketch) {
-            setTitle(sketch.title);
-            setContent(sketch.content);
-            setTags(sketch.tags);
+        if (idea) {
+            setTitle(idea.title);
+            setSynopsis(idea.synopsis);
+            setTags(idea.tags);
+            setStatus(idea.status);
         } else {
-            setTitle('Untitled Sketch');
-            setContent('<p><br></p>');
+            setTitle('Untitled Idea');
+            setSynopsis('<p><br></p>');
             setTags([]);
+            setStatus('Seedling');
         }
-
-        if (contextualNovelId) {
-            setSelectedNovelId(contextualNovelId);
-        } else if (novels && novels.length > 0) {
-            setSelectedNovelId(novels[0].id);
-        }
-    }, [sketch, contextualNovelId, novels]);
+    }, [idea]);
     
     useEffect(() => {
-        if (editorRef.current && content !== editorRef.current.innerHTML) {
-            editorRef.current.innerHTML = enhanceHtml(content);
+        if (editorRef.current && synopsis !== editorRef.current.innerHTML) {
+            editorRef.current.innerHTML = enhanceHtml(synopsis);
         }
-    }, [content]);
+    }, [synopsis]);
 
     const updateActiveFormats = useCallback(() => {
         const selection = window.getSelection();
@@ -128,20 +123,17 @@ const SketchEditorModal: React.FC<SketchEditorModalProps> = ({ sketch, onClose, 
     };
 
     const handleSave = () => {
-        if (isNew && novels && !selectedNovelId) {
-            alert('Please select a novel to associate this sketch with.');
-            return;
-        }
         const now = new Date().toISOString();
-        const finalSketch: NovelSketch = {
-            id: sketch?.id || crypto.randomUUID(),
-            title: title || 'Untitled Sketch',
-            content: editorRef.current?.innerHTML || '',
+        const finalIdea: StoryIdea = {
+            id: idea?.id || crypto.randomUUID(),
+            title: title || 'Untitled Idea',
+            synopsis: editorRef.current?.innerHTML || '',
             tags,
-            createdAt: sketch?.createdAt || now,
+            status,
+            createdAt: idea?.createdAt || now,
             updatedAt: now,
         };
-        onSave(finalSketch, selectedNovelId);
+        onSave(finalIdea);
     };
 
     const applyCommand = (e: React.MouseEvent<HTMLButtonElement>, command: string, value?: string) => {
@@ -169,7 +161,7 @@ const SketchEditorModal: React.FC<SketchEditorModalProps> = ({ sketch, onClose, 
                 onClick={e => e.stopPropagation()}
             >
                 <header className="flex justify-between items-center p-4 border-b border-inherit flex-shrink-0">
-                    <h2 className="text-xl font-bold">{isNew ? 'Create Sketch' : 'Edit Sketch'}</h2>
+                    <h2 className="text-xl font-bold">{isNew ? 'New Story Idea' : 'Edit Story Idea'}</h2>
                     <button onClick={onClose} className={`p-1 rounded-full hover:${themeClasses.bgTertiary}`}>
                         <CloseIcon className="w-6 h-6" />
                     </button>
@@ -181,7 +173,7 @@ const SketchEditorModal: React.FC<SketchEditorModalProps> = ({ sketch, onClose, 
                             type="text"
                             value={title}
                             onChange={e => setTitle(e.target.value)}
-                            placeholder="Sketch Title"
+                            placeholder="Idea Title"
                             className={`w-full text-3xl font-bold bg-transparent outline-none mb-4 ${themeClasses.accentText}`}
                         />
                         <div className="sticky top-0 z-10 bg-gray-800 p-2 rounded-md mb-4 flex items-center space-x-1">
@@ -205,20 +197,20 @@ const SketchEditorModal: React.FC<SketchEditorModalProps> = ({ sketch, onClose, 
                     </div>
                     <aside className={`w-full md:w-72 border-t md:border-t-0 md:border-l ${themeClasses.border} flex-shrink-0 flex flex-col`}>
                         <div className="flex-grow p-4 space-y-6 overflow-y-auto">
-                            {isNew && novels && novels.length > 0 && (
-                                <div>
-                                    <h3 className={`font-bold mb-2 text-sm ${themeClasses.textSecondary}`}>NOVEL</h3>
-                                    <select
-                                        value={selectedNovelId}
-                                        onChange={e => setSelectedNovelId(e.target.value)}
-                                        className={`w-full p-3 rounded-md border ${themeClasses.border} ${themeClasses.input}`}
-                                    >
-                                        {novels.map(n => (
-                                            <option key={n.id} value={n.id}>{enhancePlainText(n.title)}</option>
-                                        ))}
-                                    </select>
+                           <div>
+                                <h3 className={`font-bold mb-2 text-sm ${themeClasses.textSecondary}`}>STATUS</h3>
+                                <div className={`flex rounded-md overflow-hidden border ${themeClasses.border}`}>
+                                    {statusOptions.map(option => (
+                                        <button
+                                            key={option}
+                                            onClick={() => setStatus(option)}
+                                            className={`flex-1 py-2 text-sm font-semibold transition-colors ${status === option ? `${themeClasses.accent} ${themeClasses.accentText}` : `hover:${themeClasses.bgTertiary}`}`}
+                                        >
+                                            {option}
+                                        </button>
+                                    ))}
                                 </div>
-                            )}
+                           </div>
                             <div>
                                 <h3 className={`font-bold mb-2 text-sm ${themeClasses.textSecondary}`}>TAGS (UP TO 6)</h3>
                                 <div className="flex flex-wrap gap-1.5">
@@ -246,7 +238,7 @@ const SketchEditorModal: React.FC<SketchEditorModalProps> = ({ sketch, onClose, 
                         Cancel
                     </button>
                     <button onClick={handleSave} className={`px-6 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90 transition-opacity`}>
-                        Save Sketch
+                        Save Idea
                     </button>
                 </footer>
             </div>
@@ -254,4 +246,4 @@ const SketchEditorModal: React.FC<SketchEditorModalProps> = ({ sketch, onClose, 
     );
 };
 
-export default SketchEditorModal;
+export default StoryIdeaEditorModal;
