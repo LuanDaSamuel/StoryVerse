@@ -71,16 +71,11 @@ const HomePage: React.FC = () => {
                                         </h3>
                                    </div>
                                     <div className="flex flex-wrap gap-2 mt-auto pt-2">
-                                        {novel.tags.slice(0, 3).map(tag => (
+                                        {novel.tags.map(tag => (
                                             <span key={tag} className={`px-3 py-1 text-xs rounded-full font-semibold ${themeClasses.accent} ${themeClasses.accentText}`}>
                                                 {tag}
                                             </span>
                                         ))}
-                                        {novel.tags.length > 3 && (
-                                            <span className={`px-3 py-1 text-xs rounded-full font-semibold ${themeClasses.accent} ${themeClasses.accentText}`}>
-                                                ...
-                                            </span>
-                                        )}
                                     </div>
                                 </div>
                             </Link>

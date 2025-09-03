@@ -1,3 +1,4 @@
+
 import React, { useState, useContext, useRef, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
@@ -30,10 +31,6 @@ const NovelDetailPage: React.FC = () => {
     const [sketchToDelete, setSketchToDelete] = useState<NovelSketch | null>(null);
     const [viewingSketch, setViewingSketch] = useState<NovelSketch | null>(null);
 
-    const [tagFilter, setTagFilter] = useState('');
-    const [tagSort, setTagSort] = useState<'default' | 'alpha'>('default');
-
-
     const { novel, novelIndex } = useMemo(() => {
         const novels = projectData?.novels;
         if (!novels || !novelId) {
@@ -46,18 +43,6 @@ const NovelDetailPage: React.FC = () => {
         };
     }, [projectData, novelId]);
     
-    const filteredAndSortedTags = useMemo(() => {
-        const filtered = TAG_OPTIONS.filter(tag =>
-            tag.toLowerCase().includes(tagFilter.toLowerCase())
-        );
-
-        if (tagSort === 'alpha') {
-            return filtered.sort((a, b) => a.localeCompare(b));
-        }
-
-        return filtered;
-    }, [tagFilter, tagSort]);
-
     useEffect(() => {
         // Adjust textarea height on initial render and when novel changes
         if (descriptionTextareaRef.current) {
@@ -395,26 +380,9 @@ const NovelDetailPage: React.FC = () => {
         return (
             <>
                 <div className="pt-4">
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-                        <h3 className={`font-bold ${themeClasses.accentText}`}>Tags (up to 6)</h3>
-                        <div className="flex items-center space-x-2 w-full sm:w-auto">
-                            <input
-                                type="text"
-                                placeholder="Filter tags..."
-                                value={tagFilter}
-                                onChange={(e) => setTagFilter(e.target.value)}
-                                className={`w-full sm:w-48 px-3 py-1.5 text-sm rounded-md ${themeClasses.input} border ${themeClasses.border}`}
-                            />
-                            <button
-                                onClick={() => setTagSort(prev => prev === 'default' ? 'alpha' : 'default')}
-                                className={`px-3 py-1.5 text-sm font-semibold rounded-md whitespace-nowrap transition-colors ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-80`}
-                            >
-                                {tagSort === 'default' ? 'Sort A-Z' : 'Default Order'}
-                            </button>
-                        </div>
-                    </div>
+                    <h3 className={`font-bold mb-4 ${themeClasses.accentText}`}>Tags (up to 6)</h3>
                     <div className="flex flex-wrap gap-2">
-                        {filteredAndSortedTags.map(tag => (
+                        {TAG_OPTIONS.map(tag => (
                             <button
                                 key={tag}
                                 onClick={() => handleTagClick(tag)}
