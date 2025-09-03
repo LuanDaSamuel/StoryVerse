@@ -371,7 +371,7 @@ const NovelDetailPage: React.FC = () => {
                         ) : novel.sketches.map(sketch => (
                             <div 
                                 key={sketch.id} 
-                                className="group relative p-4 rounded-lg cursor-pointer"
+                                className={`group relative p-4 rounded-lg cursor-pointer ${themeClasses.bgTertiary} border ${themeClasses.border} transition-all duration-200 hover:shadow-lg hover:-translate-y-1`}
                                 onClick={() => setViewingSketch(sketch)}
                             >
                                 <h3 className={`font-bold text-lg ${themeClasses.accentText}`}>{enhancePlainText(sketch.title) || 'Untitled Sketch'}</h3>
