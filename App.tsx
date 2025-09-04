@@ -11,6 +11,7 @@ import ChapterEditorPage from './pages/ChapterEditorPage';
 import NovelDetailPage from './pages/NovelDetailPage';
 import ReadNovelPage from './pages/ReadNovelPage';
 import DemosPage from './pages/DemosPage';
+import StoryIdeaEditorPage from './pages/StoryIdeaEditorPage';
 import { THEME_CONFIG } from './constants';
 import { LoadingIcon } from './components/Icons';
 import { Theme } from './types';
@@ -86,8 +87,8 @@ const AppContent = () => {
 
     const onEditPage = useMatch('/novel/:novelId/edit/:chapterId');
     const onReadPage = useMatch('/novel/:novelId/read/:chapterId?');
-    const onDemosPage = useMatch('/demos');
-    const isSidebarHiddenPage = !!onEditPage || !!onReadPage || !!onDemosPage;
+    const onIdeaEditPage = useMatch('/idea/:ideaId/edit');
+    const isSidebarHiddenPage = !!onEditPage || !!onReadPage || !!onIdeaEditPage;
 
     const renderContent = () => {
         switch (status) {
@@ -113,6 +114,7 @@ const AppContent = () => {
                                 <Route path="/" element={<HomePage />} />
                                 <Route path="/create-novel" element={<CreateNovelPage />} />
                                 <Route path="/demos" element={<DemosPage />} />
+                                <Route path="/idea/:ideaId/edit" element={<StoryIdeaEditorPage />} />
                                 <Route path="/novel/:novelId" element={<NovelDetailPage />} />
                                 <Route path="/novel/:novelId/read/:chapterId?" element={<ReadNovelPage />} />
                                 <Route path="/novel/:novelId/edit" element={<NovelEditRedirect />} />

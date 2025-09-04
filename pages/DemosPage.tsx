@@ -1,48 +1,45 @@
-import React, { useContext, useState, useMemo, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useContext, useMemo, useRef } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { StoryIdea } from '../types';
-import { PlusIcon, TrashIcon, UploadIcon, BackIcon } from '../components/Icons';
-import StoryIdeaEditorModal from '../components/StoryIdeaEditorModal';
+import { PlusIcon, UploadIcon, BackIcon } from '../components/Icons';
 import ConfirmModal from '../components/ConfirmModal';
 import { enhancePlainText } from '../constants';
 import * as mammoth from 'mammoth';
 
 const DemosPage: React.FC = () => {
     const { projectData, setProjectData, themeClasses } = useContext(ProjectContext);
-    const [editingIdea, setEditingIdea] = useState<StoryIdea | 'new' | null>(null);
-    const [ideaToDelete, setIdeaToDelete] = useState<StoryIdea | null>(null);
-    const [isDocxConfirmOpen, setIsDocxConfirmOpen] = useState(false);
-    const [pendingFile, setPendingFile] = useState<File | null>(null);
+    const navigate = useNavigate();
+    const [isDocxConfirmOpen, setIsDocxConfirmOpen] = React.useState(false);
+    const [pendingFile, setPendingFile] = React.useState<File | null>(null);
     const docxInputRef = useRef<HTMLInputElement>(null);
 
     const storyIdeas = useMemo(() => {
         return [...(projectData?.storyIdeas || [])].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
     }, [projectData?.storyIdeas]);
 
-    const handleSaveIdea = (savedIdea: StoryIdea) => {
-        setProjectData(currentData => {
-            if (!currentData) return null;
-            const ideaIndex = currentData.storyIdeas.findIndex(i => i.id === savedIdea.id);
-            const updatedIdeas = [...currentData.storyIdeas];
-            if (ideaIndex > -1) {
-                updatedIdeas[ideaIndex] = savedIdea;
-            } else {
-                updatedIdeas.unshift(savedIdea);
-            }
-            return { ...currentData, storyIdeas: updatedIdeas };
-        });
-        setEditingIdea(null);
-    };
+    const handleNewIdea = () => {
+        const now = new Date().toISOString();
+        const newIdea: StoryIdea = {
+            id: crypto.randomUUID(),
+            title: 'Untitled Idea',
+            synopsis: '<p><br></p>',
+            wordCount: 0,
+            tags: [],
+            status: 'Seedling',
+            createdAt: now,
+            updatedAt: now,
+        };
 
-    const handleDeleteIdea = () => {
-        if (!ideaToDelete) return;
         setProjectData(currentData => {
             if (!currentData) return null;
-            const updatedIdeas = currentData.storyIdeas.filter(i => i.id !== ideaToDelete.id);
-            return { ...currentData, storyIdeas: updatedIdeas };
+            return {
+                ...currentData,
+                storyIdeas: [newIdea, ...(currentData.storyIdeas || [])],
+            };
         });
-        setIdeaToDelete(null);
+
+        navigate(`/idea/${newIdea.id}/edit`);
     };
     
     const handleFileSelectForDocx = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -70,6 +67,7 @@ const DemosPage: React.FC = () => {
                 id: crypto.randomUUID(),
                 title: pendingFile.name.replace(/\.docx$/, ''),
                 synopsis: cleanedHtml,
+                wordCount: 0, // Will be calculated in editor
                 tags: [],
                 status: 'Seedling',
                 createdAt: now,
@@ -126,7 +124,7 @@ const DemosPage: React.FC = () => {
                         <span>Import DOCX</span>
                     </button>
                     <button
-                        onClick={() => setEditingIdea('new')}
+                        onClick={handleNewIdea}
                         className={`flex items-center space-x-2 px-4 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}
                     >
                         <PlusIcon className="w-5 h-5" />
@@ -154,7 +152,7 @@ const DemosPage: React.FC = () => {
                         <div
                             key={idea.id}
                             className={`group relative p-5 rounded-lg flex flex-col cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-1 ${themeClasses.bgSecondary}`}
-                            onClick={() => setEditingIdea(idea)}
+                            onClick={() => navigate(`/idea/${idea.id}/edit`)}
                         >
                             <div className="flex-grow">
                                 <div className="flex justify-between items-start mb-2">
@@ -170,28 +168,11 @@ const DemosPage: React.FC = () => {
                                     {getSnippet(idea.synopsis)}
                                 </p>
                             </div>
-                            <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={(e) => { e.stopPropagation(); setIdeaToDelete(idea); }} className="p-2 rounded-full text-red-500 hover:bg-red-500/10"><TrashIcon className="w-5 h-5" /></button>
-                            </div>
                         </div>
                     ))}
                 </div>
             )}
 
-            {editingIdea && (
-                <StoryIdeaEditorModal
-                    idea={editingIdea === 'new' ? null : editingIdea}
-                    onClose={() => setEditingIdea(null)}
-                    onSave={handleSaveIdea}
-                />
-            )}
-            <ConfirmModal
-                isOpen={!!ideaToDelete}
-                onClose={() => setIdeaToDelete(null)}
-                onConfirm={handleDeleteIdea}
-                title={`Delete idea "${ideaToDelete?.title}"?`}
-                message="Are you sure you want to delete this story idea? This action is permanent and cannot be undone."
-            />
             <ConfirmModal
                 isOpen={isDocxConfirmOpen}
                 onClose={() => { setIsDocxConfirmOpen(false); setPendingFile(null); }}

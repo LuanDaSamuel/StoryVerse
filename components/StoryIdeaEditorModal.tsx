@@ -124,10 +124,19 @@ const StoryIdeaEditorModal: React.FC<StoryIdeaEditorModalProps> = ({ idea, onClo
 
     const handleSave = () => {
         const now = new Date().toISOString();
+        const synopsisHtml = editorRef.current?.innerHTML || '';
+        
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = synopsisHtml;
+        const text = tempDiv.textContent || "";
+        const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+
         const finalIdea: StoryIdea = {
             id: idea?.id || crypto.randomUUID(),
             title: title || 'Untitled Idea',
-            synopsis: editorRef.current?.innerHTML || '',
+            synopsis: synopsisHtml,
+            // FIX: The 'wordCount' property was missing and is now calculated and included.
+            wordCount,
             tags,
             status,
             createdAt: idea?.createdAt || now,

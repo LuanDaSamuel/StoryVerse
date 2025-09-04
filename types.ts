@@ -51,6 +51,7 @@ export interface StoryIdea {
   id: string;
   title: string;
   synopsis: string; // HTML content
+  wordCount: number;
   tags: string[];
   status: StoryIdeaStatus;
   createdAt: string;

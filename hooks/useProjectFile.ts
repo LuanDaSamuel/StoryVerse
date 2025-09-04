@@ -61,6 +61,7 @@ const sanitizeProjectData = (data: any): ProjectData => {
         id: idea.id || crypto.randomUUID(),
         title: idea.title || 'Untitled Idea',
         synopsis: idea.synopsis || '',
+        wordCount: idea.wordCount || 0,
         tags: Array.isArray(idea.tags) ? idea.tags : [],
         status: status,
         createdAt: idea.createdAt || new Date().toISOString(),
