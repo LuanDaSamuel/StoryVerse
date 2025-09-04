@@ -1,11 +1,13 @@
-
 import React, { useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
-import { BackIcon, ChevronLeftIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, TrashIcon, H1Icon, H2Icon, H3Icon } from '../components/Icons';
+import { BackIcon, ChevronLeftIcon, TextIcon, SearchIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, TrashIcon } from '../components/Icons';
 import { enhanceHtml, SKETCH_TAG_OPTIONS, THEME_CONFIG } from '../constants';
 import { StoryIdea, StoryIdeaStatus } from '../types';
 import ConfirmModal from '../components/ConfirmModal';
+
+// This new page provides a full-screen, auto-saving editor for Story Ideas,
+// matching the feature set and UI of the Chapter Editor for a consistent experience.
 
 const StoryIdeaEditorPage: React.FC = () => {
     const { ideaId } = useParams<{ ideaId: string }>();
@@ -13,10 +15,11 @@ const StoryIdeaEditorPage: React.FC = () => {
     const { projectData, setProjectData, theme, themeClasses } = useContext(ProjectContext);
     
     const editorRef = useRef<HTMLDivElement>(null);
-    
+    const titleInputRef = useRef<HTMLInputElement>(null);
+    const saveTimeout = useRef<number | null>(null);
+
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-    const [activeFormats, setActiveFormats] = useState({ isBold: false, isItalic: false, isUL: false, isOL: false, currentBlock: 'p' });
     
     const { idea, ideaIndex } = useMemo(() => {
         if (!projectData?.storyIdeas || !ideaId) return { idea: null, ideaIndex: -1 };
@@ -26,82 +29,77 @@ const StoryIdeaEditorPage: React.FC = () => {
         
         return { idea: projectData.storyIdeas[iIndex], ideaIndex: iIndex };
     }, [projectData, ideaId]);
+
+    const [title, setTitle] = useState(idea?.title || '');
+    const [synopsis, setSynopsis] = useState(idea?.synopsis || '');
+    const [tags, setTags] = useState<string[]>(idea?.tags || []);
+    const [status, setStatus] = useState<StoryIdeaStatus>(idea?.status || 'Seedling');
+    const [wordCount, setWordCount] = useState(idea?.wordCount || 0);
     
-    const updateIdea = useCallback((field: keyof StoryIdea, value: any) => {
-        if (ideaIndex === -1) return;
-
-        setProjectData(currentData => {
-            if (!currentData) return currentData;
-            
-            const updatedIdeas = [...currentData.storyIdeas];
-            const currentIdea = updatedIdeas[ideaIndex];
-
-            const tempDiv = document.createElement('div');
-            const newSynopsis = field === 'synopsis' ? value : currentIdea.synopsis;
-            tempDiv.innerHTML = newSynopsis;
-            const text = tempDiv.textContent || "";
-            const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
-
-            updatedIdeas[ideaIndex] = {
-                ...currentIdea,
-                [field]: value,
-                wordCount: wordCount,
-                updatedAt: new Date().toISOString(),
-            };
-            
-            return { ...currentData, storyIdeas: updatedIdeas };
-        });
-    }, [ideaIndex, setProjectData]);
-    
-    // Set initial content
+    // Load data from project when the idea changes
     useEffect(() => {
-        if (editorRef.current && idea && idea.synopsis !== editorRef.current.innerHTML) {
-            editorRef.current.innerHTML = enhanceHtml(idea.synopsis);
+        if (idea) {
+            setTitle(idea.title);
+            setSynopsis(idea.synopsis);
+            setTags(idea.tags);
+            setStatus(idea.status);
+            setWordCount(idea.wordCount);
+            if (editorRef.current && idea.synopsis !== editorRef.current.innerHTML) {
+                editorRef.current.innerHTML = enhanceHtml(idea.synopsis);
+            }
         }
     }, [idea]);
 
-    const updateActiveFormats = useCallback(() => {
-        let blockType = 'p';
-        const selection = window.getSelection();
-        if (selection?.rangeCount) {
-            let element = selection.getRangeAt(0).startContainer;
-            if (element.nodeType === 3) element = element.parentNode!;
-            while (element && element !== editorRef.current) {
-                const tag = (element as HTMLElement).tagName?.toLowerCase();
-                if (['h1', 'h2', 'h3', 'blockquote'].includes(tag)) {
-                    blockType = tag;
-                    break;
-                }
-                element = element.parentNode!;
-            }
-        }
-        setActiveFormats({
-            isBold: document.queryCommandState('bold'),
-            isItalic: document.queryCommandState('italic'),
-            isUL: document.queryCommandState('insertUnorderedList'),
-            isOL: document.queryCommandState('insertOrderedList'),
-            currentBlock: blockType,
-        });
-    }, []);
-
+    // Auto-save logic
     useEffect(() => {
-        const editorEl = editorRef.current;
-        document.addEventListener('selectionchange', updateActiveFormats);
-        editorEl?.addEventListener('keyup', updateActiveFormats);
-        editorEl?.addEventListener('mouseup', updateActiveFormats);
+        if (!idea) return; // Don't save if there's no idea loaded
+    
+        if (saveTimeout.current) {
+            clearTimeout(saveTimeout.current);
+        }
+    
+        saveTimeout.current = window.setTimeout(() => {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = synopsis;
+            const text = tempDiv.textContent || "";
+            const currentWordCount = text.trim().split(/\s+/).filter(Boolean).length;
+    
+            setProjectData(currentData => {
+                if (!currentData || ideaIndex === -1) return currentData;
+    
+                const updatedIdeas = [...currentData.storyIdeas];
+                updatedIdeas[ideaIndex] = {
+                    ...updatedIdeas[ideaIndex],
+                    title,
+                    synopsis,
+                    tags,
+                    status,
+                    wordCount: currentWordCount,
+                    updatedAt: new Date().toISOString(),
+                };
+    
+                return { ...currentData, storyIdeas: updatedIdeas };
+            });
+            setWordCount(currentWordCount); // Update local word count state after save
+        }, 1000); // 1-second debounce
+    
         return () => {
-            document.removeEventListener('selectionchange', updateActiveFormats);
-            editorEl?.removeEventListener('keyup', updateActiveFormats);
-            editorEl?.removeEventListener('mouseup', updateActiveFormats);
+            if (saveTimeout.current) {
+                clearTimeout(saveTimeout.current);
+            }
         };
-    }, [updateActiveFormats]);
+    }, [title, synopsis, tags, status, idea, ideaIndex, setProjectData]);
     
     const handleTagClick = (tag: string) => {
-        if (!idea) return;
-        const newTags = idea.tags.includes(tag)
-            ? idea.tags.filter(t => t !== tag)
-            : idea.tags.length < 6 ? [...idea.tags, tag] : idea.tags;
-        updateIdea('tags', newTags);
+        setTags(prev => {
+            if (prev.includes(tag)) {
+                return prev.filter(t => t !== tag);
+            }
+            if (prev.length < 6) {
+                return [...prev, tag];
+            }
+            return prev;
+        });
     };
 
     const handleDelete = () => {
@@ -114,16 +112,8 @@ const StoryIdeaEditorPage: React.FC = () => {
         navigate('/demos');
     };
 
-    const applyCommand = (command: string, value?: string) => {
-        document.execCommand(command, false, value);
-        editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
-        editorRef.current?.focus();
-    };
-
-    const applyParagraphStyle = (style: string) => {
-        const format = activeFormats.currentBlock === style ? 'p' : style;
-        document.execCommand('formatBlock', false, format);
-        editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+    const applyCommand = (command: string) => {
+        document.execCommand(command, false);
         editorRef.current?.focus();
     };
 
@@ -152,37 +142,19 @@ const StoryIdeaEditorPage: React.FC = () => {
                 )}
                 
                 <div className="flex-1 overflow-y-auto relative">
-                     <div className={`sticky top-0 z-10 ${themeClasses.bg} bg-opacity-80 backdrop-blur-sm border-b ${themeClasses.border}`}>
-                        <div className="px-8 md:px-16 lg:px-24 pt-6 pb-4">
-                            <button onClick={() => navigate(`/demos`)} className={`flex items-center space-x-2 ${themeClasses.text} opacity-70 hover:opacity-100`}>
-                                <BackIcon className="w-5 h-5" />
-                                <span className="font-sans">Return to Idea Box</span>
-                            </button>
-                        </div>
-                        <div className="flex justify-center pb-2">
-                             <div className="flex items-center space-x-1 p-1 rounded-full shadow-lg bg-stone-900/70 border border-white/10 backdrop-blur-sm" onMouseDown={(e) => e.preventDefault()}>
-                                <button onClick={() => applyCommand('bold')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors ${activeFormats.isBold ? 'bg-white/20' : ''}`}><BoldIcon className="w-5 h-5"/></button>
-                                <button onClick={() => applyCommand('italic')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors ${activeFormats.isItalic ? 'bg-white/20' : ''}`}><ItalicIcon className="w-5 h-5"/></button>
-                                <div className="w-px h-5 bg-white/20 mx-1"></div>
-                                <button onClick={() => applyParagraphStyle('h1')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors ${activeFormats.currentBlock === 'h1' ? 'bg-white/20' : ''}`}><H1Icon className="w-5 h-5"/></button>
-                                <button onClick={() => applyParagraphStyle('h2')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors ${activeFormats.currentBlock === 'h2' ? 'bg-white/20' : ''}`}><H2Icon className="w-5 h-5"/></button>
-                                <button onClick={() => applyParagraphStyle('h3')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors ${activeFormats.currentBlock === 'h3' ? 'bg-white/20' : ''}`}><H3Icon className="w-5 h-5"/></button>
-                                <div className="w-px h-5 bg-white/20 mx-1"></div>
-                                <button onClick={() => applyCommand('insertUnorderedList')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.isUL ? 'bg-white/20' : ''}`}><ListBulletIcon className="w-5 h-5"/></button>
-                                <button onClick={() => applyCommand('insertOrderedList')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.isOL ? 'bg-white/20' : ''}`}><OrderedListIcon className="w-5 h-5"/></button>
-                                <button onClick={() => applyParagraphStyle('blockquote')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.currentBlock === 'blockquote' ? 'bg-white/20' : ''}`}><BlockquoteIcon className="w-5 h-5"/></button>
-                                <div className="w-px h-5 bg-white/20 mx-1"></div>
-                                <button onClick={() => applyCommand('undo')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors`}><UndoIcon className="w-5 h-5"/></button>
-                                <button onClick={() => applyCommand('redo')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors`}><RedoIcon className="w-5 h-5"/></button>
-                            </div>
-                        </div>
+                    <div className={`sticky top-0 z-10 px-8 md:px-16 lg:px-24 pt-6 pb-4 ${themeClasses.bg} bg-opacity-80 backdrop-blur-sm border-b ${themeClasses.border}`}>
+                        <button onClick={() => navigate(`/demos`)} className={`flex items-center space-x-2 ${themeClasses.text} opacity-70 hover:opacity-100`}>
+                            <BackIcon className="w-5 h-5" />
+                            <span className="font-sans">Return to Idea Box</span>
+                        </button>
                     </div>
                     
                     <div className="px-8 md:px-16 lg:px-24 pt-8 pb-48">
                         <input
+                            ref={titleInputRef}
                             type="text"
-                            value={idea.title}
-                            onChange={(e) => updateIdea('title', e.target.value)}
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
                             placeholder="Idea Title"
                             className="text-4xl font-bold bg-transparent outline-none w-full mb-8"
                         />
@@ -191,7 +163,7 @@ const StoryIdeaEditorPage: React.FC = () => {
                             contentEditable
                             spellCheck={true}
                             suppressContentEditableWarning
-                            onInput={(e) => updateIdea('synopsis', e.currentTarget.innerHTML)}
+                            onInput={(e) => setSynopsis(e.currentTarget.innerHTML)}
                             className="w-full text-lg leading-relaxed outline-none story-content"
                             style={editorStyle}
                         />
@@ -205,7 +177,7 @@ const StoryIdeaEditorPage: React.FC = () => {
                             <button onClick={() => setIsSidebarOpen(false)}><ChevronLeftIcon className="w-5 h-5"/></button>
                         </div>
                         <div className={`px-4 py-4 border-b ${themeClasses.border}`}>
-                            <p className="text-3xl font-bold">{(idea.wordCount || 0).toLocaleString()}</p>
+                            <p className="text-3xl font-bold">{wordCount.toLocaleString()}</p>
                             <p className={themeClasses.textSecondary}>WORDS</p>
                         </div>
                         <div className="flex-1 p-4 space-y-6 overflow-y-auto">
@@ -213,7 +185,7 @@ const StoryIdeaEditorPage: React.FC = () => {
                                 <h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Status</h3>
                                 <div className={`flex rounded-md overflow-hidden border ${themeClasses.border}`}>
                                     {(['Seedling', 'Developing', 'Archived'] as StoryIdeaStatus[]).map(option => (
-                                        <button key={option} onClick={() => updateIdea('status', option)} className={`flex-1 py-2 text-sm font-semibold transition-colors ${idea.status === option ? `${themeClasses.accent} ${themeClasses.accentText}` : `hover:${themeClasses.bgTertiary}`}`}>
+                                        <button key={option} onClick={() => setStatus(option)} className={`flex-1 py-2 text-sm font-semibold transition-colors ${status === option ? `${themeClasses.accent} ${themeClasses.accentText}` : `hover:${themeClasses.bgTertiary}`}`}>
                                             {option}
                                         </button>
                                     ))}
@@ -223,7 +195,7 @@ const StoryIdeaEditorPage: React.FC = () => {
                                 <h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Tags (up to 6)</h3>
                                 <div className="flex flex-wrap gap-1.5">
                                     {SKETCH_TAG_OPTIONS.map(tag => (
-                                        <button key={tag} onClick={() => handleTagClick(tag)} className={`px-2 py-1 text-xs rounded-full transition-colors font-semibold ${idea.tags.includes(tag) ? `${themeClasses.accent} ${themeClasses.accentText}` : `${themeClasses.bgTertiary} hover:opacity-80`}`}>
+                                        <button key={tag} onClick={() => handleTagClick(tag)} className={`px-2 py-1 text-xs rounded-full transition-colors font-semibold ${tags.includes(tag) ? `${themeClasses.accent} ${themeClasses.accentText}` : `${themeClasses.bgTertiary} hover:opacity-80`}`}>
                                             {tag}
                                         </button>
                                     ))}
@@ -236,6 +208,22 @@ const StoryIdeaEditorPage: React.FC = () => {
                                     <span>Delete Idea</span>
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="absolute bottom-0 left-0 w-full flex justify-center pb-4 z-20 pointer-events-none">
+                    <div className="relative pointer-events-auto">
+                        <div className="flex items-center space-x-1 p-1 rounded-full shadow-lg bg-stone-900/70 border border-white/10 backdrop-blur-sm" onMouseDown={(e) => e.preventDefault()}>
+                            <button onClick={() => applyCommand('bold')} className="p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors"><BoldIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyCommand('italic')} className="p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors"><ItalicIcon className="w-5 h-5"/></button>
+                            <div className="w-px h-5 bg-white/20 mx-1"></div>
+                            <button onClick={() => applyCommand('insertUnorderedList')} className="p-2 rounded-full text-white/90 hover:bg-white/10"><ListBulletIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyCommand('insertOrderedList')} className="p-2 rounded-full text-white/90 hover:bg-white/10"><OrderedListIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyCommand('formatBlock,blockquote')} className="p-2 rounded-full text-white/90 hover:bg-white/10"><BlockquoteIcon className="w-5 h-5"/></button>
+                            <div className="w-px h-5 bg-white/20 mx-1"></div>
+                            <button onClick={() => applyCommand('undo')} className="p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors"><UndoIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyCommand('redo')} className="p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors"><RedoIcon className="w-5 h-5"/></button>
                         </div>
                     </div>
                 </div>
