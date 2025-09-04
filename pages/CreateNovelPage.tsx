@@ -1,6 +1,3 @@
-
-
-
 import React, { useState, useContext, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
@@ -104,6 +101,7 @@ const CreateNovelPage: React.FC = () => {
                 updatedAt: now,
                 history: [],
             }],
+            // FIX: Initialize sketches as an empty array for new novels.
             sketches: [],
             createdAt: now,
             ...(coverImage && { coverImage }),

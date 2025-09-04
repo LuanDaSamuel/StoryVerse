@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ProjectData, FileStatus, SaveStatus, Theme, StoryIdeaStatus } from '../types';
+// FIX: Import NovelSketch to use in sanitization logic.
+import { ProjectData, FileStatus, SaveStatus, Theme, StoryIdeaStatus, NovelSketch } from '../types';
 import { get, set, del } from 'idb-keyval';
 
 const LOCAL_BACKUP_KEY = 'storyverse-local-backup'; // Used for caching
@@ -12,7 +13,6 @@ const defaultProjectData: ProjectData = {
     theme: 'book',
   },
   novels: [],
-  sketches: [],
   storyIdeas: [],
 };
 
@@ -39,29 +39,19 @@ const sanitizeProjectData = (data: any): ProjectData => {
             history: Array.isArray(chapter.history) ? chapter.history : [],
           }))
         : [],
+      // FIX: Added sanitization for the new 'sketches' property on novels.
       sketches: Array.isArray(novel.sketches)
-        ? novel.sketches.map((sketch: any) => ({
+        ? novel.sketches.map((sketch: any): NovelSketch => ({
             id: sketch.id || crypto.randomUUID(),
-            title: sketch.title || "Untitled Sketch",
+            title: sketch.title || 'Untitled Sketch',
             content: sketch.content || '',
             tags: Array.isArray(sketch.tags) ? sketch.tags : [],
             createdAt: sketch.createdAt || new Date().toISOString(),
             updatedAt: sketch.updatedAt || new Date().toISOString(),
-        }))
+          }))
         : [],
       createdAt: novel.createdAt || new Date().toISOString(),
     }));
-  }
-  if (Array.isArray(data?.sketches)) {
-    sanitized.sketches = data.sketches.map((sketch: any) => {
-      return {
-        id: sketch.id || crypto.randomUUID(),
-        title: sketch.title || 'Untitled Sketch',
-        content: sketch.content || '',
-        createdAt: sketch.createdAt || new Date().toISOString(),
-        updatedAt: sketch.updatedAt || new Date().toISOString(),
-      };
-    });
   }
   if (Array.isArray(data?.storyIdeas)) {
     sanitized.storyIdeas = data.storyIdeas.map((idea: any) => {

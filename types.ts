@@ -17,6 +17,19 @@ export interface Chapter {
   history: ChapterHistory[];
 }
 
+export interface Novel {
+  id:string;
+  title: string;
+  description: string;
+  coverImage?: string; // base64 string
+  tags: string[];
+  chapters: Chapter[];
+  // FIX: Added sketches to the Novel type to support the sketches feature.
+  sketches: NovelSketch[];
+  createdAt: string;
+}
+
+// FIX: Added NovelSketch type to define the structure of a novel sketch.
 export interface NovelSketch {
   id: string;
   title: string;
@@ -26,28 +39,10 @@ export interface NovelSketch {
   updatedAt: string;
 }
 
-export type AggregatedSketch = NovelSketch & {
-    novelId: string;
-    novelTitle: string;
-};
-
-export interface Novel {
-  id:string;
-  title: string;
-  description: string;
-  coverImage?: string; // base64 string
-  tags: string[];
-  chapters: Chapter[];
-  sketches: NovelSketch[];
-  createdAt: string;
-}
-
-export interface Sketch {
-  id: string;
-  title: string;
-  content: string; // HTML content
-  createdAt: string;
-  updatedAt: string;
+// FIX: Added AggregatedSketch type which extends NovelSketch with novel context.
+export interface AggregatedSketch extends NovelSketch {
+  novelId: string;
+  novelTitle: string;
 }
 
 export type StoryIdeaStatus = 'Seedling' | 'Developing' | 'Archived';
@@ -67,7 +62,6 @@ export interface ProjectData {
     theme: Theme;
   };
   novels: Novel[];
-  sketches: Sketch[];
   storyIdeas: StoryIdea[];
 }
 

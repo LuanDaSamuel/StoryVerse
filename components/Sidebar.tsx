@@ -41,10 +41,6 @@ const Sidebar: React.FC = () => {
                         <PlusIcon className="w-5 h-5" />
                         <span>Create Novel</span>
                     </NavLink>
-                    <NavLink to="/sketches" className={navLinkClasses}>
-                        <QuillPenIcon className="w-5 h-5" />
-                        <span>Sketches</span>
-                    </NavLink>
                     <NavLink to="/demos" className={navLinkClasses}>
                         <LightbulbIcon className="w-5 h-5" />
                         <span>Idea Box</span>
