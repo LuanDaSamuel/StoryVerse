@@ -3,7 +3,7 @@ import React, { useContext, useEffect, useMemo, useRef, useState, useCallback } 
 // FIX: Changed react-router-dom import to namespace import to fix module resolution issues.
 import * as ReactRouterDOM from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
-import { BackIcon, BookOpenIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, TextIcon, SearchIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, CloseIcon, Bars3Icon, DownloadIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, H1Icon, H2Icon, H3Icon } from '../components/Icons';
+import { BackIcon, BookOpenIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, TextIcon, SearchIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, CloseIcon, Bars3Icon, DownloadIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon } from '../components/Icons';
 import { enhancePlainText, enhanceHtml, THEME_CONFIG } from '../constants';
 import ExportModal from '../components/ExportModal';
 
@@ -315,13 +315,6 @@ const FindReplaceModal: React.FC<{
   );
 };
 
-// FIX: Added Heading interface for Document Outline.
-interface Heading {
-  id: string;
-  level: number;
-  text: string;
-}
-
 // --- Main Page Component ---
 const ChapterEditorPage: React.FC = () => {
     const { novelId, chapterId } = ReactRouterDOM.useParams<{ novelId: string; chapterId: string }>();
@@ -339,9 +332,6 @@ const ChapterEditorPage: React.FC = () => {
     const [isFormatPanelOpen, setIsFormatPanelOpen] = useState(false);
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
     const [activeFormats, setActiveFormats] = useState({ isBold: false, isItalic: false, isUL: false, isOL: false });
-    // FIX: Added state for Document Outline.
-    const [headings, setHeadings] = useState<Heading[]>([]);
-    const headingUpdateTimeout = useRef<number | null>(null);
     const [currentFormat, setCurrentFormat] = useState({
         paragraphStyle: 'p',
         font: fontOptions[0].value,
@@ -483,26 +473,6 @@ const ChapterEditorPage: React.FC = () => {
             return updatedProjectData;
         });
     }, [novelIndex, chapterIndex, setProjectData]);
-    
-    // FIX: Added function to parse and update the Document Outline.
-    const updateHeadings = useCallback(() => {
-        if (!editorRef.current) {
-            setHeadings([]);
-            return;
-        }
-        const headingElements = editorRef.current.querySelectorAll('h1, h2, h3');
-        const newHeadings: Heading[] = Array.from(headingElements).map((el, index) => {
-            if (!el.id) {
-                el.id = `editor-heading-${index}-${Date.now()}`;
-            }
-            return {
-                id: el.id,
-                level: parseInt(el.tagName.substring(1), 10),
-                text: el.textContent || 'Untitled Heading',
-            };
-        });
-        setHeadings(newHeadings);
-    }, []);
 
     const updateActiveFormats = useCallback(() => {
         setActiveFormats({
@@ -972,16 +942,10 @@ const ChapterEditorPage: React.FC = () => {
         }
     }, []);
 
-    // FIX: Added handler to update editor content and Document Outline.
     const handleEditorInput = (e: React.FormEvent<HTMLDivElement>) => {
         const newHTML = e.currentTarget.innerHTML;
         editorContentRef.current = newHTML;
         updateChapterField('content', newHTML);
-
-        if (headingUpdateTimeout.current) clearTimeout(headingUpdateTimeout.current);
-        headingUpdateTimeout.current = window.setTimeout(() => {
-            updateHeadings();
-        }, 500);
     };
 
     // --- Effects ---
@@ -1005,8 +969,6 @@ const ChapterEditorPage: React.FC = () => {
                 selection.removeAllRanges();
                 selection.addRange(range);
             }
-            // FIX: Update the Document Outline on initial chapter load.
-            setTimeout(updateHeadings, 100);
         }
         handleSelectionChange();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1031,8 +993,6 @@ const ChapterEditorPage: React.FC = () => {
                     selection.removeAllRanges();
                     selection.addRange(range);
                 }
-                // FIX: Update the Document Outline after programmatic changes.
-                setTimeout(updateHeadings, 100);
             }
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1224,37 +1184,6 @@ const ChapterEditorPage: React.FC = () => {
                         </div>
 
                         <div className="flex-1 overflow-y-auto">
-                           {/* FIX: Added Document Outline section. */}
-                           <div className={`border-b ${themeClasses.border}`}>
-                                <div className="py-3 px-4 font-semibold text-left flex items-center space-x-3">
-                                    <ListBulletIcon className="w-5 h-5" />
-                                    <span>Document Outline</span>
-                                </div>
-                                <div className="px-4 pb-4 max-h-60 overflow-y-auto">
-                                    {headings.length > 0 ? (
-                                        <ul className="space-y-1 text-xs">
-                                            {headings.map(heading => (
-                                                <li key={heading.id}>
-                                                    <button
-                                                        onClick={() => {
-                                                            const el = document.getElementById(heading.id);
-                                                            el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                                            setIsSidebarOpen(false);
-                                                        }}
-                                                        className="w-full text-left py-1 rounded hover:bg-white/10 transition-colors"
-                                                        style={{ paddingLeft: `${(heading.level - 1) * 1}rem` }}
-                                                        title={heading.text}
-                                                    >
-                                                        <span className="truncate block">{enhancePlainText(heading.text)}</span>
-                                                    </button>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    ) : (
-                                        <p className={`text-xs ${themeClasses.textSecondary}`}>No headings found.</p>
-                                    )}
-                                </div>
-                            </div>
                            <div className={`border-b ${themeClasses.border}`}>
                                 <button
                                     onClick={() => setIsChapterListModalOpen(true)}
@@ -1300,12 +1229,8 @@ const ChapterEditorPage: React.FC = () => {
                                 className="absolute bottom-full mb-2 p-4 rounded-lg shadow-lg bg-stone-900/80 border border-white/10 backdrop-blur-sm w-[320px]"
                             >
                                 <div className="space-y-4">
-                                    {/* FIX: Restored Heading options to the paragraph style dropdown. */}
                                     <ToolbarDropdown label="Paragraph Style" value={currentFormat.paragraphStyle} onChange={(e) => applyParagraphStyle(e.target.value)}>
                                         <option value="p">Paragraph</option>
-                                        <option value="h1">Heading 1</option>
-                                        <option value="h2">Heading 2</option>
-                                        <option value="h3">Heading 3</option>
                                         <option value="blockquote">Blockquote</option>
                                     </ToolbarDropdown>
                                     <ToolbarDropdown label="Font" value={currentFormat.font} onChange={(e) => applyFont(e.target.value)}>

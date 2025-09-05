@@ -14,7 +14,7 @@ const DemosPage = () => {
     const { projectData, setProjectData, themeClasses } = useContext(ProjectContext);
     const navigate = ReactRouterDOM.useNavigate();
     const [isDocxConfirmOpen, setIsDocxConfirmOpen] = useState(false);
-    const [pendingFile, setPendingFile] = useState<File | null>(null);
+    const [pendingImportData, setPendingImportData] = useState<{ title: string; synopsisHtml: string; originalFilename: string } | null>(null);
     const docxInputRef = useRef<HTMLInputElement>(null);
     const [ideaToDelete, setIdeaToDelete] = useState<StoryIdea | null>(null);
 
@@ -46,52 +46,56 @@ const DemosPage = () => {
         navigate(`/idea/${newIdea.id}/edit`);
     };
     
-    const handleFileSelectForDocx = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileSelectForDocx = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (file) {
-            setPendingFile(file);
-            setIsDocxConfirmOpen(true);
-        }
-        e.target.value = ''; // Reset file input
-    };
-
-    const handleDocxImport = async () => {
-        if (!pendingFile) return;
-        setIsDocxConfirmOpen(false);
+        if (!file) return;
 
         try {
-            const arrayBuffer = await pendingFile.arrayBuffer();
-            
-            // Define a style map to convert Word styles to HTML headings
+            const arrayBuffer = await file.arrayBuffer();
             const styleMap = [
                 "p[style-name='Title'] => h1:fresh",
                 "p[style-name='Heading 1'] => h2:fresh",
                 "p[style-name='Heading 2'] => h3:fresh",
             ];
-    
             const { value: html } = await mammoth.convertToHtml({ arrayBuffer }, { styleMap });
             
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = html;
-    
-            let ideaTitle = pendingFile.name.replace(/\.docx$/, '');
             
-            // Find the first h1, h2, or h3 to use as the title
+            let ideaTitle = file.name.replace(/\.docx$/, '');
             const firstHeading = tempDiv.querySelector('h1, h2, h3');
-    
+            
             if (firstHeading && firstHeading.textContent) {
                 ideaTitle = firstHeading.textContent.trim();
-                firstHeading.remove(); // Remove the heading from the content
+                firstHeading.remove();
             }
-    
-            // Clean the remaining HTML for the synopsis
+            
             const synopsisHtml = tempDiv.innerHTML.replace(/<p>(\s|&nbsp;|<br\s*\/?>)*<\/p>/gi, '').trim();
+            
+            setPendingImportData({
+                title: ideaTitle,
+                synopsisHtml: synopsisHtml,
+                originalFilename: file.name,
+            });
+            setIsDocxConfirmOpen(true);
+        } catch (error) {
+            console.error(`Error processing file ${file.name}:`, error);
+            alert(`Failed to process ${file.name}. It might be corrupted or not a valid .docx file.`);
+        } finally {
+            e.target.value = ''; // Reset file input to allow re-selection
+        }
+    };
 
+    const handleDocxImport = async () => {
+        if (!pendingImportData) return;
+        setIsDocxConfirmOpen(false);
+
+        try {
             const now = new Date().toISOString();
             const newIdea: StoryIdea = {
                 id: crypto.randomUUID(),
-                title: ideaTitle,
-                synopsis: synopsisHtml,
+                title: pendingImportData.title,
+                synopsis: pendingImportData.synopsisHtml,
                 wordCount: 0, // Will be calculated in editor
                 tags: [],
                 status: 'Seedling',
@@ -106,13 +110,12 @@ const DemosPage = () => {
                     storyIdeas: [newIdea, ...currentData.storyIdeas],
                 };
             });
-
         // FIX: Corrected syntax for catch block from `catch() => {}` to `catch() {}`
         } catch (error) {
-            console.error(`Error processing file ${pendingFile.name}:`, error);
-            alert(`Failed to process ${pendingFile.name}. It might be corrupted or not a valid .docx file.`);
+            console.error(`Error importing file:`, error);
+            alert(`Failed to import the story idea.`);
         } finally {
-            setPendingFile(null);
+            setPendingImportData(null);
         }
     };
 
@@ -221,10 +224,25 @@ const DemosPage = () => {
 
             <ConfirmModal
                 isOpen={isDocxConfirmOpen}
-                onClose={() => { setIsDocxConfirmOpen(false); setPendingFile(null); }}
+                onClose={() => { setIsDocxConfirmOpen(false); setPendingImportData(null); }}
                 onConfirm={handleDocxImport}
-                title={`Import "${pendingFile?.name}"?`}
-                message="This will create a new story idea from the selected DOCX file. The app will attempt to use the first heading as the title; otherwise, it will use the filename."
+                title={`Import from "${pendingImportData?.originalFilename}"?`}
+                message={
+                    pendingImportData ? (
+                        <div>
+                            <p className="mb-4">This will create a new story idea with the following detected content:</p>
+                            <div className={`p-3 rounded-lg border ${themeClasses.border} ${themeClasses.bgTertiary}`}>
+                                <p className="font-semibold text-sm">TITLE</p>
+                                <p className={`mb-2 ${themeClasses.accentText}`}>{enhancePlainText(pendingImportData.title)}</p>
+                                <p className="font-semibold text-sm">SYNOPSIS PREVIEW</p>
+                                <p className={`text-sm italic ${themeClasses.textSecondary}`}>
+                                    {getSnippet(pendingImportData.synopsisHtml)}
+                                </p>
+                            </div>
+                            <p className="mt-4">Do you want to proceed?</p>
+                        </div>
+                    ) : "Loading preview..."
+                }
                 confirmButtonClass={`px-6 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}
             />
              <ConfirmModal

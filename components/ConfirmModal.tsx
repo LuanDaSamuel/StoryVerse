@@ -8,7 +8,7 @@ interface ConfirmModalProps {
   onClose: () => void;
   onConfirm: () => void | Promise<void>;
   title: string;
-  message: string;
+  message: React.ReactNode;
   confirmButtonClass?: string;
 }
 
@@ -36,7 +36,9 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({ isOpen, onClose, onConfirm,
                 <CloseIcon className="w-6 h-6" />
               </button>
             </div>
-            <p className={`${themeClasses.textSecondary} mb-6`}>{enhancePlainText(message)}</p>
+            <div className={`${themeClasses.textSecondary} mb-6`}>
+                {typeof message === 'string' ? enhancePlainText(message) : message}
+            </div>
             <div className="flex justify-end space-x-4">
                 <button
                   onClick={onClose}
