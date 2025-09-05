@@ -95,12 +95,13 @@ const NovelDetailPage: React.FC = () => {
             a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
         );
 
-        let newChapters: Chapter[] = [];
+        let allNewChapters: Chapter[] = [];
 
         const styleMap = [
             "p[style-name='Title'] => h1:fresh",
             "p[style-name='Heading 1'] => h2:fresh",
             "p[style-name='Heading 2'] => h3:fresh",
+            "p[style-name='Heading 3'] => h3:fresh",
         ];
 
         for (const file of sortedFiles) {
@@ -115,8 +116,9 @@ const NovelDetailPage: React.FC = () => {
                 const matches = [...cleanedHtml.matchAll(headingRegex)];
 
                 if (matches.length === 0) {
+                    // No headings found, treat the whole file as one chapter
                     const now = new Date().toISOString();
-                    newChapters.push({
+                    allNewChapters.push({
                         id: crypto.randomUUID(),
                         title: file.name.replace(/\.docx$/, ''),
                         content: cleanedHtml,
@@ -126,17 +128,36 @@ const NovelDetailPage: React.FC = () => {
                         history: [],
                     });
                 } else {
+                    // Headings found, split into chapters
+                    let lastIndex = 0;
+                    // Handle content before the first heading
+                    if (matches[0].index && matches[0].index > 0) {
+                        const preContent = cleanedHtml.substring(0, matches[0].index).trim();
+                        if (preContent) {
+                            const now = new Date().toISOString();
+                            allNewChapters.push({
+                                id: crypto.randomUUID(),
+                                title: 'Prologue',
+                                content: preContent,
+                                wordCount: 0,
+                                createdAt: now,
+                                updatedAt: now,
+                                history: [],
+                            });
+                        }
+                    }
+
                     matches.forEach((match, i) => {
                         const tempDiv = document.createElement('div');
                         tempDiv.innerHTML = match[0];
-                        const chapterTitle = tempDiv.textContent?.trim() || `Chapter ${newChapters.length + 1}`;
+                        const chapterTitle = tempDiv.textContent?.trim() || `Chapter ${allNewChapters.length + 1}`;
                         
-                        const startIndex = (match.index || 0) + match[0].length;
+                        const startIndex = match.index || 0;
                         const endIndex = (i + 1 < matches.length) ? (matches[i + 1].index || cleanedHtml.length) : cleanedHtml.length;
                         const content = cleanedHtml.substring(startIndex, endIndex);
 
                         const now = new Date().toISOString();
-                        newChapters.push({
+                        allNewChapters.push({
                             id: crypto.randomUUID(),
                             title: chapterTitle,
                             content: content.trim(),
@@ -153,9 +174,9 @@ const NovelDetailPage: React.FC = () => {
             }
         }
 
-        if (newChapters.length > 0) {
+        if (allNewChapters.length > 0) {
             const tempDiv = document.createElement('div');
-            newChapters.forEach(chapter => {
+            allNewChapters.forEach(chapter => {
                 tempDiv.innerHTML = chapter.content;
                 const text = tempDiv.textContent || "";
                 chapter.wordCount = text.trim().split(/\s+/).filter(Boolean).length;
@@ -165,7 +186,12 @@ const NovelDetailPage: React.FC = () => {
                 if (!currentData) return null;
                 const updatedNovels = [...currentData.novels];
                 if (novelIndex >= updatedNovels.length) return currentData;
-                updatedNovels[novelIndex] = { ...updatedNovels[novelIndex], chapters: newChapters };
+                const currentNovel = updatedNovels[novelIndex];
+                
+                // Replace all existing chapters with the newly imported ones
+                const updatedNovel = { ...currentNovel, chapters: allNewChapters };
+                updatedNovels[novelIndex] = updatedNovel;
+
                 return { ...currentData, novels: updatedNovels };
             });
         }
@@ -431,52 +457,63 @@ const NovelDetailPage: React.FC = () => {
                         <h1 className={`text-5xl font-bold ${themeClasses.accentText}`}>{enhancePlainText(novel.title)}</h1>
                         <textarea
                             ref={descriptionTextareaRef}
-                            value={novel.description || ''}
+                            value={enhancePlainText(novel.description)}
                             onChange={handleDescriptionChange}
-                            placeholder="Add a description..."
-                            className={`mt-2 w-full bg-transparent resize-none overflow-hidden outline-none focus:ring-1 focus:${themeClasses.accentBorder} rounded-md p-1 -m-1 transition-all ${themeClasses.textSecondary}`}
-                            rows={1}
+                            placeholder="A short, captivating description of your novel..."
+                            rows={4}
+                            className={`text-lg mt-1 bg-transparent outline-none w-full resize-none ${themeClasses.textSecondary}`}
                         />
                     </div>
-
-                    <div className={`p-6 rounded-lg ${themeClasses.bgSecondary}`}>
-                        <div className={`border-b ${themeClasses.border}`}>
-                            <button onClick={() => setActiveTab('Details')} className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'Details' ? `${themeClasses.accentText} border-b-2 ${themeClasses.accentBorder}` : `${themeClasses.textSecondary} hover:${themeClasses.accentText}` }`}>
-                                Details
-                            </button>
-                            <button onClick={() => setActiveTab('History')} className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'History' ? `${themeClasses.accentText} border-b-2 ${themeClasses.accentBorder}` : `${themeClasses.textSecondary} hover:${themeClasses.accentText}` }`}>
-                                History
-                            </button>
+                    <div className={`rounded-lg ${themeClasses.bgSecondary}`}>
+                        <div className={`px-6 border-b ${themeClasses.border}`}>
+                            <nav className="-mb-px flex space-x-6" aria-label="Tabs">
+                                <button
+                                    onClick={() => setActiveTab('Details')}
+                                    className={`whitespace-nowrap py-3 px-1 text-base font-semibold ${activeTab === 'Details' ? `border-b-2 ${themeClasses.accentBorder} ${themeClasses.accentText}` : `border-transparent ${themeClasses.textSecondary} hover:text-opacity-80`}`}
+                                >
+                                    Details
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('History')}
+                                    className={`whitespace-nowrap py-3 px-1 text-base font-semibold ${activeTab === 'History' ? `border-b-2 ${themeClasses.accentBorder} ${themeClasses.accentText}` : `border-transparent ${themeClasses.textSecondary} hover:text-opacity-80`}`}
+                                >
+                                    History
+                                </button>
+                            </nav>
                         </div>
-                        {renderTabContent()}
+                        <div className="p-6">
+                            {renderTabContent()}
+                        </div>
                     </div>
                 </div>
             </div>
+
+            <ExportModal
+                isOpen={isExportModalOpen}
+                onClose={() => setIsExportModalOpen(false)}
+                novel={novel}
+            />
             <ConfirmModal
                 isOpen={isDeleteConfirmOpen}
                 onClose={() => setIsDeleteConfirmOpen(false)}
                 onConfirm={confirmDeleteNovel}
                 title={`Delete "${novel.title}"?`}
-                message="Are you sure you want to delete this novel? This action cannot be undone."
+                message="Are you sure? This will permanently delete the entire novel and all its chapters. This action cannot be undone."
             />
-             <ConfirmModal
+            <ConfirmModal
                 isOpen={!!chapterToDelete}
                 onClose={() => setChapterToDelete(null)}
                 onConfirm={handleDeleteChapter}
-                title={`Delete "${chapterToDelete?.title}"?`}
-                message="Are you sure you want to delete this chapter? This action is permanent and cannot be undone."
+                title={`Delete chapter "${chapterToDelete?.title}"?`}
+                message="Are you sure you want to delete this chapter? This cannot be undone."
             />
             <ConfirmModal
                 isOpen={isDocxConfirmOpen}
                 onClose={() => { setIsDocxConfirmOpen(false); setPendingFiles(null); }}
                 onConfirm={handleDocxImport}
-                title="Rebuild Novel from DOCX?"
+                title={`Import from ${pendingFiles?.length === 1 ? `"${pendingFiles[0].name}"` : `${pendingFiles?.length || 0} files`}?`}
                 message="This will replace all existing chapters in this novel with the content from the selected DOCX file(s). This action cannot be undone."
-            />
-            <ExportModal
-                isOpen={isExportModalOpen}
-                onClose={() => setIsExportModalOpen(false)}
-                novel={novel}
+                confirmButtonClass={`px-6 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}
             />
         </div>
     );
