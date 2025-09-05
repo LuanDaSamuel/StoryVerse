@@ -3,10 +3,43 @@ import React, { useContext, useEffect, useMemo, useRef, useState, useCallback } 
 // FIX: Changed react-router-dom import to namespace import to fix module resolution issues.
 import * as ReactRouterDOM from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
-import { BackIcon, ChevronLeftIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, TrashIcon, H1Icon, H2Icon, H3Icon } from '../components/Icons';
+import { BackIcon, ChevronLeftIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, TrashIcon, H1Icon, H2Icon, H3Icon, TextIcon, ChevronDownIcon } from '../components/Icons';
 import { enhanceHtml, enhancePlainText, SKETCH_TAG_OPTIONS, THEME_CONFIG } from '../constants';
 import { StoryIdea, StoryIdeaStatus } from '../types';
 import ConfirmModal from '../components/ConfirmModal';
+
+const fontOptions = [
+    { name: 'Times New Roman', value: '"Times New Roman", Times, serif' },
+    { name: 'Arial', value: 'Arial, sans-serif' },
+    { name: 'Georgia', value: 'Georgia, serif' },
+    { name: 'Verdana', value: 'Verdana, sans-serif' },
+];
+
+interface ToolbarDropdownProps {
+    label: string;
+    value: string;
+    onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+    children: React.ReactNode;
+}
+
+const ToolbarDropdown: React.FC<ToolbarDropdownProps> = ({ label, value, onChange, children }) => {
+    return (
+        <div>
+            <label className="block text-xs font-semibold mb-1 text-white/70">{label}</label>
+            <div className="relative">
+                <select
+                    value={value}
+                    onChange={onChange}
+                    className="w-full appearance-none px-3 py-2 text-sm rounded-md bg-white/10 text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-white/50"
+                >
+                    {children}
+                </select>
+                <ChevronDownIcon className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-white/70" />
+            </div>
+        </div>
+    );
+};
+
 
 const StoryIdeaEditorPage: React.FC = () => {
     const { ideaId } = ReactRouterDOM.useParams<{ ideaId: string }>();
@@ -15,9 +48,11 @@ const StoryIdeaEditorPage: React.FC = () => {
     
     const editorRef = useRef<HTMLDivElement>(null);
     const saveTimeout = useRef<number | null>(null);
+    const toolbarRef = useRef<HTMLDivElement>(null);
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+    const [isFormatPanelOpen, setIsFormatPanelOpen] = useState(false);
     
     const { idea, ideaIndex } = useMemo(() => {
         if (!projectData?.storyIdeas || !ideaId) return { idea: null, ideaIndex: -1 };
@@ -33,6 +68,18 @@ const StoryIdeaEditorPage: React.FC = () => {
 
     const [documentOutline, setDocumentOutline] = useState<{ id: string; text: string; level: number }[]>([]);
     const [activeFormats, setActiveFormats] = useState({ isBold: false, isItalic: false, isUL: false, isOL: false, currentBlock: 'p' });
+    const [currentFormat, setCurrentFormat] = useState({
+        paragraphStyle: 'p',
+        font: fontOptions[0].value,
+        size: '18px',
+        paragraphSpacing: '1em',
+    });
+
+    const cleanupEditor = useCallback(() => {
+        if (!editorRef.current) return;
+        const editor = editorRef.current;
+        editor.normalize();
+    }, []);
 
     useEffect(() => {
         if (idea) {
@@ -40,11 +87,10 @@ const StoryIdeaEditorPage: React.FC = () => {
             setTags(idea.tags);
             setStatus(idea.status);
             setWordCount(idea.wordCount);
-            // Only update editor content if it's different, to avoid resetting cursor
             if (editorRef.current && idea.synopsis !== editorRef.current.innerHTML) {
                 const enhancedContent = enhanceHtml(idea.synopsis || '<p><br></p>');
                 editorRef.current.innerHTML = enhancedContent;
-                setSynopsis(enhancedContent); // Sync state with the DOM
+                setSynopsis(enhancedContent);
             }
         }
     }, [idea]);
@@ -63,7 +109,6 @@ const StoryIdeaEditorPage: React.FC = () => {
                 if (!currentData || ideaIndex === -1) return currentData;
                 const updatedIdeas = [...currentData.storyIdeas];
                 const currentIdea = updatedIdeas[ideaIndex];
-                // Only update if there are actual changes to prevent unnecessary saves
                 if (currentIdea.title !== title || currentIdea.synopsis !== synopsis || JSON.stringify(currentIdea.tags) !== JSON.stringify(tags) || currentIdea.status !== status) {
                     updatedIdeas[ideaIndex] = {
                         ...currentIdea,
@@ -95,6 +140,55 @@ const StoryIdeaEditorPage: React.FC = () => {
         setDocumentOutline(newOutline);
     }, []);
 
+    const updateCurrentFormat = useCallback(() => {
+        if (!editorRef.current) return;
+        const selection = window.getSelection();
+        if (!selection?.rangeCount || !editorRef.current.contains(selection.anchorNode)) {
+            return;
+        }
+
+        let element = selection.anchorNode;
+        if (element.nodeType === 3) element = element.parentNode!;
+        if (!(element instanceof HTMLElement)) return;
+
+        let detectedParagraphStyle = 'p';
+        let detectedParagraphSpacing = '1em';
+        
+        let blockElement: HTMLElement | null = element;
+        while (blockElement && blockElement !== editorRef.current) {
+            const tagName = blockElement.tagName.toLowerCase();
+            if (['p', 'h1', 'h2', 'h3', 'blockquote'].includes(tagName)) {
+                detectedParagraphStyle = tagName;
+                const styles = window.getComputedStyle(blockElement);
+                if (styles.marginBottom) {
+                    const mbPx = parseFloat(styles.marginBottom);
+                    const fontPx = parseFloat(styles.fontSize);
+                    if (fontPx > 0) {
+                        const mbEm = mbPx / fontPx;
+                        if (mbEm < 0.75) detectedParagraphSpacing = '0.5em';
+                        else if (mbEm < 1.25) detectedParagraphSpacing = '1em';
+                        else if (mbEm < 1.75) detectedParagraphSpacing = '1.5em';
+                        else detectedParagraphSpacing = '2em';
+                    }
+                }
+                break;
+            }
+            blockElement = blockElement.parentElement;
+        }
+
+        const inlineStyles = window.getComputedStyle(element);
+        const detectedSize = inlineStyles.fontSize;
+        const family = inlineStyles.fontFamily;
+        const matchedFont = fontOptions.find(f => family.includes(f.name))?.value || fontOptions[0].value;
+
+        setCurrentFormat({
+            paragraphStyle: detectedParagraphStyle,
+            font: matchedFont,
+            size: detectedSize,
+            paragraphSpacing: detectedParagraphSpacing,
+        });
+    }, []);
+
     const updateActiveFormats = useCallback(() => {
         const selection = window.getSelection();
         if (!selection?.rangeCount || !editorRef.current || !editorRef.current.contains(selection.anchorNode)) return;
@@ -124,7 +218,8 @@ const StoryIdeaEditorPage: React.FC = () => {
     
     const handleSelectionChange = useCallback(() => {
         updateActiveFormats();
-    }, [updateActiveFormats]);
+        updateCurrentFormat();
+    }, [updateActiveFormats, updateCurrentFormat]);
 
     useEffect(() => {
         updateDocumentOutline();
@@ -149,23 +244,27 @@ const StoryIdeaEditorPage: React.FC = () => {
         setSynopsis(e.currentTarget.innerHTML);
     };
 
+    const applyAndSaveFormat = useCallback((formatAction: () => void) => {
+        if (!editorRef.current) return;
+        formatAction();
+        cleanupEditor();
+        const event = new Event('input', { bubbles: true, cancelable: true });
+        editorRef.current.dispatchEvent(event);
+        editorRef.current.focus();
+        handleSelectionChange();
+    }, [handleSelectionChange, cleanupEditor]);
+
+    const applyCommand = (command: string, value?: string) => { applyAndSaveFormat(() => document.execCommand(command, false, value)); };
+    const applyParagraphStyle = (style: string) => { applyAndSaveFormat(() => document.execCommand('formatBlock', false, style)); };
+    const applyFont = (fontValue: string) => { const fontName = fontOptions.find(f => f.value === fontValue)?.name || 'serif'; applyAndSaveFormat(() => document.execCommand('fontName', false, fontName)); };
+    const applyColor = (color: string) => { applyAndSaveFormat(() => document.execCommand('foreColor', false, color)); };
+    const applyFontSize = (size: string) => { applyAndSaveFormat(() => { document.execCommand('fontSize', false, '1'); const fontElements = editorRef.current?.getElementsByTagName('font'); if(fontElements) { for (let i = 0, len = fontElements.length; i < len; ++i) { if (fontElements[i].size === "1") { fontElements[i].removeAttribute("size"); fontElements[i].style.fontSize = size; } } } }); };
+    const applyParagraphSpacing = (spacing: string) => { applyAndSaveFormat(() => { const selection = window.getSelection(); if (!selection || selection.rangeCount === 0) return; let node = selection.getRangeAt(0).startContainer; if (node.nodeType === 3) node = node.parentNode!; while(node && node !== editorRef.current) { if(node instanceof HTMLElement && ['P', 'H1', 'H2', 'H3', 'DIV'].includes(node.tagName)) { node.style.marginBottom = spacing; return; } node = node.parentNode!; } }); };
+
     const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-        if (e.key === '"' || e.key === "'") {
-            e.preventDefault();
-            const quote = e.key === '"' ? '“' : '‘';
-            document.execCommand('insertText', false, quote);
-        }
-        if (e.key === '-' && e.currentTarget.textContent.endsWith('-')) {
-             e.preventDefault();
-             document.execCommand('delete');
-             document.execCommand('insertText', false, '—');
-        }
-        if (e.key === '.' && e.currentTarget.textContent.endsWith('..')) {
-             e.preventDefault();
-             document.execCommand('delete');
-             document.execCommand('delete');
-             document.execCommand('insertText', false, '…');
-        }
+        if (e.key === '"' || e.key === "'") { e.preventDefault(); const quote = e.key === '"' ? '“' : '‘'; document.execCommand('insertText', false, quote); }
+        if (e.key === '-' && e.currentTarget.textContent?.endsWith('-')) { e.preventDefault(); document.execCommand('undo'); document.execCommand('insertText', false, '—'); }
+        if (e.key === '.' && e.currentTarget.textContent?.endsWith('..')) { e.preventDefault(); document.execCommand('undo'); document.execCommand('undo'); document.execCommand('insertText', false, '…'); }
     };
 
     const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
@@ -176,20 +275,16 @@ const StoryIdeaEditorPage: React.FC = () => {
         document.execCommand('insertHTML', false, htmlToInsert);
     };
 
-    const applyCommand = (command: string, value?: string) => {
-        document.execCommand(command, false, value);
-        editorRef.current?.focus();
-        handleEditorInput({ currentTarget: editorRef.current } as React.FormEvent<HTMLDivElement>);
-    };
-
-    const applyBlockFormat = (format: string) => {
-        const formatToApply = activeFormats.currentBlock === format ? 'p' : format;
-        applyCommand('formatBlock', formatToApply);
-    };
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => { if (toolbarRef.current && !toolbarRef.current.contains(event.target as Node)) { setIsFormatPanelOpen(false); } };
+        if (isFormatPanelOpen) { document.addEventListener('mousedown', handleClickOutside); }
+        return () => { document.removeEventListener('mousedown', handleClickOutside); };
+    }, [isFormatPanelOpen]);
     
     const handleTagClick = (tag: string) => { setTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : prev.length < 6 ? [...prev, tag] : prev); };
     const handleDelete = () => { if (!idea) return; setProjectData(d => d ? { ...d, storyIdeas: d.storyIdeas.filter(i => i.id !== idea.id) } : null); navigate('/demos'); };
     const editorStyle = useMemo(() => (theme === 'book' ? { color: THEME_CONFIG.book.text.match(/\[(.*?)\]/)?.[1] || '#F5EADD' } : { color: 'inherit' }), [theme]);
+    const colorPalette = useMemo(() => (theme === 'book' ? [THEME_CONFIG.book.text.match(/\[(.*?)\]/)?.[1] || '#F5EADD', '#3B82F6', '#FBBF24', '#22C55E', '#EC4899'] : ['#3B2F27', '#3B82F6', '#FBBF24', '#22C55E', '#EC4899']), [theme]);
     
     if (!idea) return <div className={`flex h-screen items-center justify-center ${themeClasses.bg}`}><p>Loading idea...</p></div>;
 
@@ -205,7 +300,7 @@ const StoryIdeaEditorPage: React.FC = () => {
                     </div>
                     <div className="px-8 md:px-16 lg:px-24 pt-8 pb-48">
                         <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="Idea Title" className="text-4xl font-bold bg-transparent outline-none w-full mb-8" />
-                        <div ref={editorRef} contentEditable spellCheck={true} suppressContentEditableWarning onInput={handleEditorInput} onKeyDown={handleKeyDown} onPaste={handlePaste} className="w-full text-lg leading-relaxed outline-none story-content" style={editorStyle} />
+                        <div ref={editorRef} contentEditable spellCheck={true} suppressContentEditableWarning onInput={handleEditorInput} onKeyDown={handleKeyDown} onPaste={handlePaste} onBlur={cleanupEditor} className="w-full text-lg leading-relaxed outline-none story-content" style={editorStyle} />
                     </div>
                 </div>
                 <div className={`fixed top-0 right-0 h-full z-40 transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
@@ -241,18 +336,47 @@ const StoryIdeaEditorPage: React.FC = () => {
                     </div>
                 </div>
                 <div className="absolute bottom-0 left-0 w-full flex justify-center pb-4 z-20 pointer-events-none">
-                    <div className="relative pointer-events-auto">
+                    <div ref={toolbarRef} className="relative pointer-events-auto">
+                        {isFormatPanelOpen && (
+                            <div className="absolute bottom-full mb-2 p-4 rounded-lg shadow-lg bg-stone-900/80 border border-white/10 backdrop-blur-sm w-[320px]">
+                                <div className="space-y-4">
+                                    <ToolbarDropdown label="Paragraph Style" value={currentFormat.paragraphStyle} onChange={(e) => applyParagraphStyle(e.target.value)}>
+                                        <option value="p">Paragraph</option>
+                                        <option value="h1">Heading 1</option>
+                                        <option value="h2">Heading 2</option>
+                                        <option value="h3">Heading 3</option>
+                                        <option value="blockquote">Blockquote</option>
+                                    </ToolbarDropdown>
+                                    <ToolbarDropdown label="Font" value={currentFormat.font} onChange={(e) => applyFont(e.target.value)}>
+                                        {fontOptions.map(font => <option key={font.name} value={font.value}>{font.name}</option>)}
+                                    </ToolbarDropdown>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <ToolbarDropdown label="Size" value={currentFormat.size} onChange={(e) => applyFontSize(e.target.value)}>
+                                            <option value="14px">14</option><option value="16px">16</option><option value="18px">18</option><option value="20px">20</option><option value="24px">24</option>
+                                        </ToolbarDropdown>
+                                        <ToolbarDropdown label="Paragraph Spacing" value={currentFormat.paragraphSpacing} onChange={(e) => applyParagraphSpacing(e.target.value)}>
+                                            <option value="0.5em">0.5</option><option value="1em">1.0</option><option value="1.5em">1.5</option><option value="2em">2.0</option>
+                                        </ToolbarDropdown>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold mb-2 text-white/70">Color</label>
+                                        <div className="flex space-x-2">{colorPalette.map(color => <button key={color} onClick={() => applyColor(color)} className="w-6 h-6 rounded-full border border-gray-400" style={{backgroundColor: color}}></button>)}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                         <div className="flex items-center space-x-1 p-1 rounded-full shadow-lg bg-stone-900/70 border border-white/10 backdrop-blur-sm" onMouseDown={e => e.preventDefault()}>
+                            <button onClick={() => setIsFormatPanelOpen(p => !p)} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors ${isFormatPanelOpen ? 'bg-white/20' : ''}`}><TextIcon className="w-5 h-5"/></button>
                             <button onClick={() => applyCommand('bold')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.isBold ? 'bg-white/20' : ''}`}><BoldIcon className="w-5 h-5"/></button>
                             <button onClick={() => applyCommand('italic')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.isItalic ? 'bg-white/20' : ''}`}><ItalicIcon className="w-5 h-5"/></button>
                             <div className="w-px h-5 bg-white/20 mx-1" />
-                            <button onClick={() => applyBlockFormat('h1')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.currentBlock === 'h1' ? 'bg-white/20' : ''}`}><H1Icon className="w-5 h-5"/></button>
-                            <button onClick={() => applyBlockFormat('h2')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.currentBlock === 'h2' ? 'bg-white/20' : ''}`}><H2Icon className="w-5 h-5"/></button>
-                            <button onClick={() => applyBlockFormat('h3')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.currentBlock === 'h3' ? 'bg-white/20' : ''}`}><H3Icon className="w-5 h-5"/></button>
+                            <button onClick={() => applyParagraphStyle('h1')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.currentBlock === 'h1' ? 'bg-white/20' : ''}`}><H1Icon className="w-5 h-5"/></button>
+                            <button onClick={() => applyParagraphStyle('h2')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.currentBlock === 'h2' ? 'bg-white/20' : ''}`}><H2Icon className="w-5 h-5"/></button>
+                            <button onClick={() => applyParagraphStyle('h3')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.currentBlock === 'h3' ? 'bg-white/20' : ''}`}><H3Icon className="w-5 h-5"/></button>
                             <div className="w-px h-5 bg-white/20 mx-1" />
                             <button onClick={() => applyCommand('insertUnorderedList')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.isUL ? 'bg-white/20' : ''}`}><ListBulletIcon className="w-5 h-5"/></button>
                             <button onClick={() => applyCommand('insertOrderedList')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.isOL ? 'bg-white/20' : ''}`}><OrderedListIcon className="w-5 h-5"/></button>
-                            <button onClick={() => applyBlockFormat('blockquote')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.currentBlock === 'blockquote' ? 'bg-white/20' : ''}`}><BlockquoteIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyParagraphStyle('blockquote')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.currentBlock === 'blockquote' ? 'bg-white/20' : ''}`}><BlockquoteIcon className="w-5 h-5"/></button>
                             <div className="w-px h-5 bg-white/20 mx-1" />
                             <button onClick={() => applyCommand('undo')} className="p-2 rounded-full text-white/90 hover:bg-white/10"><UndoIcon className="w-5 h-5"/></button>
                             <button onClick={() => applyCommand('redo')} className="p-2 rounded-full text-white/90 hover:bg-white/10"><RedoIcon className="w-5 h-5"/></button>
