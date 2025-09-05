@@ -3,7 +3,7 @@ import React, { useContext, useEffect, useMemo, useRef, useState, useCallback } 
 // FIX: Changed react-router-dom import to namespace import to fix module resolution issues.
 import * as ReactRouterDOM from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
-import { BackIcon, ChevronLeftIcon, TextIcon, SearchIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, TrashIcon } from '../components/Icons';
+import { BackIcon, ChevronLeftIcon, TextIcon, SearchIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, TrashIcon, H1Icon, H2Icon, H3Icon } from '../components/Icons';
 import { enhanceHtml, SKETCH_TAG_OPTIONS, THEME_CONFIG } from '../constants';
 import { StoryIdea, StoryIdeaStatus } from '../types';
 import ConfirmModal from '../components/ConfirmModal';
@@ -37,6 +37,9 @@ const StoryIdeaEditorPage: React.FC = () => {
     const [tags, setTags] = useState<string[]>(idea?.tags || []);
     const [status, setStatus] = useState<StoryIdeaStatus>(idea?.status || 'Seedling');
     const [wordCount, setWordCount] = useState(idea?.wordCount || 0);
+
+    const [documentOutline, setDocumentOutline] = useState<{ id: string; text: string; level: number }[]>([]);
+    const [currentBlockFormat, setCurrentBlockFormat] = useState('p');
     
     // Load data from project when the idea changes
     useEffect(() => {
@@ -91,6 +94,60 @@ const StoryIdeaEditorPage: React.FC = () => {
             }
         };
     }, [title, synopsis, tags, status, idea, ideaIndex, setProjectData]);
+
+    const updateDocumentOutline = useCallback(() => {
+        if (!editorRef.current) return;
+        const headings = Array.from(editorRef.current.querySelectorAll('h1, h2, h3'));
+        const newOutline = headings.map((heading, index) => {
+            const id = heading.id || `heading-${index}`;
+            heading.id = id; // Ensure heading has an id for scrolling
+            return {
+                id,
+                text: heading.textContent || 'Untitled Heading',
+                level: parseInt(heading.tagName.substring(1), 10),
+            };
+        });
+        setDocumentOutline(newOutline);
+    }, []);
+
+    const updateCurrentFormat = useCallback(() => {
+        const selection = window.getSelection();
+        if (!selection?.rangeCount || !editorRef.current || !editorRef.current.contains(selection.anchorNode)) return;
+        
+        let element = selection.anchorNode;
+        if (element?.nodeType === 3) {
+            element = element.parentNode;
+        }
+
+        let blockType = 'p';
+        let parent = element as HTMLElement | null;
+        while(parent && parent !== editorRef.current) {
+            const tag = parent.tagName.toLowerCase();
+            if(['h1','h2','h3','blockquote'].includes(tag)) {
+                blockType = tag;
+                break;
+            }
+            parent = parent.parentElement;
+        }
+        setCurrentBlockFormat(blockType);
+    }, []);
+
+    useEffect(() => {
+        updateDocumentOutline();
+        
+        const editorEl = editorRef.current;
+        document.addEventListener('selectionchange', updateCurrentFormat);
+        editorEl?.addEventListener('keyup', updateCurrentFormat);
+        editorEl?.addEventListener('mouseup', updateCurrentFormat);
+        editorEl?.addEventListener('focus', updateCurrentFormat);
+
+        return () => {
+            document.removeEventListener('selectionchange', updateCurrentFormat);
+            editorEl?.removeEventListener('keyup', updateCurrentFormat);
+            editorEl?.removeEventListener('mouseup', updateCurrentFormat);
+            editorEl?.removeEventListener('focus', updateCurrentFormat);
+        };
+    }, [synopsis, updateDocumentOutline, updateCurrentFormat]);
     
     const handleTagClick = (tag: string) => {
         setTags(prev => {
@@ -114,8 +171,14 @@ const StoryIdeaEditorPage: React.FC = () => {
         navigate('/demos');
     };
 
-    const applyCommand = (command: string) => {
+    const applyInlineFormat = (command: string) => {
         document.execCommand(command, false);
+        editorRef.current?.focus();
+    };
+
+    const applyBlockFormat = (format: string) => {
+        const formatToApply = currentBlockFormat === format ? 'p' : format;
+        document.execCommand('formatBlock', false, formatToApply);
         editorRef.current?.focus();
     };
 
@@ -184,6 +247,29 @@ const StoryIdeaEditorPage: React.FC = () => {
                         </div>
                         <div className="flex-1 p-4 space-y-6 overflow-y-auto">
                             <div>
+                                <h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Document Outline</h3>
+                                {documentOutline.length > 0 ? (
+                                    <ul className="space-y-1">
+                                        {documentOutline.map(heading => (
+                                            <li key={heading.id}>
+                                                <button
+                                                    onClick={() => {
+                                                        const el = document.getElementById(heading.id);
+                                                        el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                                    }}
+                                                    className="w-full text-left px-2 py-1 rounded hover:bg-white/10 transition-colors"
+                                                    style={{ paddingLeft: `${heading.level}rem` }}
+                                                >
+                                                    {heading.text}
+                                                </button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : (
+                                    <p className={`text-xs ${themeClasses.textSecondary}`}>No headings found. Use H1, H2, or H3 to create an outline.</p>
+                                )}
+                            </div>
+                            <div>
                                 <h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Status</h3>
                                 <div className={`flex rounded-md overflow-hidden border ${themeClasses.border}`}>
                                     {(['Seedling', 'Developing', 'Archived'] as StoryIdeaStatus[]).map(option => (
@@ -217,15 +303,19 @@ const StoryIdeaEditorPage: React.FC = () => {
                 <div className="absolute bottom-0 left-0 w-full flex justify-center pb-4 z-20 pointer-events-none">
                     <div className="relative pointer-events-auto">
                         <div className="flex items-center space-x-1 p-1 rounded-full shadow-lg bg-stone-900/70 border border-white/10 backdrop-blur-sm" onMouseDown={(e) => e.preventDefault()}>
-                            <button onClick={() => applyCommand('bold')} className="p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors"><BoldIcon className="w-5 h-5"/></button>
-                            <button onClick={() => applyCommand('italic')} className="p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors"><ItalicIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyInlineFormat('bold')} className="p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors"><BoldIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyInlineFormat('italic')} className="p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors"><ItalicIcon className="w-5 h-5"/></button>
                             <div className="w-px h-5 bg-white/20 mx-1"></div>
-                            <button onClick={() => applyCommand('insertUnorderedList')} className="p-2 rounded-full text-white/90 hover:bg-white/10"><ListBulletIcon className="w-5 h-5"/></button>
-                            <button onClick={() => applyCommand('insertOrderedList')} className="p-2 rounded-full text-white/90 hover:bg-white/10"><OrderedListIcon className="w-5 h-5"/></button>
-                            <button onClick={() => applyCommand('formatBlock,blockquote')} className="p-2 rounded-full text-white/90 hover:bg-white/10"><BlockquoteIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyBlockFormat('h1')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors ${currentBlockFormat === 'h1' ? 'bg-white/20' : ''}`}><H1Icon className="w-5 h-5"/></button>
+                            <button onClick={() => applyBlockFormat('h2')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors ${currentBlockFormat === 'h2' ? 'bg-white/20' : ''}`}><H2Icon className="w-5 h-5"/></button>
+                            <button onClick={() => applyBlockFormat('h3')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors ${currentBlockFormat === 'h3' ? 'bg-white/20' : ''}`}><H3Icon className="w-5 h-5"/></button>
                             <div className="w-px h-5 bg-white/20 mx-1"></div>
-                            <button onClick={() => applyCommand('undo')} className="p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors"><UndoIcon className="w-5 h-5"/></button>
-                            <button onClick={() => applyCommand('redo')} className="p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors"><RedoIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyInlineFormat('insertUnorderedList')} className="p-2 rounded-full text-white/90 hover:bg-white/10"><ListBulletIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyInlineFormat('insertOrderedList')} className="p-2 rounded-full text-white/90 hover:bg-white/10"><OrderedListIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyBlockFormat('blockquote')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors ${currentBlockFormat === 'blockquote' ? 'bg-white/20' : ''}`}><BlockquoteIcon className="w-5 h-5"/></button>
+                            <div className="w-px h-5 bg-white/20 mx-1"></div>
+                            <button onClick={() => applyInlineFormat('undo')} className="p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors"><UndoIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyInlineFormat('redo')} className="p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors"><RedoIcon className="w-5 h-5"/></button>
                         </div>
                     </div>
                 </div>

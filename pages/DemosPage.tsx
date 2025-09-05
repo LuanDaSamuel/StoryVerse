@@ -56,21 +56,23 @@ const DemosPage = () => {
                 "p[style-name='Title'] => h1:fresh",
                 "p[style-name='Heading 1'] => h2:fresh",
                 "p[style-name='Heading 2'] => h3:fresh",
+                "p[style-name='Heading 3'] => h3:fresh",
             ];
             const { value: html } = await mammoth.convertToHtml({ arrayBuffer }, { styleMap });
             
             const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = html;
+            // Clean up empty paragraphs that mammoth sometimes creates
+            tempDiv.innerHTML = html.replace(/<p>(\s|&nbsp;|<br\s*\/?>)*<\/p>/gi, '').trim();
             
             let ideaTitle = file.name.replace(/\.docx$/, '');
+            // Find the first heading to use as a title, but DON'T remove it from the content.
             const firstHeading = tempDiv.querySelector('h1, h2, h3');
             
             if (firstHeading && firstHeading.textContent) {
                 ideaTitle = firstHeading.textContent.trim();
-                firstHeading.remove();
             }
             
-            const synopsisHtml = tempDiv.innerHTML.replace(/<p>(\s|&nbsp;|<br\s*\/?>)*<\/p>/gi, '').trim();
+            const synopsisHtml = tempDiv.innerHTML;
             
             setPendingImportData({
                 title: ideaTitle,
