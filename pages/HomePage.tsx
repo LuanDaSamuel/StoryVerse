@@ -1,6 +1,7 @@
 
 import React, { useContext, useState } from 'react';
-import { Link } from 'react-router-dom';
+// FIX: Changed react-router-dom import to namespace import to fix module resolution issues.
+import * as ReactRouterDOM from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { enhancePlainText } from '../constants';
 import { Novel } from '../types';
@@ -43,7 +44,7 @@ const HomePage: React.FC = () => {
                             onMouseEnter={() => setHoveredNovel(novel)}
                             className={`transition-all duration-300 ease-in-out ${isBlurred ? 'blur-sm scale-95 opacity-60' : ''}`}
                         >
-                            <Link
+                            <ReactRouterDOM.Link
                                 to={`/novel/${novel.id}`}
                                 className={`group relative block rounded-lg shadow-lg overflow-hidden transition-transform duration-300 ${themeClasses.bgSecondary} ${isHovered ? 'transform -translate-y-2' : ''}`}
                             >
@@ -78,7 +79,7 @@ const HomePage: React.FC = () => {
                                         ))}
                                     </div>
                                 </div>
-                            </Link>
+                            </ReactRouterDOM.Link>
                         </div>
                     );
                 })}

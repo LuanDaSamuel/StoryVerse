@@ -1,5 +1,7 @@
+
 import React, { useState, useContext, useRef, useMemo, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+// FIX: Changed react-router-dom import to namespace import to fix module resolution issues.
+import * as ReactRouterDOM from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { TAG_OPTIONS, enhancePlainText, enhanceHtml } from '../constants';
 import { Novel, Chapter } from '../types';
@@ -10,8 +12,8 @@ import ExportModal from '../components/ExportModal';
 import * as mammoth from 'mammoth';
 
 const NovelDetailPage: React.FC = () => {
-    const { novelId } = useParams<{ novelId: string }>();
-    const navigate = useNavigate();
+    const { novelId } = ReactRouterDOM.useParams<{ novelId: string }>();
+    const navigate = ReactRouterDOM.useNavigate();
     const { projectData, setProjectData, themeClasses } = useContext(ProjectContext);
     const coverImageInputRef = useRef<HTMLInputElement>(null);
     const docxInputRef = useRef<HTMLInputElement>(null);
@@ -372,7 +374,7 @@ const NovelDetailPage: React.FC = () => {
                                 key={chapter.id}
                                 className={`group flex items-center justify-between p-4 rounded-lg transition-colors ${themeClasses.bgTertiary}`}
                             >
-                                <Link to={`/novel/${novelId}/edit/${chapter.id}`} className="flex-grow pr-4">
+                                <ReactRouterDOM.Link to={`/novel/${novelId}/edit/${chapter.id}`} className="flex-grow pr-4">
                                     <div>
                                         <p className={`${themeClasses.accentText} font-semibold`}>
                                             {enhancePlainText(chapter.title || `Untitled Chapter`)}
@@ -382,7 +384,7 @@ const NovelDetailPage: React.FC = () => {
                                             <span>{(chapter.wordCount || 0).toLocaleString()} words</span>
                                         </div>
                                     </div>
-                                </Link>
+                                </ReactRouterDOM.Link>
                                 <button
                                     onClick={() => setChapterToDelete(chapter)}
                                     className={`flex-shrink-0 p-2 -mr-2 rounded-full text-red-500 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/10`}

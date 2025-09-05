@@ -1,6 +1,7 @@
 
 import React, { useMemo, useContext, useEffect, useRef } from 'react';
-import { HashRouter, Routes, Route, Navigate, useParams, useMatch, useNavigate } from 'react-router-dom';
+// FIX: Changed react-router-dom import to namespace import to fix module resolution issues.
+import * as ReactRouterDOM from 'react-router-dom';
 import { useProjectFile } from './hooks/useProjectFile';
 import { ProjectContext } from './contexts/ProjectContext';
 import WelcomeScreen from './components/WelcomeScreen';
@@ -17,27 +18,27 @@ import { LoadingIcon } from './components/Icons';
 import { Theme } from './types';
 
 const NovelEditRedirect = () => {
-    const { novelId } = useParams<{ novelId: string }>();
+    const { novelId } = ReactRouterDOM.useParams<{ novelId: string }>();
     const { projectData } = useContext(ProjectContext);
 
     if (!projectData || !novelId) {
-        return <Navigate to="/" replace />; 
+        return <ReactRouterDOM.Navigate to="/" replace />; 
     }
 
     const novel = projectData.novels.find(n => n.id === novelId);
     
     if (!novel) {
         // Novel was not found, safely redirect to home.
-        return <Navigate to="/" replace />;
+        return <ReactRouterDOM.Navigate to="/" replace />;
     }
 
     if (novel.chapters.length === 0) {
         // If novel has no chapters, redirect to novel detail page.
-        return <Navigate to={`/novel/${novelId}`} replace />;
+        return <ReactRouterDOM.Navigate to={`/novel/${novelId}`} replace />;
     }
 
     const firstChapterId = novel.chapters[0].id;
-    return <Navigate to={`/novel/${novelId}/edit/${firstChapterId}`} replace />;
+    return <ReactRouterDOM.Navigate to={`/novel/${novelId}/edit/${firstChapterId}`} replace />;
 };
 
 const AppContent = () => {
@@ -53,7 +54,7 @@ const AppContent = () => {
         closeProject,
     } = useProjectFile();
     
-    const navigate = useNavigate();
+    const navigate = ReactRouterDOM.useNavigate();
     const initialLoadHandled = useRef(false);
 
     // This effect handles redirecting to the home page on initial load or after import.
@@ -85,9 +86,9 @@ const AppContent = () => {
         projectName,
     }), [projectData, setProjectData, downloadProject, closeProject, theme, themeClasses, saveStatus, projectName]);
 
-    const onEditPage = useMatch('/novel/:novelId/edit/:chapterId');
-    const onReadPage = useMatch('/novel/:novelId/read/:chapterId?');
-    const onIdeaEditPage = useMatch('/idea/:ideaId/edit');
+    const onEditPage = ReactRouterDOM.useMatch('/novel/:novelId/edit/:chapterId');
+    const onReadPage = ReactRouterDOM.useMatch('/novel/:novelId/read/:chapterId?');
+    const onIdeaEditPage = ReactRouterDOM.useMatch('/idea/:ideaId/edit');
     const isSidebarHiddenPage = !!onEditPage || !!onReadPage || !!onIdeaEditPage;
 
     const renderContent = () => {
@@ -110,16 +111,16 @@ const AppContent = () => {
                     <div className={`flex h-screen ${themeClasses.bg} ${themeClasses.text}`}>
                         {!isSidebarHiddenPage && <Sidebar />}
                         <main className="flex-1 overflow-y-auto">
-                            <Routes>
-                                <Route path="/" element={<HomePage />} />
-                                <Route path="/create-novel" element={<CreateNovelPage />} />
-                                <Route path="/demos" element={<DemosPage />} />
-                                <Route path="/idea/:ideaId/edit" element={<StoryIdeaEditorPage />} />
-                                <Route path="/novel/:novelId" element={<NovelDetailPage />} />
-                                <Route path="/novel/:novelId/read/:chapterId?" element={<ReadNovelPage />} />
-                                <Route path="/novel/:novelId/edit" element={<NovelEditRedirect />} />
-                                <Route path="/novel/:novelId/edit/:chapterId" element={<ChapterEditorPage />} />
-                            </Routes>
+                            <ReactRouterDOM.Routes>
+                                <ReactRouterDOM.Route path="/" element={<HomePage />} />
+                                <ReactRouterDOM.Route path="/create-novel" element={<CreateNovelPage />} />
+                                <ReactRouterDOM.Route path="/demos" element={<DemosPage />} />
+                                <ReactRouterDOM.Route path="/idea/:ideaId/edit" element={<StoryIdeaEditorPage />} />
+                                <ReactRouterDOM.Route path="/novel/:novelId" element={<NovelDetailPage />} />
+                                <ReactRouterDOM.Route path="/novel/:novelId/read/:chapterId?" element={<ReadNovelPage />} />
+                                <ReactRouterDOM.Route path="/novel/:novelId/edit" element={<NovelEditRedirect />} />
+                                <ReactRouterDOM.Route path="/novel/:novelId/edit/:chapterId" element={<ChapterEditorPage />} />
+                            </ReactRouterDOM.Routes>
                         </main>
                     </div>
                 );
@@ -141,9 +142,9 @@ const AppContent = () => {
 function App(): React.ReactNode {
   return (
     <React.StrictMode>
-      <HashRouter>
+      <ReactRouterDOM.HashRouter>
         <AppContent />
-      </HashRouter>
+      </ReactRouterDOM.HashRouter>
     </React.StrictMode>
   );
 }

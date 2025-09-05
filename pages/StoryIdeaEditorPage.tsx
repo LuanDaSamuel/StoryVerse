@@ -1,5 +1,7 @@
+
 import React, { useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+// FIX: Changed react-router-dom import to namespace import to fix module resolution issues.
+import * as ReactRouterDOM from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { BackIcon, ChevronLeftIcon, TextIcon, SearchIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, TrashIcon } from '../components/Icons';
 import { enhanceHtml, SKETCH_TAG_OPTIONS, THEME_CONFIG } from '../constants';
@@ -10,8 +12,8 @@ import ConfirmModal from '../components/ConfirmModal';
 // matching the feature set and UI of the Chapter Editor for a consistent experience.
 
 const StoryIdeaEditorPage: React.FC = () => {
-    const { ideaId } = useParams<{ ideaId: string }>();
-    const navigate = useNavigate();
+    const { ideaId } = ReactRouterDOM.useParams<{ ideaId: string }>();
+    const navigate = ReactRouterDOM.useNavigate();
     const { projectData, setProjectData, theme, themeClasses } = useContext(ProjectContext);
     
     const editorRef = useRef<HTMLDivElement>(null);

@@ -1,5 +1,7 @@
+
 import React, { useState, useMemo, useContext, useEffect, useRef } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+// FIX: Changed react-router-dom import to namespace import to fix module resolution issues.
+import * as ReactRouterDOM from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { enhanceHtml, enhancePlainText } from '../constants';
 import { BackIcon, Bars3Icon, ChevronLeftIcon, ChevronRightIcon, CloseIcon } from '../components/Icons';
@@ -34,13 +36,13 @@ const ChapterListModal: React.FC<{
                     <ul className="space-y-1">
                         {novel.chapters.map(chapter => (
                             <li key={chapter.id}>
-                                <Link
+                                <ReactRouterDOM.Link
                                     to={`/novel/${novelId}/read/${chapter.id}`}
                                     onClick={onClose}
                                     className={`block w-full text-left px-3 py-2 rounded-md transition-colors ${themeClasses.accentText} hover:${themeClasses.bgTertiary}`}
                                 >
                                     {enhancePlainText(chapter.title || 'Untitled Chapter')}
-                                </Link>
+                                </ReactRouterDOM.Link>
                             </li>
                         ))}
                     </ul>
@@ -52,8 +54,8 @@ const ChapterListModal: React.FC<{
 
 
 const ReadNovelPage: React.FC = () => {
-    const { novelId, chapterId } = useParams<{ novelId: string; chapterId?: string }>();
-    const navigate = useNavigate();
+    const { novelId, chapterId } = ReactRouterDOM.useParams<{ novelId: string; chapterId?: string }>();
+    const navigate = ReactRouterDOM.useNavigate();
     const { projectData, themeClasses } = useContext(ProjectContext);
 
     const [isChapterListOpen, setIsChapterListOpen] = useState(false);
@@ -171,23 +173,23 @@ const ReadNovelPage: React.FC = () => {
 
                          <div className="mt-16 flex justify-between items-center font-sans">
                             {prevChapter ? (
-                                <Link 
+                                <ReactRouterDOM.Link 
                                     to={`/novel/${novelId}/read/${prevChapter.id}`}
                                     className={`inline-flex items-center gap-2 px-4 py-2 rounded-full font-semibold transition-colors ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-80`}
                                 >
                                     <ChevronLeftIcon className="w-5 h-5" />
                                     Previous Chapter
-                                </Link>
+                                </ReactRouterDOM.Link>
                             ) : (<div />) /* Placeholder to keep "Next" button on the right */}
 
                              {nextChapter ? (
-                                <Link
+                                <ReactRouterDOM.Link
                                     to={`/novel/${novelId}/read/${nextChapter.id}`}
                                     className={`inline-flex items-center gap-2 px-4 py-2 rounded-full font-semibold transition-colors ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-80`}
                                 >
                                     Next Chapter
                                     <ChevronRightIcon className="w-5 h-5" />
-                                </Link>
+                                </ReactRouterDOM.Link>
                              ) : (<div />)}
                         </div>
                     </section>

@@ -1,5 +1,7 @@
+
 import React, { useState, useContext } from 'react';
-import { NavLink } from 'react-router-dom';
+// FIX: Changed react-router-dom import to namespace import to fix module resolution issues.
+import * as ReactRouterDOM from 'react-router-dom';
 import { AppLogoIcon, HomeIcon, PlusIcon, SettingsIcon, LightbulbIcon, QuillPenIcon } from './Icons';
 import SettingsModal from './SettingsModal';
 import { ProjectContext } from '../contexts/ProjectContext';
@@ -33,18 +35,18 @@ const Sidebar: React.FC = () => {
                     <span className="text-xl font-bold">StoryVerse</span>
                 </div>
                 <nav className="flex-1 p-4 space-y-2">
-                    <NavLink to="/" className={navLinkClasses}>
+                    <ReactRouterDOM.NavLink to="/" className={navLinkClasses}>
                         <HomeIcon className="w-5 h-5" />
                         <span>Home page</span>
-                    </NavLink>
-                    <NavLink to="/create-novel" className={navLinkClasses}>
+                    </ReactRouterDOM.NavLink>
+                    <ReactRouterDOM.NavLink to="/create-novel" className={navLinkClasses}>
                         <PlusIcon className="w-5 h-5" />
                         <span>Create Novel</span>
-                    </NavLink>
-                    <NavLink to="/demos" className={navLinkClasses}>
+                    </ReactRouterDOM.NavLink>
+                    <ReactRouterDOM.NavLink to="/demos" className={navLinkClasses}>
                         <LightbulbIcon className="w-5 h-5" />
                         <span>Idea Box</span>
-                    </NavLink>
+                    </ReactRouterDOM.NavLink>
                 </nav>
                 <div className="p-4 border-t border-inherit">
                     <button onClick={() => setIsSettingsOpen(true)} className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${sidebarTextColor} hover:${themeClasses.bgTertiary}`}>

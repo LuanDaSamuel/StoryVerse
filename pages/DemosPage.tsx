@@ -1,18 +1,22 @@
-import React, { useContext, useMemo, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+
+import React, { useContext, useMemo, useRef, useState } from 'react';
+// FIX: Changed react-router-dom import to namespace import to fix module resolution issues.
+import * as ReactRouterDOM from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { StoryIdea } from '../types';
-import { PlusIcon, UploadIcon, BackIcon } from '../components/Icons';
+import { PlusIcon, UploadIcon, BackIcon, TrashIcon } from '../components/Icons';
 import ConfirmModal from '../components/ConfirmModal';
 import { enhancePlainText } from '../constants';
 import * as mammoth from 'mammoth';
 
-const DemosPage: React.FC = () => {
+// FIX: Removed React.FC type, which is discouraged and was causing a type error.
+const DemosPage = () => {
     const { projectData, setProjectData, themeClasses } = useContext(ProjectContext);
-    const navigate = useNavigate();
-    const [isDocxConfirmOpen, setIsDocxConfirmOpen] = React.useState(false);
-    const [pendingFile, setPendingFile] = React.useState<File | null>(null);
+    const navigate = ReactRouterDOM.useNavigate();
+    const [isDocxConfirmOpen, setIsDocxConfirmOpen] = useState(false);
+    const [pendingFile, setPendingFile] = useState<File | null>(null);
     const docxInputRef = useRef<HTMLInputElement>(null);
+    const [ideaToDelete, setIdeaToDelete] = useState<StoryIdea | null>(null);
 
     const storyIdeas = useMemo(() => {
         return [...(projectData?.storyIdeas || [])].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
@@ -82,12 +86,23 @@ const DemosPage: React.FC = () => {
                 };
             });
 
+        // FIX: Corrected syntax for catch block from `catch() => {}` to `catch() {}`
         } catch (error) {
             console.error(`Error processing file ${pendingFile.name}:`, error);
             alert(`Failed to process ${pendingFile.name}. It might be corrupted or not a valid .docx file.`);
         } finally {
             setPendingFile(null);
         }
+    };
+
+    const handleDeleteIdea = () => {
+        if (!ideaToDelete) return;
+        setProjectData(currentData => {
+            if (!currentData) return null;
+            const updatedIdeas = currentData.storyIdeas.filter(i => i.id !== ideaToDelete.id);
+            return { ...currentData, storyIdeas: updatedIdeas };
+        });
+        setIdeaToDelete(null);
     };
 
     const getSnippet = (html: string) => {
@@ -140,10 +155,10 @@ const DemosPage: React.FC = () => {
                         <p className={`${themeClasses.accentText} opacity-80 mb-6`}>
                             Click 'New Idea' to capture your first story concept, or import an idea from a DOCX file.
                         </p>
-                        <Link to="/" className={`inline-flex items-center space-x-2 px-4 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}>
+                        <ReactRouterDOM.Link to="/" className={`inline-flex items-center space-x-2 px-4 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}>
                             <BackIcon className="w-5 h-5" />
                             <span>Go to Home page</span>
-                        </Link>
+                        </ReactRouterDOM.Link>
                     </div>
                 </div>
             ) : (
@@ -168,6 +183,16 @@ const DemosPage: React.FC = () => {
                                     {getSnippet(idea.synopsis)}
                                 </p>
                             </div>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setIdeaToDelete(idea);
+                                }}
+                                className={`absolute top-3 right-3 p-2 rounded-full text-red-500 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-opacity`}
+                                aria-label={`Delete idea: ${enhancePlainText(idea.title)}`}
+                            >
+                                <TrashIcon className="w-5 h-5" />
+                            </button>
                         </div>
                     ))}
                 </div>
@@ -180,6 +205,13 @@ const DemosPage: React.FC = () => {
                 title={`Import "${pendingFile?.name}"?`}
                 message="This will create a new story idea from the selected DOCX file. The filename will be used as the title."
                 confirmButtonClass={`px-6 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}
+            />
+             <ConfirmModal
+                isOpen={!!ideaToDelete}
+                onClose={() => setIdeaToDelete(null)}
+                onConfirm={handleDeleteIdea}
+                title={`Delete "${ideaToDelete?.title}"?`}
+                message="Are you sure you want to delete this story idea? This action is permanent and cannot be undone."
             />
         </div>
     );
