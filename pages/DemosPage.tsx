@@ -61,16 +61,37 @@ const DemosPage = () => {
 
         try {
             const arrayBuffer = await pendingFile.arrayBuffer();
-            const { value: html } = await mammoth.convertToHtml({ arrayBuffer });
             
-            // Clean the HTML by removing empty paragraphs which can mess with styling.
-            const cleanedHtml = html.replace(/<p>(\s|&nbsp;|<br\s*\/?>)*<\/p>/gi, '');
+            // Define a style map to convert Word styles to HTML headings
+            const styleMap = [
+                "p[style-name='Title'] => h1:fresh",
+                "p[style-name='Heading 1'] => h2:fresh",
+                "p[style-name='Heading 2'] => h3:fresh",
+            ];
+    
+            const { value: html } = await mammoth.convertToHtml({ arrayBuffer }, { styleMap });
+            
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = html;
+    
+            let ideaTitle = pendingFile.name.replace(/\.docx$/, '');
+            
+            // Find the first h1, h2, or h3 to use as the title
+            const firstHeading = tempDiv.querySelector('h1, h2, h3');
+    
+            if (firstHeading && firstHeading.textContent) {
+                ideaTitle = firstHeading.textContent.trim();
+                firstHeading.remove(); // Remove the heading from the content
+            }
+    
+            // Clean the remaining HTML for the synopsis
+            const synopsisHtml = tempDiv.innerHTML.replace(/<p>(\s|&nbsp;|<br\s*\/?>)*<\/p>/gi, '').trim();
 
             const now = new Date().toISOString();
             const newIdea: StoryIdea = {
                 id: crypto.randomUUID(),
-                title: pendingFile.name.replace(/\.docx$/, ''),
-                synopsis: cleanedHtml,
+                title: ideaTitle,
+                synopsis: synopsisHtml,
                 wordCount: 0, // Will be calculated in editor
                 tags: [],
                 status: 'Seedling',
@@ -203,7 +224,7 @@ const DemosPage = () => {
                 onClose={() => { setIsDocxConfirmOpen(false); setPendingFile(null); }}
                 onConfirm={handleDocxImport}
                 title={`Import "${pendingFile?.name}"?`}
-                message="This will create a new story idea from the selected DOCX file. The filename will be used as the title."
+                message="This will create a new story idea from the selected DOCX file. The app will attempt to use the first heading as the title; otherwise, it will use the filename."
                 confirmButtonClass={`px-6 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}
             />
              <ConfirmModal
