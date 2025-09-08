@@ -124,7 +124,7 @@ const CreateNovelPage: React.FC = () => {
     };
 
     return (
-        <div className={`p-8 md:p-12 ${themeClasses.bg} min-h-screen`}>
+        <div className={`p-4 sm:p-8 md:p-12 ${themeClasses.bg} min-h-screen`}>
             <button onClick={() => navigate(-1)} className={`flex items-center space-x-2 mb-8 ${themeClasses.text} opacity-70 hover:opacity-100`}>
                 <BackIcon className="w-5 h-5" />
                 <span>Back to Home page</span>

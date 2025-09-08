@@ -146,7 +146,7 @@ const DemosPage = () => {
     };
 
     return (
-        <div className={`p-8 md:p-12 ${themeClasses.bg} h-full overflow-y-auto`}>
+        <div className={`p-4 sm:p-8 md:p-12 ${themeClasses.bg} h-full overflow-y-auto`}>
             <div className="flex justify-between items-center mb-8">
                 <h1 className={`text-3xl font-bold ${themeClasses.text}`}>Idea Box</h1>
                 <div className="flex items-center space-x-2">

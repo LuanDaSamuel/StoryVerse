@@ -6,7 +6,11 @@ import { AppLogoIcon, HomeIcon, PlusIcon, SettingsIcon, LightbulbIcon, QuillPenI
 import SettingsModal from './SettingsModal';
 import { ProjectContext } from '../contexts/ProjectContext';
 
-const Sidebar: React.FC = () => {
+interface SidebarProps {
+    onLinkClick?: () => void;
+}
+
+const Sidebar: React.FC<SidebarProps> = ({ onLinkClick = () => {} }) => {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const { theme, themeClasses } = useContext(ProjectContext);
 
@@ -35,15 +39,15 @@ const Sidebar: React.FC = () => {
                     <span className="text-xl font-bold">StoryVerse</span>
                 </div>
                 <nav className="flex-1 p-4 space-y-2">
-                    <ReactRouterDOM.NavLink to="/" className={navLinkClasses}>
+                    <ReactRouterDOM.NavLink to="/" className={navLinkClasses} onClick={onLinkClick}>
                         <HomeIcon className="w-5 h-5" />
                         <span>Home page</span>
                     </ReactRouterDOM.NavLink>
-                    <ReactRouterDOM.NavLink to="/create-novel" className={navLinkClasses}>
+                    <ReactRouterDOM.NavLink to="/create-novel" className={navLinkClasses} onClick={onLinkClick}>
                         <PlusIcon className="w-5 h-5" />
                         <span>Create Novel</span>
                     </ReactRouterDOM.NavLink>
-                    <ReactRouterDOM.NavLink to="/demos" className={navLinkClasses}>
+                    <ReactRouterDOM.NavLink to="/demos" className={navLinkClasses} onClick={onLinkClick}>
                         <LightbulbIcon className="w-5 h-5" />
                         <span>Idea Box</span>
                     </ReactRouterDOM.NavLink>

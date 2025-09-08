@@ -1,5 +1,5 @@
 
-import React, { useMemo, useContext, useEffect, useRef } from 'react';
+import React, { useMemo, useContext, useEffect, useRef, useState } from 'react';
 // FIX: Changed react-router-dom import to namespace import to fix module resolution issues.
 import * as ReactRouterDOM from 'react-router-dom';
 import { useProjectFile } from './hooks/useProjectFile';
@@ -14,7 +14,7 @@ import ReadNovelPage from './pages/ReadNovelPage';
 import DemosPage from './pages/DemosPage';
 import StoryIdeaEditorPage from './pages/StoryIdeaEditorPage';
 import { THEME_CONFIG } from './constants';
-import { LoadingIcon } from './components/Icons';
+import { LoadingIcon, Bars3Icon } from './components/Icons';
 import { Theme } from './types';
 
 const NovelEditRedirect = () => {
@@ -54,6 +54,7 @@ const AppContent = () => {
         closeProject,
     } = useProjectFile();
     
+    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
     const navigate = ReactRouterDOM.useNavigate();
     const initialLoadHandled = useRef(false);
 
@@ -89,7 +90,7 @@ const AppContent = () => {
     const onEditPage = ReactRouterDOM.useMatch('/novel/:novelId/edit/:chapterId');
     const onReadPage = ReactRouterDOM.useMatch('/novel/:novelId/read/:chapterId?');
     const onIdeaEditPage = ReactRouterDOM.useMatch('/idea/:ideaId/edit');
-    const isSidebarHiddenPage = !!onEditPage || !!onReadPage || !!onIdeaEditPage;
+    const isSidebarPermanentlyHidden = !!onEditPage || !!onReadPage || !!onIdeaEditPage;
 
     const renderContent = () => {
         switch (status) {
@@ -109,8 +110,40 @@ const AppContent = () => {
                 if (!projectData) return null;
                 return (
                     <div className={`flex h-screen ${themeClasses.bg} ${themeClasses.text}`}>
-                        {!isSidebarHiddenPage && <Sidebar />}
+                        {/* Desktop Sidebar */}
+                        {!isSidebarPermanentlyHidden && (
+                            <div className="hidden md:block flex-shrink-0">
+                                <Sidebar />
+                            </div>
+                        )}
+
+                        {/* Mobile Sidebar & Overlay */}
+                        {!isSidebarPermanentlyHidden && (
+                            <>
+                                <div 
+                                    className={`fixed inset-0 bg-black/60 z-30 md:hidden transition-opacity ${isMobileSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                                    onClick={() => setIsMobileSidebarOpen(false)}
+                                    aria-hidden="true"
+                                />
+                                <div className={`fixed inset-y-0 left-0 z-40 transition-transform duration-300 ease-in-out md:hidden ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+                                    <Sidebar onLinkClick={() => setIsMobileSidebarOpen(false)} />
+                                </div>
+                            </>
+                        )}
+                        
                         <main className="flex-1 overflow-y-auto">
+                            {/* Mobile Header with Hamburger */}
+                            {!isSidebarPermanentlyHidden && (
+                                <header className={`sticky top-0 z-10 flex items-center justify-between p-4 md:hidden ${themeClasses.bgSecondary} border-b ${themeClasses.border}`}>
+                                    <button onClick={() => setIsMobileSidebarOpen(true)} className={themeClasses.accentText}>
+                                        <span className="sr-only">Open Menu</span>
+                                        <Bars3Icon className="h-6 w-6" />
+                                    </button>
+                                    <span className={`font-bold ${themeClasses.accentText}`}>StoryVerse</span>
+                                    <div className="w-6" /> {/* Spacer to center title */}
+                                </header>
+                            )}
+
                             <ReactRouterDOM.Routes>
                                 <ReactRouterDOM.Route path="/" element={<HomePage />} />
                                 <ReactRouterDOM.Route path="/create-novel" element={<CreateNovelPage />} />
