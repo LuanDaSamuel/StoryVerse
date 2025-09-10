@@ -34,10 +34,10 @@ const HomePage = () => {
                     <ReactRouterDOM.Link
                         to={`/novel/${novel.id}`}
                         key={novel.id}
-                        className={`group relative block rounded-lg overflow-hidden transition-all duration-300 ease-in-out transform hover:-translate-y-1 hover:shadow-2xl ${themeClasses.bgSecondary}`}
+                        className={`group flex flex-col rounded-lg overflow-hidden transition-all duration-300 ease-in-out transform hover:-translate-y-1 hover:shadow-2xl ${themeClasses.bgSecondary}`}
                     >
                         {/* Cover Image */}
-                        <div className={`relative w-full aspect-[3/4] ${themeClasses.bgTertiary}`}>
+                        <div className={`relative w-full aspect-[3/4] flex-shrink-0 ${themeClasses.bgTertiary}`}>
                             {novel.coverImage ? (
                                 <img src={novel.coverImage} alt={novel.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                             ) : (
@@ -47,7 +47,7 @@ const HomePage = () => {
                             )}
                         </div>
                         {/* Novel Details */}
-                        <div className="p-4">
+                        <div className="p-4 flex flex-col flex-grow">
                             <h3 className={`font-bold text-xl truncate ${themeClasses.accentText}`} title={novel.title}>
                                 {enhancePlainText(novel.title)}
                             </h3>
@@ -58,16 +58,12 @@ const HomePage = () => {
                                     </span>
                                 ))}
                             </div>
-                        </div>
-
-                        {/* Description Tooltip overlay */}
-                        {novel.description && (
-                            <div className="absolute bottom-0 left-0 right-0 p-4 pt-12 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none transform translate-y-2 group-hover:translate-y-0">
-                                <p className="text-sm text-white overflow-hidden" style={{ display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical' }}>
+                             {novel.description && (
+                                <p className={`mt-2 text-sm ${themeClasses.textSecondary}`}>
                                     {enhancePlainText(novel.description)}
                                 </p>
-                            </div>
-                        )}
+                            )}
+                        </div>
                     </ReactRouterDOM.Link>
                 ))}
             </div>
