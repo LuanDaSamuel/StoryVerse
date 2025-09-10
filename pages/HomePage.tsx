@@ -34,10 +34,10 @@ const HomePage = () => {
                     <ReactRouterDOM.Link
                         to={`/novel/${novel.id}`}
                         key={novel.id}
-                        className={`group relative block rounded-lg overflow-hidden transition-all duration-300 ease-in-out transform hover:-translate-y-1 hover:shadow-2xl ${themeClasses.bgSecondary}`}
+                        className={`group relative flex flex-col rounded-lg overflow-hidden transition-all duration-300 ease-in-out transform hover:-translate-y-1 hover:shadow-2xl ${themeClasses.bgSecondary}`}
                     >
                         {/* Cover Image */}
-                        <div className={`relative w-full aspect-[3/4] ${themeClasses.bgTertiary}`}>
+                        <div className={`relative w-full aspect-[3/4] flex-shrink-0 ${themeClasses.bgTertiary}`}>
                             {novel.coverImage ? (
                                 <img src={novel.coverImage} alt={novel.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                             ) : (
@@ -47,11 +47,11 @@ const HomePage = () => {
                             )}
                         </div>
                         {/* Novel Details */}
-                        <div className="p-4">
-                            <h3 className={`font-bold text-xl ${themeClasses.accentText}`} title={novel.title}>
+                        <div className="p-4 flex flex-col flex-grow">
+                            <h3 className={`font-bold text-xl ${themeClasses.accentText} min-h-[3.5rem]`} title={novel.title}>
                                 {enhancePlainText(novel.title)}
                             </h3>
-                            <div className="flex flex-wrap gap-2 my-2">
+                            <div className="flex flex-wrap gap-2 mt-auto pt-2">
                                 {novel.tags.map(tag => (
                                     <span key={tag} className={`px-2 py-0.5 text-xs rounded-full font-semibold ${themeClasses.accent} ${themeClasses.accentText}`}>
                                         {tag}
@@ -60,10 +60,10 @@ const HomePage = () => {
                             </div>
                         </div>
 
-                        {/* Description Tooltip overlay */}
+                        {/* Centered, truncated description overlay on hover */}
                         {novel.description && (
-                            <div className="absolute inset-0 p-4 bg-black/75 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300 overflow-y-auto">
-                                <p className="text-sm text-white">
+                            <div className="absolute inset-0 p-6 bg-black/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center text-center">
+                                <p className="text-white text-base line-clamp-[12]">
                                     {enhancePlainText(novel.description)}
                                 </p>
                             </div>
