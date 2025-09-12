@@ -262,9 +262,147 @@ const StoryIdeaEditorPage: React.FC = () => {
     const applyParagraphSpacing = (spacing: string) => { applyAndSaveFormat(() => { const selection = window.getSelection(); if (!selection || selection.rangeCount === 0) return; let node = selection.getRangeAt(0).startContainer; if (node.nodeType === 3) node = node.parentNode!; while(node && node !== editorRef.current) { if(node instanceof HTMLElement && ['P', 'H1', 'H2', 'H3', 'DIV'].includes(node.tagName)) { node.style.marginBottom = spacing; return; } node = node.parentNode!; } }); };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-        if (e.key === '"' || e.key === "'") { e.preventDefault(); const quote = e.key === '"' ? '“' : '‘'; document.execCommand('insertText', false, quote); }
-        if (e.key === '-' && e.currentTarget.textContent?.endsWith('-')) { e.preventDefault(); document.execCommand('undo'); document.execCommand('insertText', false, '—'); }
-        if (e.key === '.' && e.currentTarget.textContent?.endsWith('..')) { e.preventDefault(); document.execCommand('undo'); document.execCommand('undo'); document.execCommand('insertText', false, '…'); }
+        const selection = window.getSelection();
+        if (!selection || !selection.rangeCount) {
+            return;
+        }
+
+        const range = selection.getRangeAt(0);
+        
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            document.execCommand('insertText', false, '    ');
+            return;
+        }
+
+        if (e.key === 'Backspace' || e.key === 'Delete') {
+            if (range.collapsed && range.startContainer.nodeType === Node.TEXT_NODE) {
+                const textNode = range.startContainer as Text;
+                const offset = range.startOffset;
+                const text = textNode.textContent || '';
+                
+                if (e.key === 'Backspace' && offset >= 4 && text.substring(offset - 4, offset) === '    ') {
+                    e.preventDefault();
+                    range.setStart(textNode, offset - 4);
+                    range.deleteContents();
+                    editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+                    return;
+                }
+                
+                if (e.key === 'Delete' && text.length - offset >= 4 && text.substring(offset, offset + 4) === '    ') {
+                    e.preventDefault();
+                    range.setEnd(textNode, offset + 4);
+                    range.deleteContents();
+                    editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+                    return;
+                }
+            }
+        }
+
+
+        if (e.key === '"' || e.key === "'") {
+            e.preventDefault();
+            const openQuote = e.key === '"' ? '“' : '‘';
+            const closeQuote = e.key === '"' ? '”' : '’';
+
+            if (!range.collapsed) {
+                // If text is selected, wrap it with smart quotes
+                const selectedContent = range.extractContents();
+                const fragment = document.createDocumentFragment();
+                fragment.appendChild(document.createTextNode(openQuote));
+                fragment.appendChild(selectedContent);
+                fragment.appendChild(document.createTextNode(closeQuote));
+                range.insertNode(fragment);
+                range.collapse(false);
+                selection.removeAllRanges();
+                selection.addRange(range);
+            } else {
+                // If no text is selected, insert a single smart quote based on context.
+                const { startContainer, startOffset } = range;
+                if (!editorRef.current) return;
+
+                // 1. Determine if the cursor is at the beginning of a block-level element.
+                let isAtStartOfBlock = false;
+                let node: Node | null = startContainer;
+                // Find the nearest ancestor element that is a direct child of the editor. This is our block.
+                while (node && node.parentNode !== editorRef.current) {
+                    node = node.parentNode;
+                }
+                
+                // If we are at the very start of the editor, consider it the start of a block.
+                if (editorRef.current.contains(startContainer) && startContainer === editorRef.current && startOffset === 0) {
+                     isAtStartOfBlock = true;
+                } else if (node && node.nodeType === Node.ELEMENT_NODE) {
+                    const rangeToCheck = document.createRange();
+                    rangeToCheck.selectNodeContents(node);
+                    rangeToCheck.setEnd(startContainer, startOffset);
+                    // If the text content from the start of the block to the cursor is empty, it's the start.
+                    if (rangeToCheck.toString().trim() === '') {
+                        isAtStartOfBlock = true;
+                    }
+                }
+
+                // Get text before the cursor for context.
+                const precedingRange = document.createRange();
+                precedingRange.setStart(editorRef.current, 0);
+                precedingRange.setEnd(startContainer, startOffset);
+                const textBeforeCursor = precedingRange.toString();
+                const lastChar = textBeforeCursor.slice(-1);
+
+                if (isAtStartOfBlock) {
+                    // Always use an opening quote at the start of a block.
+                    document.execCommand('insertText', false, e.key === '"' ? '“' : '‘');
+                } else if (e.key === "'") {
+                    // Heuristic for apostrophe vs. single quote.
+                    if (/\w/.test(lastChar)) {
+                        document.execCommand('insertText', false, '’'); // Apostrophe
+                    } else {
+                        // Balance single quotes.
+                        const openSingleCount = (textBeforeCursor.match(/‘/g) || []).length;
+                        const closeSingleCount = (textBeforeCursor.match(/’/g) || []).length;
+                        document.execCommand('insertText', false, openSingleCount > closeSingleCount ? '’' : '‘');
+                    }
+                } else { // e.key === '"'
+                    // Balance double quotes.
+                    const openDoubleCount = (textBeforeCursor.match(/“/g) || []).length;
+                    const closeDoubleCount = (textBeforeCursor.match(/”/g) || []).length;
+                    document.execCommand('insertText', false, openDoubleCount > closeDoubleCount ? '”' : '“');
+                }
+            }
+            editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+            return;
+        }
+
+        if (['.', '-'].includes(e.key)) {
+            if (range.collapsed && range.startContainer.nodeType === Node.TEXT_NODE) {
+                const textNode = range.startContainer as Text;
+                const offset = range.startOffset;
+
+                if (e.key === '.' && textNode.textContent?.substring(offset - 2, offset) === '..') {
+                    e.preventDefault();
+                    range.setStart(textNode, offset - 2);
+                    range.deleteContents();
+                    range.insertNode(document.createTextNode('…'));
+                    range.collapse(false);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                    editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+                    return;
+                }
+
+                if (e.key === '-' && textNode.textContent?.substring(offset - 1, offset) === '-') {
+                    e.preventDefault();
+                    range.setStart(textNode, offset - 1);
+                    range.deleteContents();
+                    range.insertNode(document.createTextNode('—'));
+                    range.collapse(false);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                    editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+                    return;
+                }
+            }
+        }
     };
 
     const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
