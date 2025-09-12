@@ -525,6 +525,7 @@ const ChapterEditorPage: React.FC = () => {
 
         const inlineStyles = window.getComputedStyle(element);
         const detectedSize = inlineStyles.fontSize;
+        
         const family = inlineStyles.fontFamily;
         const matchedFont = fontOptions.find(f => family.includes(f.name))?.value || fontOptions[0].value;
 
@@ -541,56 +542,142 @@ const ChapterEditorPage: React.FC = () => {
         updateCurrentFormat();
     }, [updateActiveFormats, updateCurrentFormat]);
 
-    const handleEditorInput = useCallback((e: React.FormEvent<HTMLDivElement>) => {
-        const newContent = e.currentTarget.innerHTML;
-        if (editorContentRef.current !== newContent) {
-            editorContentRef.current = newContent;
-            updateChapterField('content', newContent);
-        }
-    }, [updateChapterField]);
+    const applyAndSaveFormat = useCallback((formatAction: () => void) => {
+        if (!editorRef.current) return;
+        
+        formatAction();
+        
+        cleanupEditor();
+
+        const event = new Event('input', { bubbles: true, cancelable: true });
+        editorRef.current.dispatchEvent(event);
+        
+        editorRef.current.focus();
+        
+        handleSelectionChange();
+
+    }, [handleSelectionChange, cleanupEditor]);
+
+    const applyCommand = (command: string, value?: string) => {
+        applyAndSaveFormat(() => document.execCommand(command, false, value));
+    };
+    
+    const applyParagraphStyle = (style: string) => {
+        applyAndSaveFormat(() => document.execCommand('formatBlock', false, style));
+    };
+    
+    const applyFont = (fontValue: string) => {
+        const fontName = fontOptions.find(f => f.value === fontValue)?.name || 'serif';
+        applyAndSaveFormat(() => document.execCommand('fontName', false, fontName));
+    };
+
+    const applyColor = (color: string) => {
+        applyAndSaveFormat(() => document.execCommand('foreColor', false, color));
+    };
+    
+    const applyFontSize = (size: string) => {
+        applyAndSaveFormat(() => {
+            if (!editorRef.current) return;
+            editorRef.current.focus();
+            const selection = window.getSelection();
+            if (!selection?.rangeCount) return;
+
+            // For a cursor without selection, insert a styled span to start typing with the new size.
+            if (selection.isCollapsed) {
+                const range = selection.getRangeAt(0);
+                const span = document.createElement('span');
+                span.style.fontSize = size;
+                span.textContent = '\u200B'; // Zero-width space
+                range.insertNode(span);
+                
+                range.selectNodeContents(span);
+                range.collapse(false);
+                selection.removeAllRanges();
+                selection.addRange(range);
+                return;
+            }
+
+            // For a text selection, use a temporary highlight. This is a robust way to wrap content
+            // that might cross multiple existing HTML tags. The browser handles splitting nodes correctly.
+            const DUMMY_COLOR_RGB = 'rgb(1, 2, 3)';
+            document.execCommand('styleWithCSS', false, 'true');
+            document.execCommand('hiliteColor', false, DUMMY_COLOR_RGB);
+
+            // Find all the elements that were just highlighted.
+            const tempSpans = Array.from(editorRef.current.querySelectorAll<HTMLElement>(`span[style*="background-color: ${DUMMY_COLOR_RGB}"]`));
+            
+            const parentsToClean = new Set<Node>();
+
+            tempSpans.forEach(span => {
+                if (span.parentElement) {
+                    parentsToClean.add(span.parentElement);
+                }
+
+                // Replace the temporary background color with the desired font size.
+                span.style.backgroundColor = '';
+                span.style.fontSize = size;
+                
+                // If the span has no style attribute left, it's an empty wrapper and can be removed.
+                if (!span.getAttribute('style')?.trim()) {
+                    const parent = span.parentNode;
+                    if (parent) {
+                        while (span.firstChild) {
+                            parent.insertBefore(span.firstChild, span);
+                        }
+                        parent.removeChild(span);
+                    }
+                }
+            });
+
+            // After styling, perform a cleanup pass on the affected areas of the DOM.
+            // This merges adjacent `<span>` elements if they have the exact same style,
+            // preventing the editor's HTML from becoming a mess of redundant tags.
+            parentsToClean.forEach(parent => {
+                let child = parent.firstChild;
+                while (child) {
+                    const next = child.nextSibling;
+                    if (
+                        next &&
+                        child instanceof HTMLSpanElement &&
+                        next instanceof HTMLSpanElement &&
+                        child.style.cssText === next.style.cssText
+                    ) {
+                        while (next.firstChild) {
+                            child.appendChild(next.firstChild);
+                        }
+                        parent.removeChild(next);
+                        // Do not advance child, check again against the new next sibling
+                    } else {
+                        child = next; // Advance only if no merge happened
+                    }
+                }
+                parent.normalize(); // Also merge adjacent text nodes.
+            });
+        });
+    };
+    
+    const applyParagraphSpacing = (spacing: string) => {
+        applyAndSaveFormat(() => {
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0) return;
+            let node = selection.getRangeAt(0).startContainer;
+            if (node.nodeType === 3) node = node.parentNode!;
+            while(node && node !== editorRef.current) {
+                if(node instanceof HTMLElement && ['P', 'H1', 'H2', 'DIV'].includes(node.tagName)) {
+                    node.style.marginBottom = spacing;
+                    return;
+                }
+                node = node.parentNode!;
+            }
+        });
+    };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            // Let browser handle Enter, then check and fix if it created a DIV.
-            setTimeout(() => {
-                if (!editorRef.current) return;
-                const selection = window.getSelection();
-                if (!selection?.anchorNode) return;
-
-                // Find the block element containing the cursor.
-                let blockElement: Node | null = selection.anchorNode;
-                while (blockElement && blockElement.parentNode !== editorRef.current) {
-                    blockElement = blockElement.parentNode;
-                }
-
-                // If it's a DIV, convert it to a P.
-                if (blockElement instanceof HTMLElement && blockElement.tagName === 'DIV') {
-                    const p = document.createElement('p');
-                    // Move all child nodes from the div to the new p
-                    while (blockElement.firstChild) {
-                        p.appendChild(blockElement.firstChild);
-                    }
-                    // If the new p is empty, add a <br> to make it visible.
-                    if (!p.innerHTML) {
-                        p.innerHTML = '<br>';
-                    }
-                    
-                    blockElement.parentNode.replaceChild(p, blockElement);
-
-                    // Restore selection to the new paragraph to continue typing.
-                    const range = document.createRange();
-                    range.setStart(p, 0);
-                    range.collapse(true);
-                    selection.removeAllRanges();
-                    selection.addRange(range);
-                }
-            }, 0);
-        }
-
         const selection = window.getSelection();
         if (!selection || !selection.rangeCount) {
             return;
         }
+
         const range = selection.getRangeAt(0);
         
         if (e.key === 'Tab') {
@@ -598,6 +685,31 @@ const ChapterEditorPage: React.FC = () => {
             document.execCommand('insertText', false, '    ');
             return;
         }
+
+        if (e.key === 'Backspace' || e.key === 'Delete') {
+            if (range.collapsed && range.startContainer.nodeType === Node.TEXT_NODE) {
+                const textNode = range.startContainer as Text;
+                const offset = range.startOffset;
+                const text = textNode.textContent || '';
+                
+                if (e.key === 'Backspace' && offset >= 4 && text.substring(offset - 4, offset) === '    ') {
+                    e.preventDefault();
+                    range.setStart(textNode, offset - 4);
+                    range.deleteContents();
+                    editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+                    return;
+                }
+                
+                if (e.key === 'Delete' && text.length - offset >= 4 && text.substring(offset, offset + 4) === '    ') {
+                    e.preventDefault();
+                    range.setEnd(textNode, offset + 4);
+                    range.deleteContents();
+                    editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+                    return;
+                }
+            }
+        }
+
 
         if (e.key === '"' || e.key === "'") {
             e.preventDefault();
@@ -620,40 +732,49 @@ const ChapterEditorPage: React.FC = () => {
                 const { startContainer, startOffset } = range;
                 if (!editorRef.current) return;
 
+                // 1. Determine if the cursor is at the beginning of a block-level element.
                 let isAtStartOfBlock = false;
                 let node: Node | null = startContainer;
+                // Find the nearest ancestor element that is a direct child of the editor. This is our block.
                 while (node && node.parentNode !== editorRef.current) {
                     node = node.parentNode;
                 }
                 
+                // If we are at the very start of the editor, consider it the start of a block.
                 if (editorRef.current.contains(startContainer) && startContainer === editorRef.current && startOffset === 0) {
                      isAtStartOfBlock = true;
                 } else if (node && node.nodeType === Node.ELEMENT_NODE) {
                     const rangeToCheck = document.createRange();
                     rangeToCheck.selectNodeContents(node);
                     rangeToCheck.setEnd(startContainer, startOffset);
+                    // If the text content from the start of the block to the cursor is empty, it's the start.
                     if (rangeToCheck.toString().trim() === '') {
                         isAtStartOfBlock = true;
                     }
                 }
 
+                // Get text before the cursor for context.
                 const precedingRange = document.createRange();
                 precedingRange.setStart(editorRef.current, 0);
                 precedingRange.setEnd(startContainer, startOffset);
                 const textBeforeCursor = precedingRange.toString();
                 const lastChar = textBeforeCursor.slice(-1);
 
-                if (isAtStartOfBlock || /\s|\(|\[|\{/.test(lastChar)) {
-                    document.execCommand('insertText', false, openQuote);
+                if (isAtStartOfBlock) {
+                    // Always use an opening quote at the start of a block.
+                    document.execCommand('insertText', false, e.key === '"' ? '“' : '‘');
                 } else if (e.key === "'") {
+                    // Heuristic for apostrophe vs. single quote.
                     if (/\w/.test(lastChar)) {
                         document.execCommand('insertText', false, '’'); // Apostrophe
                     } else {
+                        // Balance single quotes.
                         const openSingleCount = (textBeforeCursor.match(/‘/g) || []).length;
                         const closeSingleCount = (textBeforeCursor.match(/’/g) || []).length;
                         document.execCommand('insertText', false, openSingleCount > closeSingleCount ? '’' : '‘');
                     }
-                } else {
+                } else { // e.key === '"'
+                    // Balance double quotes.
                     const openDoubleCount = (textBeforeCursor.match(/“/g) || []).length;
                     const closeDoubleCount = (textBeforeCursor.match(/”/g) || []).length;
                     document.execCommand('insertText', false, openDoubleCount > closeDoubleCount ? '”' : '“');
@@ -693,163 +814,304 @@ const ChapterEditorPage: React.FC = () => {
                 }
             }
         }
-    };
     
-    const applyAndSaveFormat = useCallback((formatAction: () => void) => {
-        if (!editorRef.current) return;
-        formatAction();
-        cleanupEditor(); // Clean up potential DOM messes from execCommand
+        if (e.key === 'Enter') {
+            setTimeout(() => {
+                const newSelection = window.getSelection();
+                if (!newSelection?.rangeCount || !editorRef.current) return;
+                
+                let currentBlock = newSelection.getRangeAt(0).startContainer;
+                while (currentBlock && currentBlock.parentNode !== editorRef.current) {
+                    currentBlock = currentBlock.parentNode;
+                }
         
-        // Manually trigger the input event to ensure changes are saved
-        const event = new Event('input', { bubbles: true, cancelable: true });
-        editorRef.current.dispatchEvent(event);
-        
-        editorRef.current.focus();
-        handleSelectionChange(); // Update toolbar state
-    }, [handleSelectionChange, cleanupEditor]);
-    
-    const applyCommand = (command: string, value?: string) => {
-        applyAndSaveFormat(() => document.execCommand(command, false, value));
-    };
-
-    const applyParagraphStyle = (style: string) => {
-        applyAndSaveFormat(() => document.execCommand('formatBlock', false, style));
-    };
-
-    const applyFont = (fontValue: string) => {
-        const fontName = fontOptions.find(f => f.value === fontValue)?.name || 'serif';
-        applyAndSaveFormat(() => document.execCommand('fontName', false, fontName));
-    };
-
-    const applyColor = (color: string) => {
-        applyAndSaveFormat(() => document.execCommand('foreColor', false, color));
-    };
-
-    const applyFontSize = (size: string) => {
-        applyAndSaveFormat(() => {
-            document.execCommand('fontSize', false, '1'); // Use a dummy size
-            const fontElements = editorRef.current?.getElementsByTagName('font');
-            if(fontElements) {
-                for (let i = 0, len = fontElements.length; i < len; ++i) {
-                    if (fontElements[i].size === "1") {
-                        fontElements[i].removeAttribute("size");
-                        fontElements[i].style.fontSize = size;
+                if (currentBlock instanceof HTMLElement) {
+                    const isNewBlockEmpty = (currentBlock.textContent?.trim() === '' && currentBlock.children.length === 0) || currentBlock.innerHTML === '<br>';
+                    if (isNewBlockEmpty) {
+                        const previousBlock = currentBlock.previousElementSibling;
+                        if (previousBlock instanceof HTMLElement) {
+                            let styleSource: Element = previousBlock;
+                            let lastNode: Node | null = previousBlock;
+                            while (lastNode && lastNode.lastChild) {
+                                lastNode = lastNode.lastChild;
+                            }
+                            
+                            if (lastNode) {
+                                styleSource = lastNode.nodeType === Node.TEXT_NODE ? lastNode.parentElement! : lastNode as Element;
+                            }
+                            
+                            const computedStyle = window.getComputedStyle(styleSource);
+                            const stylesToCopy = {
+                                fontSize: computedStyle.fontSize,
+                                fontFamily: computedStyle.fontFamily,
+                                color: computedStyle.color,
+                            };
+                            
+                            const editorStyles = window.getComputedStyle(editorRef.current!);
+                            const styleCarrier = document.createElement('span');
+                            let styleApplied = false;
+                            
+                            if (stylesToCopy.fontSize !== editorStyles.fontSize) {
+                                styleCarrier.style.fontSize = stylesToCopy.fontSize;
+                                styleApplied = true;
+                            }
+                            if (stylesToCopy.fontFamily !== editorStyles.fontFamily) {
+                                styleCarrier.style.fontFamily = stylesToCopy.fontFamily;
+                                styleApplied = true;
+                            }
+                            if (stylesToCopy.color !== editorStyles.color) {
+                                styleCarrier.style.color = stylesToCopy.color;
+                                styleApplied = true;
+                            }
+                            
+                            if (styleApplied) {
+                                currentBlock.innerHTML = '';
+                                styleCarrier.innerHTML = '&#8203;';
+                                currentBlock.appendChild(styleCarrier);
+                                
+                                const range = document.createRange();
+                                range.setStart(styleCarrier, 1);
+                                range.collapse(true);
+                                newSelection.removeAllRanges();
+                                newSelection.addRange(range);
+                            }
+                        }
                     }
                 }
-            }
-        });
-    };
-    
-    const applyParagraphSpacing = (spacing: string) => {
-        applyAndSaveFormat(() => {
-            const selection = window.getSelection();
-            if (!selection || selection.rangeCount === 0) return;
-            let node = selection.getRangeAt(0).startContainer;
-            if (node.nodeType === 3) node = node.parentNode!; // get element
-            
-            while(node && node !== editorRef.current) {
-                if(node instanceof HTMLElement && ['P', 'H1', 'H2', 'H3', 'DIV'].includes(node.tagName)) {
-                    node.style.marginBottom = spacing;
-                    return;
+        
+                // Adjust Scroll Position
+                let element = newSelection.getRangeAt(0).startContainer;
+                if (element.nodeType === Node.TEXT_NODE) element = element.parentElement!;
+                if (!(element instanceof HTMLElement)) return;
+
+                const toolbarEl = toolbarRef.current;
+                const scrollContainerEl = scrollContainerRef.current;
+                if (!toolbarEl || !scrollContainerEl) return;
+                
+                const elementRect = element.getBoundingClientRect();
+                const toolbarRect = toolbarEl.getBoundingClientRect();
+                const buffer = 20; 
+
+                if (elementRect.bottom > toolbarRect.top - buffer) {
+                    const scrollAmount = elementRect.bottom - (toolbarRect.top - buffer);
+                    scrollContainerEl.scrollBy({ top: scrollAmount, behavior: 'smooth' });
                 }
-                node = node.parentNode!;
-            }
-        });
+            }, 0);
+            setTimeout(cleanupEditor, 10);
+        }
     };
-    
+
+    const handleKeyUp = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+        // This function is intentionally left empty after removing heading markdown shortcuts.
+        // It can be used for future key-up-based features.
+    }, []);
+
     const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
         e.preventDefault();
+        
         const text = e.clipboardData.getData('text/plain');
         if (!text) return;
-        const htmlToInsert = text.split(/\r?\n/).map(line => `<p>${enhancePlainText(line) || '<br>'}</p>`).join('');
+
+        // Sanitize pasted text into clean paragraphs.
+        // Each line becomes a new <p> tag, preserving paragraph breaks from the source.
+        const htmlToInsert = text
+            .split(/\r?\n/)
+            .map(line => `<p>${line.trim() === '' ? '<br>' : enhancePlainText(line)}</p>`)
+            .join('');
+
         document.execCommand('insertHTML', false, htmlToInsert);
+        cleanupEditor();
     };
 
+    const handleCopy = useCallback((e: ClipboardEvent) => {
+        const selection = window.getSelection();
+        if (!selection?.rangeCount) return;
+    
+        const selectedText = selection.toString();
+        const cleanedText = selectedText.replace(/(\r\n|\n|\r){2,}/g, '\n\n').trim();
+    
+        if (cleanedText.length < selectedText.length || (selectedText.length > 0 && cleanedText.length === 0)) {
+            e.preventDefault();
+    
+            const selectedHtmlFragment = selection.getRangeAt(0).cloneContents();
+            const tempDiv = document.createElement('div');
+            tempDiv.appendChild(selectedHtmlFragment);
+            
+            e.clipboardData?.setData('text/plain', cleanedText);
+            e.clipboardData?.setData('text/html', tempDiv.innerHTML);
+        }
+    }, []);
+
+    const handleEditorInput = (e: React.FormEvent<HTMLDivElement>) => {
+        const newHTML = e.currentTarget.innerHTML;
+        editorContentRef.current = newHTML;
+        updateChapterField('content', newHTML);
+    };
+
+    // --- Effects ---
+    // This effect handles loading content when the chapter is switched.
     useEffect(() => {
-        if (chapter && editorRef.current) {
-            const currentContent = editorRef.current.innerHTML;
-            const chapterContent = enhanceHtml(chapter.content || '<p><br></p>');
-            if (currentContent !== chapterContent) {
-                 editorRef.current.innerHTML = chapterContent;
-                 editorContentRef.current = chapterContent;
+        if (editorRef.current && chapter) {
+            const initialContent = chapter.content || '<p><br></p>';
+            const enhancedContent = enhanceHtml(initialContent);
+
+            // Directly set content and sync the tracking ref
+            editorRef.current.innerHTML = enhancedContent;
+            editorContentRef.current = initialContent;
+
+            // After loading a new chapter, focus the editor and move cursor to the end.
+            editorRef.current.focus();
+            const selection = window.getSelection();
+            if (selection) {
+                const range = document.createRange();
+                range.selectNodeContents(editorRef.current);
+                range.collapse(false); // Go to end
+                selection.removeAllRanges();
+                selection.addRange(range);
             }
         }
-    }, [chapter]);
+        handleSelectionChange();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [chapterId]);
+
+    // This effect handles programmatic content changes (like "Replace All in Novel").
+    useEffect(() => {
+        if (chapter && editorRef.current) {
+            const contentFromState = chapter.content || '<p><br></p>';
+            // If state content diverges from our tracked editor content, it was a programmatic change.
+            if (contentFromState !== editorContentRef.current) {
+                const enhancedContent = enhanceHtml(contentFromState);
+                editorRef.current.innerHTML = enhancedContent;
+                editorContentRef.current = contentFromState; // Re-sync the ref
+
+                // After a programmatic change, moving cursor to the end is a sensible default.
+                const selection = window.getSelection();
+                if (selection) {
+                    const range = document.createRange();
+                    range.selectNodeContents(editorRef.current);
+                    range.collapse(false);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                }
+            }
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [chapter?.content]);
 
     useEffect(() => {
+        const editorEl = editorRef.current;
+        document.addEventListener('selectionchange', handleSelectionChange);
+        if (editorEl) {
+            editorEl.addEventListener('keyup', handleSelectionChange);
+            editorEl.addEventListener('mouseup', handleSelectionChange);
+            editorEl.addEventListener('focus', handleSelectionChange);
+            editorEl.addEventListener('copy', handleCopy);
+        }
+        window.addEventListener('resize', handleSelectionChange);
+
+        return () => {
+            document.removeEventListener('selectionchange', handleSelectionChange);
+            if(editorEl) {
+                editorEl.removeEventListener('keyup', handleSelectionChange);
+                editorEl.removeEventListener('mouseup', handleSelectionChange);
+                editorEl.removeEventListener('focus', handleSelectionChange);
+                editorEl.removeEventListener('copy', handleCopy);
+            }
+            window.removeEventListener('resize', handleSelectionChange);
+        };
+    }, [handleSelectionChange, handleCopy]);
+    
+     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (toolbarRef.current && !toolbarRef.current.contains(event.target as Node)) {
                 setIsFormatPanelOpen(false);
             }
         };
+
         if (isFormatPanelOpen) {
             document.addEventListener('mousedown', handleClickOutside);
         }
+
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
     }, [isFormatPanelOpen]);
-
-    useEffect(() => {
-        document.addEventListener('selectionchange', handleSelectionChange);
-        const editorEl = editorRef.current;
-        if (editorEl) {
-            editorEl.addEventListener('keyup', handleSelectionChange);
-            editorEl.addEventListener('mouseup', handleSelectionChange);
-            editorEl.addEventListener('focus', handleSelectionChange);
-        }
-        return () => {
-            document.removeEventListener('selectionchange', handleSelectionChange);
-             if(editorEl) {
-                editorEl.removeEventListener('keyup', handleSelectionChange);
-                editorEl.removeEventListener('mouseup', handleSelectionChange);
-                editorEl.removeEventListener('focus', handleSelectionChange);
-            }
-        };
-    }, [handleSelectionChange]);
-
+    
     const handleReplaceAllInNovel = (find: string, replace: string, caseSensitive: boolean, wholeWord: boolean) => {
-        if (novelIndex === -1) return;
-        
-        let flags = 'g';
-        if (!caseSensitive) flags += 'i';
-        let pattern = find.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        if (wholeWord) {
-            pattern = `\\b${pattern}\\b`;
-        }
-        const regex = new RegExp(pattern, flags);
-
-        const tempDiv = document.createElement('div');
+        if (!find || novelIndex === -1) return;
 
         setProjectData(currentData => {
             if (!currentData) return null;
-            const updatedNovels = [...currentData.novels];
-            const currentNovel = updatedNovels[novelIndex];
-            
-            const updatedChapters = currentNovel.chapters.map(chap => {
-                tempDiv.innerHTML = chap.content;
-                const walker = document.createTreeWalker(tempDiv, NodeFilter.SHOW_TEXT);
-                let textNode;
-                while(textNode = walker.nextNode()) {
-                    if (textNode.textContent) {
-                         textNode.textContent = textNode.textContent.replace(regex, replace);
-                    }
-                }
-                const newContent = tempDiv.innerHTML;
-                
-                tempDiv.innerHTML = newContent;
+
+            const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            let pattern = escapeRegExp(find);
+            if (wholeWord) {
+                pattern = `\\b${pattern}\\b`;
+            }
+            const flags = caseSensitive ? 'g' : 'gi';
+            const findRegex = new RegExp(pattern, flags);
+
+            const tempDiv = document.createElement('div');
+
+            const getWordCount = (html: string) => {
+                if (!html) return 0;
+                tempDiv.innerHTML = html;
                 const text = tempDiv.textContent || "";
-                const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
-                
-                return { ...chap, content: newContent, wordCount, updatedAt: new Date().toISOString() };
-            });
+                return text.trim().split(/\s+/).filter(Boolean).length;
+            };
+
+            const updatedNovels = [...currentData.novels];
+            if (novelIndex >= updatedNovels.length) return currentData;
             
-            updatedNovels[novelIndex] = { ...currentNovel, chapters: updatedChapters };
-            return { ...currentData, novels: updatedNovels };
+            let currentNovel = { ...updatedNovels[novelIndex] };
+            let changesMade = false;
+
+            const updatedChapters = currentNovel.chapters.map(chap => {
+                const docFragment = document.createElement('div');
+                docFragment.innerHTML = chap.content;
+                
+                const walker = document.createTreeWalker(docFragment, NodeFilter.SHOW_TEXT);
+                const textNodes: Text[] = [];
+                let currentNode = walker.nextNode();
+                while(currentNode) {
+                    textNodes.push(currentNode as Text);
+                    currentNode = walker.nextNode();
+                }
+                
+                let chapterChanged = false;
+                textNodes.forEach(textNode => {
+                    const originalText = textNode.nodeValue || '';
+                    const newText = originalText.replace(findRegex, replace);
+                    if (originalText !== newText) {
+                        textNode.nodeValue = newText;
+                        chapterChanged = true;
+                    }
+                });
+
+                if (chapterChanged) {
+                    changesMade = true;
+                    const newContent = docFragment.innerHTML;
+                    return { 
+                        ...chap, 
+                        content: newContent, 
+                        wordCount: getWordCount(newContent),
+                        updatedAt: new Date().toISOString() 
+                    };
+                }
+                return chap;
+            });
+
+            if (changesMade) {
+                currentNovel = { ...currentNovel, chapters: updatedChapters };
+                updatedNovels[novelIndex] = currentNovel;
+                return { ...currentData, novels: updatedNovels };
+            }
+
+            return currentData;
         });
     };
-    
-    if (!novel || !chapter) {
+
+    if (!projectData || !novel || !chapter || !chapterId) {
         return (
             <div className={`flex h-screen items-center justify-center ${themeClasses.bg}`}>
                 <p>Loading chapter...</p>
@@ -857,23 +1119,26 @@ const ChapterEditorPage: React.FC = () => {
         );
     }
 
-    const prevChapter = chapterIndex > 0 ? novel.chapters[chapterIndex - 1] : null;
-    const nextChapter = chapterIndex < novel.chapters.length - 1 ? novel.chapters[chapterIndex + 1] : null;
-
     return (
         <>
             <div className={`flex h-screen font-serif ${themeClasses.bg} ${themeClasses.text}`}>
-                <div 
-                    ref={scrollContainerRef}
-                    className="flex-1 overflow-y-auto relative"
-                >
-                    <div className={`sticky top-0 z-10 px-8 md:px-16 lg:px-24 pt-6 pb-4 ${themeClasses.bg} bg-opacity-80 backdrop-blur-sm border-b ${themeClasses.border}`}>
+                {/* Backdrop for sidebar */}
+                {isSidebarOpen && (
+                    <div
+                        onClick={() => setIsSidebarOpen(false)}
+                        className="fixed inset-0 bg-black/50 z-30"
+                        aria-hidden="true"
+                    />
+                )}
+                
+                <div ref={scrollContainerRef} className="flex-1 overflow-y-auto relative">
+                     <div className={`sticky top-0 z-10 px-8 md:px-16 lg:px-24 pt-6 pb-4 ${themeClasses.bg} bg-opacity-80 backdrop-blur-sm border-b ${themeClasses.border}`}>
                         <button onClick={() => navigate(`/novel/${novelId}`)} className={`flex items-center space-x-2 ${themeClasses.text} opacity-70 hover:opacity-100`}>
                             <BackIcon className="w-5 h-5" />
-                            <span className="font-sans">Back to Details</span>
+                            <span className="font-sans">Return to Details</span>
                         </button>
                     </div>
-
+                    
                     <div className="px-8 md:px-16 lg:px-24 pt-8 pb-48">
                         <input
                             type="text"
@@ -882,7 +1147,6 @@ const ChapterEditorPage: React.FC = () => {
                             placeholder="Chapter Title"
                             className="text-4xl font-bold bg-transparent outline-none w-full mb-8"
                         />
-
                         <div
                             ref={editorRef}
                             contentEditable
@@ -890,6 +1154,7 @@ const ChapterEditorPage: React.FC = () => {
                             suppressContentEditableWarning
                             onInput={handleEditorInput}
                             onKeyDown={handleKeyDown}
+                            onKeyUp={handleKeyUp}
                             onPaste={handlePaste}
                             onBlur={cleanupEditor}
                             className="w-full text-lg leading-relaxed outline-none story-content"
@@ -897,150 +1162,160 @@ const ChapterEditorPage: React.FC = () => {
                         />
                     </div>
                 </div>
+                
+                {/* Editor Tools Sidebar */}
+                <div
+                    className={`
+                        fixed top-0 right-0 h-full z-40 transition-transform duration-300 ease-in-out
+                        ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}
+                    `}
+                >
+                    <div className={`w-80 h-full ${themeClasses.bgSecondary} ${themeClasses.accentText} text-sm font-sans border-l ${themeClasses.border} flex flex-col`}>
+                        <div className={`px-4 py-3 flex justify-between items-center border-b ${themeClasses.border}`}>
+                            <span className="font-bold text-base">EDITOR TOOLS</span>
+                            <button onClick={() => setIsSidebarOpen(false)}>
+                                <ChevronRightIcon className="w-5 h-5"/>
+                            </button>
+                        </div>
 
-                {/* Right Sidebar for chapter navigation & word count */}
-                <div className={`w-80 h-full ${themeClasses.bgSecondary} ${themeClasses.accentText} text-sm font-sans border-l ${themeClasses.border} flex-shrink-0 hidden md:flex flex-col`}>
-                    <div className="p-4 border-b border-inherit">
-                        <p className="font-bold">{novel.title}</p>
-                    </div>
-                     <div className={`px-4 py-4 border-b ${themeClasses.border}`}>
-                        <p className="text-3xl font-bold">{chapter.wordCount.toLocaleString()}</p>
-                        <p className={themeClasses.textSecondary}>WORDS IN CHAPTER</p>
-                    </div>
-                    <nav className="flex-1 p-4 overflow-y-auto">
-                        <p className="font-bold mb-2">CHAPTER OUTLINE</p>
-                        <ul className="space-y-1">
-                            {novel.chapters.map(c => (
-                                <li key={c.id}>
-                                    <ReactRouterDOM.Link 
-                                        to={`/novel/${novelId}/edit/${c.id}`}
-                                        className={`block w-full text-left px-3 py-2 rounded-md transition-colors ${c.id === chapterId ? `${themeClasses.bgTertiary}` : `hover:${themeClasses.bgTertiary}`}`}
-                                    >
-                                        {enhancePlainText(c.title || 'Untitled Chapter')}
-                                    </ReactRouterDOM.Link>
-                                </li>
-                            ))}
-                        </ul>
-                    </nav>
-                     <div className={`p-4 border-t ${themeClasses.border} space-y-2`}>
-                        <button onClick={() => setIsFindReplaceOpen(true)} className={`w-full flex items-center space-x-2 px-3 py-2 rounded-md hover:${themeClasses.bgTertiary}`}>
-                            <SearchIcon className="w-5 h-5"/>
-                            <span>Find & Replace...</span>
-                        </button>
-                        <button onClick={() => setIsExportModalOpen(true)} className={`w-full flex items-center space-x-2 px-3 py-2 rounded-md hover:${themeClasses.bgTertiary}`}>
-                            <DownloadIcon className="w-5 h-5"/>
-                            <span>Export Novel...</span>
-                        </button>
+                        <div className={`px-4 py-4 border-b ${themeClasses.border}`}>
+                            <p className="text-3xl font-bold">{(chapter.wordCount || 0).toLocaleString()}</p>
+                            <p className={themeClasses.textSecondary}>WORDS</p>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto">
+                           <div className={`border-b ${themeClasses.border}`}>
+                                <button
+                                    onClick={() => setIsChapterListModalOpen(true)}
+                                    className={`w-full flex justify-between items-center py-3 px-4 font-semibold text-left transition-colors hover:${themeClasses.bgTertiary}`}
+                                >
+                                    <div className="flex items-center space-x-3">
+                                        <Bars3Icon className="w-5 h-5" />
+                                        <span>Chapter Outline</span>
+                                    </div>
+                                </button>
+                            </div>
+                            <div className={`border-b ${themeClasses.border}`}>
+                                <button
+                                    onClick={() => navigate(`/novel/${novelId}/read/${chapterId}`)}
+                                    className={`w-full flex justify-between items-center py-3 px-4 font-semibold text-left transition-colors hover:${themeClasses.bgTertiary}`}
+                                >
+                                    <div className="flex items-center space-x-3">
+                                        <BookOpenIcon className="w-5 h-5" />
+                                        <span>Read Novel</span>
+                                    </div>
+                                </button>
+                            </div>
+                            <div className={`border-b ${themeClasses.border}`}>
+                                <button
+                                    onClick={() => setIsExportModalOpen(true)}
+                                    className={`w-full flex justify-between items-center py-3 px-4 font-semibold text-left transition-colors hover:${themeClasses.bgTertiary}`}
+                                >
+                                    <div className="flex items-center space-x-3">
+                                        <DownloadIcon className="w-5 h-5" />
+                                        <span>Export Novel</span>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            {/* Bottom Toolbar */}
-            <div className="absolute bottom-0 left-0 w-full flex justify-center pb-4 z-20 pointer-events-none">
-                <div ref={toolbarRef} className="relative pointer-events-auto">
-                    {isFormatPanelOpen && (
-                        <div className="absolute bottom-full mb-2 p-4 rounded-lg shadow-lg bg-stone-900/80 border border-white/10 backdrop-blur-sm w-[320px]">
-                            <div className="space-y-4">
-                               <ToolbarDropdown label="Paragraph Style" value={currentFormat.paragraphStyle} onChange={(e) => applyParagraphStyle(e.target.value)}>
-                                    <option value="p">Paragraph</option>
-                                    <option value="h1">Heading 1</option>
-                                    <option value="h2">Heading 2</option>
-                                    <option value="h3">Heading 3</option>
-                                    <option value="blockquote">Blockquote</option>
-                                </ToolbarDropdown>
-                                 <ToolbarDropdown label="Font" value={currentFormat.font} onChange={(e) => applyFont(e.target.value)}>
-                                    {fontOptions.map(font => <option key={font.name} value={font.value}>{font.name}</option>)}
-                                </ToolbarDropdown>
-                                <div className="grid grid-cols-2 gap-4">
-                                     <ToolbarDropdown label="Size" value={currentFormat.size} onChange={(e) => applyFontSize(e.target.value)}>
-                                        <option value="14px">14</option>
-                                        <option value="16px">16</option>
-                                        <option value="18px">18</option>
-                                        <option value="20px">20</option>
-                                        <option value="24px">24</option>
+                {/* Pinned Toolbar */}
+                <div className="absolute bottom-0 left-0 w-full flex justify-center pb-4 z-20 pointer-events-none">
+                    <div ref={toolbarRef} className="relative pointer-events-auto">
+                        {isFormatPanelOpen && (
+                            <div
+                                className="absolute bottom-full mb-2 p-4 rounded-lg shadow-lg bg-stone-900/80 border border-white/10 backdrop-blur-sm w-[320px]"
+                            >
+                                <div className="space-y-4">
+                                    <ToolbarDropdown label="Paragraph Style" value={currentFormat.paragraphStyle} onChange={(e) => applyParagraphStyle(e.target.value)}>
+                                        <option value="p">Paragraph</option>
+                                        <option value="blockquote">Blockquote</option>
                                     </ToolbarDropdown>
-                                    <ToolbarDropdown label="Paragraph Spacing" value={currentFormat.paragraphSpacing} onChange={(e) => applyParagraphSpacing(e.target.value)}>
-                                        <option value="0.5em">0.5</option>
-                                        <option value="1em">1.0</option>
-                                        <option value="1.5em">1.5</option>
-                                        <option value="2em">2.0</option>
+                                    <ToolbarDropdown label="Font" value={currentFormat.font} onChange={(e) => applyFont(e.target.value)}>
+                                        {fontOptions.map(font => <option key={font.name} value={font.value}>{font.name}</option>)}
                                     </ToolbarDropdown>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-semibold mb-2 text-white/70">Color</label>
-                                    <div className="flex space-x-2">
-                                        {colorPalette.map(color => (
-                                            <button key={color} onClick={() => applyColor(color)} className="w-6 h-6 rounded-full border border-gray-400" style={{backgroundColor: color}}></button>
-                                        ))}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <ToolbarDropdown label="Size" value={currentFormat.size} onChange={(e) => applyFontSize(e.target.value)}>
+                                            <option value="14px">14</option>
+                                            <option value="16px">16</option>
+                                            <option value="18px">18</option>
+                                            <option value="20px">20</option>
+                                            <option value="24px">24</option>
+                                        </ToolbarDropdown>
+                                        <ToolbarDropdown label="Paragraph Spacing" value={currentFormat.paragraphSpacing} onChange={(e) => applyParagraphSpacing(e.target.value)}>
+                                            <option value="0.5em">0.5</option>
+                                            <option value="1em">1.0</option>
+                                            <option value="1.5em">1.5</option>
+                                            <option value="2em">2.0</option>
+                                        </ToolbarDropdown>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold mb-2 text-white/70">Color</label>
+                                        <div className="flex space-x-2">
+                                            {colorPalette.map(color => (
+                                                <button key={color} onClick={() => applyColor(color)} className="w-6 h-6 rounded-full border border-gray-400" style={{backgroundColor: color}}></button>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
+                        )}
+                        <div
+                            className="flex items-center space-x-1 p-1 rounded-full shadow-lg bg-stone-900/70 border border-white/10 backdrop-blur-sm"
+                            onMouseDown={(e) => e.preventDefault()}
+                        >
+                            <button onClick={() => setIsFormatPanelOpen(p => !p)} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors ${isFormatPanelOpen ? 'bg-white/20' : ''}`}><TextIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyCommand('bold')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors ${activeFormats.isBold ? 'bg-white/20' : ''}`}><BoldIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyCommand('italic')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors ${activeFormats.isItalic ? 'bg-white/20' : ''}`}><ItalicIcon className="w-5 h-5"/></button>
+                            <div className="w-px h-5 bg-white/20 mx-1"></div>
+                            <button onClick={() => applyCommand('insertUnorderedList')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.isUL ? 'bg-white/20' : ''}`}><ListBulletIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyCommand('insertOrderedList')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.isOL ? 'bg-white/20' : ''}`}><OrderedListIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyParagraphStyle('blockquote')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${currentFormat.paragraphStyle === 'blockquote' ? 'bg-white/20' : ''}`}><BlockquoteIcon className="w-5 h-5"/></button>
+                            <div className="w-px h-5 bg-white/20 mx-1"></div>
+                            <button onClick={() => setIsFindReplaceOpen(true)} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors`}><SearchIcon className="w-5 h-5"/></button>
+                            <div className="w-px h-5 bg-white/20 mx-1"></div>
+                            <button onClick={() => applyCommand('undo')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors`}><UndoIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyCommand('redo')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors`}><RedoIcon className="w-5 h-5"/></button>
                         </div>
-                    )}
-
-                    <div className="flex items-center space-x-1 p-1 rounded-full shadow-lg bg-stone-900/70 border border-white/10 backdrop-blur-sm font-sans" onMouseDown={e => e.preventDefault()}>
-                        {prevChapter && (
-                            <ReactRouterDOM.Link to={`/novel/${novelId}/edit/${prevChapter.id}`} className="p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors">
-                                <ChevronLeftIcon className="w-5 h-5"/>
-                            </ReactRouterDOM.Link>
-                        )}
-                        <button onClick={() => setIsChapterListModalOpen(true)} className="p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors md:hidden">
-                            <Bars3Icon className="w-5 h-5"/>
-                        </button>
-                        <div className="w-px h-5 bg-white/20 mx-1" />
-                        <button onClick={() => setIsFormatPanelOpen(p => !p)} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors ${isFormatPanelOpen ? 'bg-white/20' : ''}`}>
-                            <TextIcon className="w-5 h-5"/>
-                        </button>
-                        <button onClick={() => applyCommand('bold')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.isBold ? 'bg-white/20' : ''}`}>
-                            <BoldIcon className="w-5 h-5"/>
-                        </button>
-                        <button onClick={() => applyCommand('italic')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.isItalic ? 'bg-white/20' : ''}`}>
-                            <ItalicIcon className="w-5 h-5"/>
-                        </button>
-                        <div className="w-px h-5 bg-white/20 mx-1" />
-                        <button onClick={() => applyCommand('insertUnorderedList')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.isUL ? 'bg-white/20' : ''}`}>
-                            <ListBulletIcon className="w-5 h-5"/>
-                        </button>
-                        <button onClick={() => applyCommand('insertOrderedList')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.isOL ? 'bg-white/20' : ''}`}>
-                            <OrderedListIcon className="w-5 h-5"/>
-                        </button>
-                        <button onClick={() => applyParagraphStyle('blockquote')} className={`p-2 rounded-full text-white/90 hover:bg-white/10`}>
-                            <BlockquoteIcon className="w-5 h-5"/>
-                        </button>
-                        <div className="w-px h-5 bg-white/20 mx-1" />
-                        <button onClick={() => applyCommand('undo')} className="p-2 rounded-full text-white/90 hover:bg-white/10">
-                            <UndoIcon className="w-5 h-5"/>
-                        </button>
-                        <button onClick={() => applyCommand('redo')} className="p-2 rounded-full text-white/90 hover:bg-white/10">
-                            <RedoIcon className="w-5 h-5"/>
-                        </button>
-                         <div className="w-px h-5 bg-white/20 mx-1" />
-                        {nextChapter && (
-                            <ReactRouterDOM.Link to={`/novel/${novelId}/edit/${nextChapter.id}`} className="p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors">
-                                <ChevronRightIcon className="w-5 h-5"/>
-                            </ReactRouterDOM.Link>
-                        )}
                     </div>
                 </div>
             </div>
 
-            <ChapterListModal 
-                isOpen={isChapterListModalOpen} 
-                onClose={() => setIsChapterListModalOpen(false)} 
-                novel={novel} 
-                currentChapterId={chapterId}
-                themeClasses={themeClasses}
-            />
-            <FindReplaceModal
+            {!isSidebarOpen && (
+                <button
+                    onClick={() => setIsSidebarOpen(true)}
+                    className={`
+                        fixed top-4 right-4 z-30 p-2 rounded-md
+                        ${themeClasses.bgSecondary} ${themeClasses.accentText}
+                        hover:opacity-80 shadow-lg border ${themeClasses.border}
+                    `}
+                    aria-label="Open editor tools"
+                >
+                    <ChevronLeftIcon className="w-5 h-5" />
+                </button>
+            )}
+
+            <FindReplaceModal 
                 isOpen={isFindReplaceOpen}
                 onClose={() => setIsFindReplaceOpen(false)}
                 editorRef={editorRef}
                 onReplaceAllInNovel={handleReplaceAllInNovel}
             />
+            
             <ExportModal
                 isOpen={isExportModalOpen}
                 onClose={() => setIsExportModalOpen(false)}
                 novel={novel}
+            />
+
+            <ChapterListModal
+                isOpen={isChapterListModalOpen}
+                onClose={() => setIsChapterListModalOpen(false)}
+                novel={novel}
+                currentChapterId={chapterId}
+                themeClasses={themeClasses}
             />
         </>
     );

@@ -262,43 +262,6 @@ const StoryIdeaEditorPage: React.FC = () => {
     const applyParagraphSpacing = (spacing: string) => { applyAndSaveFormat(() => { const selection = window.getSelection(); if (!selection || selection.rangeCount === 0) return; let node = selection.getRangeAt(0).startContainer; if (node.nodeType === 3) node = node.parentNode!; while(node && node !== editorRef.current) { if(node instanceof HTMLElement && ['P', 'H1', 'H2', 'H3', 'DIV'].includes(node.tagName)) { node.style.marginBottom = spacing; return; } node = node.parentNode!; } }); };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            // Let browser handle Enter, then check and fix if it created a DIV.
-            setTimeout(() => {
-                if (!editorRef.current) return;
-                const selection = window.getSelection();
-                if (!selection?.anchorNode) return;
-
-                // Find the block element containing the cursor.
-                let blockElement: Node | null = selection.anchorNode;
-                while (blockElement && blockElement.parentNode !== editorRef.current) {
-                    blockElement = blockElement.parentNode;
-                }
-
-                // If it's a DIV, convert it to a P.
-                if (blockElement instanceof HTMLElement && blockElement.tagName === 'DIV') {
-                    const p = document.createElement('p');
-                    // Move all child nodes from the div to the new p
-                    while (blockElement.firstChild) {
-                        p.appendChild(blockElement.firstChild);
-                    }
-                    // If the new p is empty, add a <br> to make it visible.
-                    if (!p.innerHTML) {
-                        p.innerHTML = '<br>';
-                    }
-                    
-                    blockElement.parentNode.replaceChild(p, blockElement);
-
-                    // Restore selection to the new paragraph to continue typing.
-                    const range = document.createRange();
-                    range.setStart(p, 0);
-                    range.collapse(true);
-                    selection.removeAllRanges();
-                    selection.addRange(range);
-                }
-            }, 0);
-        }
-        
         const selection = window.getSelection();
         if (!selection || !selection.rangeCount) {
             return;
