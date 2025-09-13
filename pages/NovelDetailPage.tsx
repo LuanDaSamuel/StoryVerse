@@ -510,7 +510,7 @@ const NovelDetailPage: React.FC = () => {
                             }}
                             placeholder="A short, captivating description of your novel..."
                             rows={4}
-                            className={`text-lg mt-1 bg-transparent outline-none w-full resize-none max-h-48 overflow-y-auto ${themeClasses.textSecondary}`}
+                            className={`text-lg mt-1 bg-transparent outline-none w-full resize-none ${themeClasses.textSecondary}`}
                         />
                     </div>
                     <div className={`rounded-lg ${themeClasses.bgSecondary}`}>
