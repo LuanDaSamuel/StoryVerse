@@ -38,13 +38,53 @@ const NovelDetailPage: React.FC = () => {
         };
     }, [projectData, novelId]);
     
+    const [editableTitle, setEditableTitle] = useState(novel?.title || '');
+    const [editableDescription, setEditableDescription] = useState(novel?.description || '');
+    const saveTimeout = useRef<number | null>(null);
+
+    // Sync local state when the novel ID changes to handle navigation between different novels.
     useEffect(() => {
-        // Adjust textarea height on initial render and when novel changes
+        if (novel) {
+            setEditableTitle(novel.title);
+            setEditableDescription(novel.description);
+        }
+    }, [novel?.id]);
+
+    // Debounced save effect for title and description
+    useEffect(() => {
+        if (saveTimeout.current) clearTimeout(saveTimeout.current);
+
+        saveTimeout.current = window.setTimeout(() => {
+            if (novelIndex === -1 || !projectData) return;
+
+            const currentNovelInState = projectData.novels[novelIndex];
+            if (currentNovelInState.title !== editableTitle || currentNovelInState.description !== editableDescription) {
+                 setProjectData(currentData => {
+                    if (!currentData || !currentData.novels[novelIndex]) return currentData;
+                    const updatedNovels = [...currentData.novels];
+                    updatedNovels[novelIndex] = {
+                        ...updatedNovels[novelIndex],
+                        title: editableTitle,
+                        description: editableDescription,
+                    };
+                    return { ...currentData, novels: updatedNovels };
+                });
+            }
+        }, 1000);
+
+        return () => {
+            if (saveTimeout.current) clearTimeout(saveTimeout.current);
+        };
+    }, [editableTitle, editableDescription, novelIndex, projectData, setProjectData]);
+
+    useEffect(() => {
+        // Adjust textarea height on initial render and when content changes
         if (descriptionTextareaRef.current) {
             descriptionTextareaRef.current.style.height = 'auto';
-            descriptionTextareaRef.current.style.height = `${descriptionTextareaRef.current.scrollHeight}px`;
+            const scrollHeight = descriptionTextareaRef.current.scrollHeight;
+            descriptionTextareaRef.current.style.height = `${scrollHeight}px`;
         }
-    }, [novel?.description]);
+    }, [editableDescription]);
     
     useEffect(() => {
         if (novelIndex === -1) return;
@@ -224,22 +264,6 @@ const NovelDetailPage: React.FC = () => {
             };
             reader.readAsDataURL(file);
         }
-    };
-
-    const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        if (novelIndex === -1) return;
-        
-        e.target.style.height = 'auto';
-        e.target.style.height = `${e.target.scrollHeight}px`;
-        
-        const newDescription = e.target.value;
-        setProjectData(currentData => {
-            if (!currentData) return null;
-            const updatedNovels = [...currentData.novels];
-            if (novelIndex >= updatedNovels.length) return currentData;
-            updatedNovels[novelIndex].description = newDescription;
-            return { ...currentData, novels: updatedNovels };
-        });
     };
 
     const handleTagClick = (tag: string) => {
@@ -456,14 +480,37 @@ const NovelDetailPage: React.FC = () => {
                 {/* Right Column */}
                 <div className="lg:col-span-2 space-y-8">
                     <div className={`p-6 rounded-lg ${themeClasses.bgSecondary}`}>
-                        <h1 className={`text-5xl font-bold ${themeClasses.accentText}`}>{enhancePlainText(novel.title)}</h1>
+                        <input
+                            type="text"
+                            value={editableTitle}
+                            onChange={(e) => setEditableTitle(e.target.value)}
+                            onBlur={() => {
+                                const enhanced = enhancePlainText(editableTitle);
+                                if (enhanced !== editableTitle) {
+                                    setEditableTitle(enhanced);
+                                }
+                            }}
+                            placeholder="Novel Title"
+                            className={`text-5xl font-bold bg-transparent outline-none w-full ${themeClasses.accentText}`}
+                        />
                         <textarea
                             ref={descriptionTextareaRef}
-                            value={enhancePlainText(novel.description)}
-                            onChange={handleDescriptionChange}
+                            value={editableDescription}
+                            onChange={(e) => {
+                                setEditableDescription(e.target.value);
+                                // Auto-sizing logic
+                                e.target.style.height = 'auto';
+                                e.target.style.height = `${e.target.scrollHeight}px`;
+                            }}
+                            onBlur={() => {
+                                const enhanced = enhancePlainText(editableDescription);
+                                if (enhanced !== editableDescription) {
+                                    setEditableDescription(enhanced);
+                                }
+                            }}
                             placeholder="A short, captivating description of your novel..."
                             rows={4}
-                            className={`text-lg mt-1 bg-transparent outline-none w-full resize-none ${themeClasses.textSecondary}`}
+                            className={`text-lg mt-1 bg-transparent outline-none w-full resize-none max-h-48 overflow-y-auto ${themeClasses.textSecondary}`}
                         />
                     </div>
                     <div className={`rounded-lg ${themeClasses.bgSecondary}`}>
