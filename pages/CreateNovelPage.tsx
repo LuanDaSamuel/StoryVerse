@@ -48,11 +48,11 @@ const CreateNovelPage: React.FC = () => {
         }
     }, [title, description, coverImage, selectedTags]);
 
-    // Autosize the description textarea
+    // Autosize the description textarea to fit its content.
     useEffect(() => {
         if (descriptionTextareaRef.current) {
             const textarea = descriptionTextareaRef.current;
-            textarea.style.height = '1px';
+            textarea.style.height = 'auto'; // Reset height to allow shrinking
             textarea.style.height = `${textarea.scrollHeight}px`;
         }
     }, [description]);
@@ -178,8 +178,7 @@ const CreateNovelPage: React.FC = () => {
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
                             placeholder="A short, captivating description of your novel..."
-                            className={`text-lg mt-1 bg-transparent outline-none w-full resize-none ${themeClasses.textSecondary} ${placeholderClass}`}
-                            rows={3}
+                            className={`text-lg mt-1 bg-transparent outline-none w-full resize-none min-h-[6rem] ${themeClasses.textSecondary} ${placeholderClass}`}
                         />
                     </div>
                     <div className={`p-6 mt-6 rounded-lg ${themeClasses.bgTertiary}`}>

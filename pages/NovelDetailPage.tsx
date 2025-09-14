@@ -77,11 +77,11 @@ const NovelDetailPage: React.FC = () => {
         };
     }, [editableTitle, editableDescription, novelIndex, projectData, setProjectData]);
 
+    // Auto-resize the description textarea to fit its content.
     useEffect(() => {
-        // Adjust textarea height on initial render and when content changes
         if (descriptionTextareaRef.current) {
             const textarea = descriptionTextareaRef.current;
-            textarea.style.height = '1px';
+            textarea.style.height = 'auto'; // Reset height to allow shrinking
             textarea.style.height = `${textarea.scrollHeight}px`;
         }
     }, [editableDescription]);
@@ -506,8 +506,7 @@ const NovelDetailPage: React.FC = () => {
                                 }
                             }}
                             placeholder="A short, captivating description of your novel..."
-                            rows={4}
-                            className={`text-lg mt-1 bg-transparent outline-none w-full resize-none ${themeClasses.textSecondary}`}
+                            className={`text-lg mt-1 bg-transparent outline-none w-full resize-none min-h-[7rem] ${themeClasses.textSecondary}`}
                         />
                     </div>
                     <div className={`rounded-lg ${themeClasses.bgSecondary}`}>
