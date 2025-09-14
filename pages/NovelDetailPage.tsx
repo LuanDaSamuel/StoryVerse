@@ -80,9 +80,9 @@ const NovelDetailPage: React.FC = () => {
     useEffect(() => {
         // Adjust textarea height on initial render and when content changes
         if (descriptionTextareaRef.current) {
-            descriptionTextareaRef.current.style.height = 'auto';
-            const scrollHeight = descriptionTextareaRef.current.scrollHeight;
-            descriptionTextareaRef.current.style.height = `${scrollHeight}px`;
+            const textarea = descriptionTextareaRef.current;
+            textarea.style.height = '1px';
+            textarea.style.height = `${textarea.scrollHeight}px`;
         }
     }, [editableDescription]);
     
@@ -498,9 +498,6 @@ const NovelDetailPage: React.FC = () => {
                             value={editableDescription}
                             onChange={(e) => {
                                 setEditableDescription(e.target.value);
-                                // Auto-sizing logic
-                                e.target.style.height = 'auto';
-                                e.target.style.height = `${e.target.scrollHeight}px`;
                             }}
                             onBlur={() => {
                                 const enhanced = enhancePlainText(editableDescription);

@@ -19,6 +19,7 @@ const CreateNovelPage: React.FC = () => {
     const [tagFilter, setTagFilter] = useState('');
     const [tagSort, setTagSort] = useState<'default' | 'alpha'>('default');
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const descriptionTextareaRef = useRef<HTMLTextAreaElement>(null);
 
     // Load draft from session storage on component mount
     useEffect(() => {
@@ -46,6 +47,15 @@ const CreateNovelPage: React.FC = () => {
             console.error("Failed to save novel draft to session storage:", error);
         }
     }, [title, description, coverImage, selectedTags]);
+
+    // Autosize the description textarea
+    useEffect(() => {
+        if (descriptionTextareaRef.current) {
+            const textarea = descriptionTextareaRef.current;
+            textarea.style.height = '1px';
+            textarea.style.height = `${textarea.scrollHeight}px`;
+        }
+    }, [description]);
 
 
     const placeholderClass = themeClasses.input.split(' ').find(c => c.startsWith('placeholder-')) || 'placeholder-gray-400';
@@ -164,10 +174,11 @@ const CreateNovelPage: React.FC = () => {
                             className={`text-5xl font-bold bg-transparent outline-none w-full mb-2 ${themeClasses.accentText} ${placeholderClass}`}
                         />
                          <textarea
+                            ref={descriptionTextareaRef}
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
                             placeholder="A short, captivating description of your novel..."
-                            className={`text-lg mt-1 bg-transparent outline-none w-full h-24 resize-none ${themeClasses.textSecondary} ${placeholderClass}`}
+                            className={`text-lg mt-1 bg-transparent outline-none w-full resize-none ${themeClasses.textSecondary} ${placeholderClass}`}
                             rows={3}
                         />
                     </div>
