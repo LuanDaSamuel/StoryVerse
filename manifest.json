@@ -1,0 +1,17 @@
+{
+  "name": "StoryVerse",
+  "short_name": "StoryVerse",
+  "description": "A web-based application for writers to create, manage, and write their novels. All your work is saved locally in a project file on your computer.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#5D4C40",
+  "theme_color": "#5D4C40",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
