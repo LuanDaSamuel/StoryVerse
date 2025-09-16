@@ -1,26 +1,22 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
-// FIX: Import NovelSketch to use in sanitization logic.
-import { ProjectData, FileStatus, SaveStatus, Theme, StoryIdeaStatus, NovelSketch } from '../types';
+import { ProjectData, StorageStatus, SaveStatus, Theme, StoryIdeaStatus, NovelSketch } from '../types';
 import { get, set, del } from 'idb-keyval';
 
-const LOCAL_BACKUP_KEY = 'storyverse-local-backup'; // Used for caching
-const PROJECT_FILE_HANDLE_KEY = 'storyverse-project-file-handle'; // Used for the main file
-
+// --- Constants ---
+const LOCAL_BACKUP_KEY = 'storyverse-local-backup';
+const PROJECT_FILE_HANDLE_KEY = 'storyverse-project-file-handle';
 const isFileSystemAccessAPISupported = 'showOpenFilePicker' in window;
 
 const defaultProjectData: ProjectData = {
-  settings: {
-    theme: 'book',
-  },
+  settings: { theme: 'book' },
   novels: [],
   storyIdeas: [],
 };
 
 const sanitizeProjectData = (data: any): ProjectData => {
   const sanitized = JSON.parse(JSON.stringify(defaultProjectData));
-  if (data?.settings?.theme) {
-    sanitized.settings.theme = data.settings.theme as Theme;
-  }
+  if (data?.settings?.theme) sanitized.settings.theme = data.settings.theme as Theme;
   if (Array.isArray(data?.novels)) {
     sanitized.novels = data.novels.map((novel: any) => ({
       id: novel.id || crypto.randomUUID(),
@@ -39,7 +35,6 @@ const sanitizeProjectData = (data: any): ProjectData => {
             history: Array.isArray(chapter.history) ? chapter.history : [],
           }))
         : [],
-      // FIX: Added sanitization for the new 'sketches' property on novels.
       sketches: Array.isArray(novel.sketches)
         ? novel.sketches.map((sketch: any): NovelSketch => ({
             id: sketch.id || crypto.randomUUID(),
@@ -74,125 +69,62 @@ const sanitizeProjectData = (data: any): ProjectData => {
 
 async function verifyPermission(handle: FileSystemHandle) {
     const options = { mode: 'readwrite' as const };
-    if ((await handle.queryPermission(options)) === 'granted') {
-        return true;
-    }
-    if ((await handle.requestPermission(options)) === 'granted') {
-        return true;
-    }
+    if ((await handle.queryPermission(options)) === 'granted') return true;
+    if ((await handle.requestPermission(options)) === 'granted') return true;
     return false;
 }
 
 export function useProjectFile() {
   const [projectData, setProjectData] = useState<ProjectData | null>(null);
-  const [status, setStatus] = useState<FileStatus>('loading');
+  const [status, setStatus] = useState<StorageStatus>('loading');
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
-  const [projectFileHandle, setProjectFileHandle] = useState<FileSystemFileHandle | null>(null);
   const [projectName, setProjectName] = useState('');
   
   const saveTimeout = useRef<number | null>(null);
   const dataVersion = useRef(0);
   const lastSavedVersion = useRef(0);
+  
+  const projectFileHandleRef = useRef<FileSystemFileHandle | null>(null);
 
   const projectDataRef = useRef(projectData);
   projectDataRef.current = projectData;
-  const projectFileHandleRef = useRef(projectFileHandle);
-  projectFileHandleRef.current = projectFileHandle;
-  const saveStatusRef = useRef(saveStatus);
-  saveStatusRef.current = saveStatus;
-
-  useEffect(() => {
-    const init = async () => {
-      // Don't even try to load from a handle if the API isn't supported.
-      if (!isFileSystemAccessAPISupported) {
-          setStatus('welcome');
-          return;
-      }
-
-      try {
-        const handle: FileSystemFileHandle | undefined = await get(PROJECT_FILE_HANDLE_KEY);
-        if (handle && await verifyPermission(handle)) {
-            setProjectFileHandle(handle);
-            setProjectName(handle.name);
-            const file = await handle.getFile();
-            const fileContent = await file.text();
-            const rawData = JSON.parse(fileContent);
-            const data = sanitizeProjectData(rawData);
-            
-            projectDataRef.current = data;
-            setProjectData(data);
-            await set(LOCAL_BACKUP_KEY, data); // Update cache
-            setStatus('ready');
-        } else {
-            // If no handle or permission, clear stored handle and go to welcome
-            await del(PROJECT_FILE_HANDLE_KEY);
-            setStatus('welcome');
-        }
-      } catch (error) {
-        console.error('Error loading project from file handle:', error);
-        // Fallback to welcome screen on any error
-        setStatus('welcome');
-      }
-    };
-    init();
-  }, []);
 
   const saveProject = useCallback(async (data: ProjectData, version: number) => {
     setSaveStatus('saving');
     try {
-      await set(LOCAL_BACKUP_KEY, data); // Save to cache first for speed and resilience
+        await set(LOCAL_BACKUP_KEY, data);
 
-      if (projectFileHandleRef.current) {
-          try {
-              const writable = await projectFileHandleRef.current.createWritable();
-              await writable.write(JSON.stringify(data, null, 2));
-              await writable.close();
-          } catch (error) {
-              console.error('Saving to project file failed:', error);
-              if (error instanceof DOMException && error.name === 'NotAllowedError') {
-                  // User revoked permission. Clear handle and treat as closed project.
-                  await del(PROJECT_FILE_HANDLE_KEY);
-                  setProjectFileHandle(null);
-                  setProjectName('');
-                  projectDataRef.current = null;
-                  setProjectData(null);
-                  setStatus('welcome');
-                  alert('Permission to save the file was denied. The project has been closed.');
-              }
-          }
-      }
-      lastSavedVersion.current = version;
-      if (dataVersion.current === lastSavedVersion.current) {
-        setSaveStatus('saved');
-      }
+        if (projectFileHandleRef.current) {
+            const writable = await projectFileHandleRef.current.createWritable();
+            await writable.write(JSON.stringify(data, null, 2));
+            await writable.close();
+        }
+        
+        lastSavedVersion.current = version;
+        if (dataVersion.current === lastSavedVersion.current) {
+            setSaveStatus('saved');
+        }
     } catch (error) {
-      console.error('Error saving project:', error);
-      setSaveStatus('unsaved');
+        console.error('Error saving project:', error);
+        setSaveStatus('unsaved');
     }
   }, []);
 
   useEffect(() => {
     if (status === 'ready' && projectData && saveStatus === 'unsaved') {
       if (saveTimeout.current) clearTimeout(saveTimeout.current);
-      
       const versionToSave = dataVersion.current;
       saveTimeout.current = window.setTimeout(() => {
-        if (projectDataRef.current) {
-            saveProject(projectDataRef.current, versionToSave);
-        }
+        if (projectDataRef.current) saveProject(projectDataRef.current, versionToSave);
       }, 1000);
     }
-    return () => {
-      if (saveTimeout.current) clearTimeout(saveTimeout.current);
-    };
+    return () => { if (saveTimeout.current) clearTimeout(saveTimeout.current); };
   }, [projectData, status, saveStatus, saveProject]);
 
   const setProjectDataWithSave = (updater: React.SetStateAction<ProjectData | null>) => {
     dataVersion.current++;
     setSaveStatus('unsaved');
-    const newData = typeof updater === 'function'
-        ? (updater as (prevState: ProjectData | null) => ProjectData | null)(projectDataRef.current)
-        : updater;
+    const newData = typeof updater === 'function' ? (updater as (prevState: ProjectData | null) => ProjectData | null)(projectDataRef.current) : updater;
     projectDataRef.current = newData;
     setProjectData(newData);
   };
@@ -202,154 +134,90 @@ export function useProjectFile() {
         clearTimeout(saveTimeout.current);
         saveTimeout.current = null;
     }
-    if (status === 'ready' && projectDataRef.current && saveStatusRef.current === 'unsaved') {
+    if (status === 'ready' && projectDataRef.current && saveStatus !== 'saved') {
         await saveProject(projectDataRef.current, dataVersion.current);
     }
-  }, [status, saveProject]);
+  }, [status, saveStatus, saveProject]);
 
-  const createProject = useCallback(async () => {
-    if (isFileSystemAccessAPISupported) {
-        try {
-            const newHandle = await window.showSaveFilePicker({
-                suggestedName: 'StoryVerse-Project.json',
-                types: [{ description: 'StoryVerse Projects', accept: { 'application/json': ['.json'] } }],
-            });
-
-            const writable = await newHandle.createWritable();
-            await writable.write(JSON.stringify(defaultProjectData, null, 2));
-            await writable.close();
-            
-            await set(PROJECT_FILE_HANDLE_KEY, newHandle);
-            await set(LOCAL_BACKUP_KEY, defaultProjectData);
-            
-            setProjectFileHandle(newHandle);
-            setProjectName(newHandle.name);
-            projectDataRef.current = defaultProjectData;
-            setProjectData(defaultProjectData);
-            setStatus('ready');
-            setSaveStatus('saved');
-            return; // Exit on success
-        } catch (error) {
-            if (error instanceof DOMException && error.name === 'AbortError') return;
-            console.warn('showSaveFilePicker failed for create, falling back to in-memory.', error);
-            // Fall-through to the fallback logic
+  // --- Initialization ---
+  useEffect(() => {
+    const initLocal = async () => {
+        if (!isFileSystemAccessAPISupported) {
+          // Check for a local backup if FS API is not supported.
+          const backup: ProjectData | undefined = await get(LOCAL_BACKUP_KEY);
+          if (backup) {
+              setProjectData(sanitizeProjectData(backup));
+              setProjectName('Local Backup');
+              setStatus('ready');
+          } else {
+              setStatus('welcome');
+          }
+          return;
         }
-    }
-
-    // Fallback: create in memory, user must download to save.
-    await del(PROJECT_FILE_HANDLE_KEY);
-    await set(LOCAL_BACKUP_KEY, defaultProjectData);
-    
-    setProjectFileHandle(null);
-    setProjectName('Untitled Project.json');
-    projectDataRef.current = defaultProjectData;
-    setProjectData(defaultProjectData);
-    setStatus('ready');
-    setSaveStatus('saved');
-  }, []);
-
-  const openProject = useCallback(async () => {
-    if (isFileSystemAccessAPISupported) {
         try {
-            const [fileHandle] = await window.showOpenFilePicker({
-                types: [{ description: 'StoryVerse Projects', accept: { 'application/json': ['.json'] } }],
-            });
-            const file = await fileHandle.getFile();
-            const fileContent = await file.text();
-            const rawData = JSON.parse(fileContent);
-
-            if (rawData && rawData.settings && Array.isArray(rawData.novels)) {
-                const data = sanitizeProjectData(rawData);
-                await set(PROJECT_FILE_HANDLE_KEY, fileHandle);
-                await set(LOCAL_BACKUP_KEY, data);
-
-                setProjectFileHandle(fileHandle);
-                setProjectName(fileHandle.name);
-                projectDataRef.current = data;
+            const handle: FileSystemFileHandle | undefined = await get(PROJECT_FILE_HANDLE_KEY);
+            if (handle && await verifyPermission(handle)) {
+                projectFileHandleRef.current = handle;
+                setProjectName(handle.name);
+                const file = await handle.getFile();
+                const data = sanitizeProjectData(JSON.parse(await file.text()));
                 setProjectData(data);
                 setStatus('ready');
-                setSaveStatus('saved');
-                return; // Exit on success
             } else {
-                throw new Error('Invalid project file format.');
+                setStatus('welcome');
             }
         } catch (error) {
-            if (error instanceof DOMException && error.name === 'AbortError') return;
-            // If the error is about invalid format, show alert and stop.
-            if (error instanceof Error && error.message.includes('Invalid project file format')) {
-                 alert('Failed to open file: Invalid project file format.');
-                 return;
-            }
-            console.warn('showOpenFilePicker failed, falling back to input.', error);
-            // Fall-through to the fallback logic for other errors (like SecurityError)
-        }
-    }
-
-    // Fallback for browsers without File System Access API or when it fails
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'application/json,.json';
-    input.onchange = async (event) => {
-        const file = (event.target as HTMLInputElement).files?.[0];
-        if (!file) return;
-
-        try {
-            const fileContent = await file.text();
-            const rawData = JSON.parse(fileContent);
-            if (rawData && rawData.settings && Array.isArray(rawData.novels)) {
-                const data = sanitizeProjectData(rawData);
-                await del(PROJECT_FILE_HANDLE_KEY); 
-                await set(LOCAL_BACKUP_KEY, data);
-
-                setProjectFileHandle(null);
-                setProjectName(file.name);
-                projectDataRef.current = data;
-                setProjectData(data);
-                setStatus('ready');
-                setSaveStatus('saved');
-            } else {
-                throw new Error('Invalid project file format.');
-            }
-        } catch (error) {
-            console.error('Error opening project file from input:', error);
-            alert('Failed to open file.');
+            console.error('Initial local file load error:', error);
+            setStatus('welcome');
         }
     };
-    input.click();
+    initLocal();
+  }, []);
+
+  // --- Local File Logic ---
+  const createLocalProject = useCallback(async () => {
+    if (isFileSystemAccessAPISupported) {
+        try {
+            const handle = await window.showSaveFilePicker({ suggestedName: 'StoryVerse-Project.json', types: [{ description: 'StoryVerse Projects', accept: { 'application/json': ['.json'] } }] });
+            const writable = await handle.createWritable();
+            await writable.write(JSON.stringify(defaultProjectData, null, 2));
+            await writable.close();
+            await set(PROJECT_FILE_HANDLE_KEY, handle);
+            projectFileHandleRef.current = handle;
+            setProjectName(handle.name);
+            setProjectData(defaultProjectData);
+            setStatus('ready');
+            return;
+        } catch (error) { if (error instanceof DOMException && error.name === 'AbortError') return; }
+    }
+    // Fallback for non-FS API browsers
+    alert("Your browser doesn't support the File System Access API. Using a temporary in-browser project. Please download to save your work.");
+    setProjectName('Untitled Project.json');
+    setProjectData(defaultProjectData);
+    setStatus('ready');
+  }, []);
+
+  const openLocalProject = useCallback(async () => {
+    try {
+        const [handle] = await window.showOpenFilePicker({ types: [{ description: 'StoryVerse Projects', accept: { 'application/json': ['.json'] } }] });
+        const file = await handle.getFile();
+        const data = sanitizeProjectData(JSON.parse(await file.text()));
+        await set(PROJECT_FILE_HANDLE_KEY, handle);
+        projectFileHandleRef.current = handle;
+        setProjectName(handle.name);
+        setProjectData(data);
+        setStatus('ready');
+    } catch (error) { if (error instanceof DOMException && error.name === 'AbortError') return; alert('Failed to open file.'); }
   }, []);
   
   const downloadProject = useCallback(async () => {
     await saveNow();
-    const dataToSave = projectDataRef.current;
-    if (!dataToSave) return;
-
-    const now = new Date();
-    const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}`;
-    const suggestedName = `StoryVerse-Backup-${timestamp}.json`;
-
-    if (isFileSystemAccessAPISupported) {
-        try {
-            const newHandle = await window.showSaveFilePicker({
-                suggestedName,
-                types: [{ description: 'StoryVerse Projects', accept: { 'application/json': ['.json'] } }],
-            });
-            const writable = await newHandle.createWritable();
-            await writable.write(JSON.stringify(dataToSave, null, 2));
-            await writable.close();
-            return; // Exit on success
-        } catch (error) {
-            if (error instanceof DOMException && error.name === 'AbortError') return;
-            console.warn('showSaveFilePicker failed for download, falling back to anchor.', error);
-            // Fall-through to fallback logic
-        }
-    }
-
-    // Fallback logic
-    const blob = new Blob([JSON.stringify(dataToSave, null, 2)], { type: 'application/json' });
+    if (!projectDataRef.current) return;
+    const blob = new Blob([JSON.stringify(projectDataRef.current, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = suggestedName;
+    a.download = projectName || 'StoryVerse-Backup.json';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -358,11 +226,11 @@ export function useProjectFile() {
 
   const closeProject = useCallback(async () => {
     await saveNow();
-    await del(LOCAL_BACKUP_KEY);
+    // Clear local handle
     await del(PROJECT_FILE_HANDLE_KEY);
-    projectDataRef.current = null;
+    projectFileHandleRef.current = null;
+    // Reset app state
     setProjectData(null);
-    setProjectFileHandle(null);
     setProjectName('');
     setStatus('welcome');
   }, [saveNow]);
@@ -373,8 +241,8 @@ export function useProjectFile() {
     status, 
     saveStatus,
     projectName,
-    createProject, 
-    openProject, 
+    createLocalProject, 
+    openLocalProject, 
     downloadProject, 
     closeProject,
   };

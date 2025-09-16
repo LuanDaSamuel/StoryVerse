@@ -1,4 +1,3 @@
-
 import React, { createContext } from 'react';
 import { ProjectData, Theme, ThemeConfig, SaveStatus } from '../types';
 

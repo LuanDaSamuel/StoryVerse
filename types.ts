@@ -66,7 +66,7 @@ export interface ProjectData {
   storyIdeas: StoryIdea[];
 }
 
-export type FileStatus = 'loading' | 'welcome' | 'ready' | 'error';
+export type StorageStatus = 'loading' | 'welcome' | 'ready' | 'error';
 
 export interface ThemeConfig {
     bg: string;

@@ -48,8 +48,8 @@ const AppContent = () => {
         status,
         saveStatus,
         projectName,
-        createProject,
-        openProject,
+        createLocalProject,
+        openLocalProject,
         downloadProject,
         closeProject,
     } = useProjectFile();
@@ -103,7 +103,10 @@ const AppContent = () => {
             case 'welcome':
                 return (
                     <div className={`${themeClasses.bg} ${themeClasses.text}`}>
-                        <WelcomeScreen onCreate={createProject} onOpen={openProject} />
+                        <WelcomeScreen 
+                          onCreateLocalProject={createLocalProject}
+                          onOpenLocalProject={openLocalProject}
+                        />
                     </div>
                 );
             case 'ready':

@@ -1,4 +1,5 @@
 
+
 import React, { useContext, useState } from 'react';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { Theme } from '../types';
@@ -50,6 +51,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
     return themeClasses.border;
   };
   
+  const storageLocation = 'a local file';
+
   return (
     <>
       <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 font-sans" onClick={onClose} role="dialog" aria-modal="true">
@@ -91,13 +94,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
               <h3 className={`text-lg mb-3 ${subHeadingStyle}`}>Project Data</h3>
                <div className={`p-3 rounded-lg ${themeClasses.bgTertiary} mb-3`}>
                   <p className={`text-sm ${descriptionColor}`}>
-                    Your project is being saved to: <span className="font-semibold">{projectName}</span>
+                    Your project is being saved to {storageLocation}: <span className="font-semibold">{projectName}</span>
                   </p>
               </div>
               <div className="space-y-3">
                 <button onClick={downloadProject} className={`w-full flex items-center space-x-3 text-left px-4 py-3 rounded-lg font-semibold transition-colors ${themeClasses.bgTertiary} hover:opacity-80`}>
                   <DownloadIcon className="w-5 h-5"/>
-                  <span>Save a Copy...</span>
+                  <span>Save a Local Copy...</span>
                 </button>
                 <button onClick={() => setIsConfirmOpen(true)} className="w-full flex items-center space-x-3 text-left px-4 py-3 rounded-lg font-semibold transition-colors bg-red-700 text-red-100 hover:bg-red-800">
                   <TrashIcon className="w-5 h-5"/>
@@ -113,7 +116,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
         onClose={() => setIsConfirmOpen(false)}
         onConfirm={handleCloseProject}
         title="Close Project?"
-        message="Are you sure you want to close this project? Any unsaved changes will be saved to your file before closing. You can open it again later."
+        message="This will save your current work and return you to the welcome screen."
       />
     </>
   );
