@@ -1,4 +1,5 @@
 
+
 import React, { useMemo, useContext, useEffect, useRef, useState } from 'react';
 // FIX: Changed react-router-dom import to namespace import to fix module resolution issues.
 import * as ReactRouterDOM from 'react-router-dom';
@@ -104,8 +105,8 @@ const AppContent = () => {
                 return (
                     <div className={`${themeClasses.bg} ${themeClasses.text}`}>
                         <WelcomeScreen 
-                          onCreateLocalProject={createLocalProject}
-                          onOpenLocalProject={openLocalProject}
+                          onCreate={createLocalProject}
+                          onOpen={openLocalProject}
                         />
                     </div>
                 );
