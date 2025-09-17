@@ -36,6 +36,17 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
     });
   };
 
+  const handleBaseFontSizeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newSize = parseInt(e.target.value, 10);
+    setProjectData(currentData => {
+        if (!currentData) return null;
+        return {
+            ...currentData,
+            settings: { ...currentData.settings, baseFontSize: newSize },
+        };
+    });
+  };
+
   const handleCloseProject = async () => {
     await closeProject();
   };
@@ -86,6 +97,26 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                     </div>
                   </button>
                 ))}
+              </div>
+            </div>
+
+            {/* Editor Settings */}
+            <div>
+              <h3 className={`text-lg mb-3 ${subHeadingStyle}`}>Editor</h3>
+              <div className={`p-3 rounded-lg ${themeClasses.bgTertiary} flex items-center justify-between`}>
+                <label htmlFor="baseFontSize" className={`font-semibold ${descriptionColor}`}>Base Font Size</label>
+                <select
+                  id="baseFontSize"
+                  value={projectData.settings.baseFontSize || 18}
+                  onChange={handleBaseFontSizeChange}
+                  className={`w-24 px-3 py-1.5 text-sm rounded-md ${themeClasses.input} border ${themeClasses.border}`}
+                >
+                  <option value="14">14px</option>
+                  <option value="16">16px</option>
+                  <option value="18">18px</option>
+                  <option value="20">20px</option>
+                  <option value="22">22px</option>
+                </select>
               </div>
             </div>
 

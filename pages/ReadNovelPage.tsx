@@ -73,6 +73,8 @@ const ReadNovelPage: React.FC = () => {
         return { novel: n, currentChapter: c, chapterIndex: cIndex };
     }, [projectData, novelId, chapterId]);
 
+    const baseFontSize = projectData?.settings?.baseFontSize || 18;
+
     useEffect(() => {
         // If novel is loaded but chapter isn't (or no ID is in URL), redirect to first chapter.
         if (novel && !currentChapter && novel.chapters.length > 0) {
@@ -156,7 +158,10 @@ const ReadNovelPage: React.FC = () => {
                     </button>
                 </header>
                 
-                <article className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+                <article
+                    className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12"
+                    style={{ fontSize: `${baseFontSize}px` }}
+                >
                      <section
                         key={currentChapter.id}
                         aria-labelledby={`chapter-title-${currentChapter.id}`}

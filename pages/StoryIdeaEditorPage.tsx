@@ -1,4 +1,5 @@
 
+
 import React, { useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 // FIX: Changed react-router-dom import to namespace import to fix module resolution issues.
 import * as ReactRouterDOM from 'react-router-dom';
@@ -258,7 +259,63 @@ const StoryIdeaEditorPage: React.FC = () => {
     const applyParagraphStyle = (style: string) => { applyAndSaveFormat(() => document.execCommand('formatBlock', false, style)); };
     const applyFont = (fontValue: string) => { const fontName = fontOptions.find(f => f.value === fontValue)?.name || 'serif'; applyAndSaveFormat(() => document.execCommand('fontName', false, fontName)); };
     const applyColor = (color: string) => { applyAndSaveFormat(() => document.execCommand('foreColor', false, color)); };
-    const applyFontSize = (size: string) => { applyAndSaveFormat(() => { document.execCommand('fontSize', false, '1'); const fontElements = editorRef.current?.getElementsByTagName('font'); if(fontElements) { for (let i = 0, len = fontElements.length; i < len; ++i) { if (fontElements[i].size === "1") { fontElements[i].removeAttribute("size"); fontElements[i].style.fontSize = size; } } } }); };
+    
+    const applyFontSize = (size: string) => {
+        applyAndSaveFormat(() => {
+            if (!editorRef.current) return;
+            editorRef.current.focus();
+            const selection = window.getSelection();
+            if (!selection?.rangeCount) return;
+
+            if (selection.isCollapsed) {
+                const range = selection.getRangeAt(0);
+                const span = document.createElement('span');
+                span.style.fontSize = size;
+                span.textContent = '\u200B'; // Zero-width space
+                range.insertNode(span);
+                range.selectNodeContents(span);
+                range.collapse(false);
+                selection.removeAllRanges();
+                selection.addRange(range);
+                return;
+            }
+
+            const DUMMY_COLOR_RGB = 'rgb(1, 2, 3)';
+            document.execCommand('styleWithCSS', false, 'true');
+            document.execCommand('hiliteColor', false, DUMMY_COLOR_RGB);
+
+            const tempSpans = Array.from(editorRef.current.querySelectorAll<HTMLElement>(`span[style*="background-color: ${DUMMY_COLOR_RGB}"]`));
+            const parentsToClean = new Set<Node>();
+
+            tempSpans.forEach(span => {
+                if (span.parentElement) parentsToClean.add(span.parentElement);
+                span.style.backgroundColor = '';
+                span.style.fontSize = size;
+                if (!span.getAttribute('style')?.trim()) {
+                    const parent = span.parentNode;
+                    if (parent) {
+                        while (span.firstChild) parent.insertBefore(span.firstChild, span);
+                        parent.removeChild(span);
+                    }
+                }
+            });
+
+            parentsToClean.forEach(parent => {
+                let child = parent.firstChild;
+                while (child) {
+                    const next = child.nextSibling;
+                    if (next && child instanceof HTMLSpanElement && next instanceof HTMLSpanElement && child.style.cssText === next.style.cssText) {
+                        while (next.firstChild) child.appendChild(next.firstChild);
+                        parent.removeChild(next);
+                    } else {
+                        child = next;
+                    }
+                }
+                parent.normalize();
+            });
+        });
+    };
+
     const applyParagraphSpacing = (spacing: string) => { applyAndSaveFormat(() => { const selection = window.getSelection(); if (!selection || selection.rangeCount === 0) return; let node = selection.getRangeAt(0).startContainer; if (node.nodeType === 3) node = node.parentNode!; while(node && node !== editorRef.current) { if(node instanceof HTMLElement && ['P', 'H1', 'H2', 'H3', 'DIV'].includes(node.tagName)) { node.style.marginBottom = spacing; return; } node = node.parentNode!; } }); };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -421,7 +478,18 @@ const StoryIdeaEditorPage: React.FC = () => {
     
     const handleTagClick = (tag: string) => { setTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : prev.length < 6 ? [...prev, tag] : prev); };
     const handleDelete = () => { if (!idea) return; setProjectData(d => d ? { ...d, storyIdeas: d.storyIdeas.filter(i => i.id !== idea.id) } : null); navigate('/demos'); };
-    const editorStyle = useMemo(() => (theme === 'book' ? { color: THEME_CONFIG.book.text.match(/\[(.*?)\]/)?.[1] || '#F5EADD' } : { color: 'inherit' }), [theme]);
+    
+    const editorStyle = useMemo(() => {
+        const baseFontSize = projectData?.settings?.baseFontSize || 18;
+        const style: React.CSSProperties = {
+            fontSize: `${baseFontSize}px`
+        };
+        if (theme === 'book') {
+            style.color = THEME_CONFIG.book.text.match(/\[(.*?)\]/)?.[1] || '#F5EADD';
+        }
+        return style;
+    }, [theme, projectData?.settings?.baseFontSize]);
+    
     const colorPalette = useMemo(() => (theme === 'book' ? [THEME_CONFIG.book.text.match(/\[(.*?)\]/)?.[1] || '#F5EADD', '#3B82F6', '#FBBF24', '#22C55E', '#EC4899'] : ['#3B2F27', '#3B82F6', '#FBBF24', '#22C55E', '#EC4899']), [theme]);
     
     if (!idea) return <div className={`flex h-screen items-center justify-center ${themeClasses.bg}`}><p>Loading idea...</p></div>;

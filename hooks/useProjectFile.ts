@@ -9,7 +9,7 @@ const PROJECT_FILE_HANDLE_KEY = 'storyverse-project-file-handle';
 const isFileSystemAccessAPISupported = 'showOpenFilePicker' in window;
 
 const defaultProjectData: ProjectData = {
-  settings: { theme: 'book' },
+  settings: { theme: 'book', baseFontSize: 18 },
   novels: [],
   storyIdeas: [],
 };
@@ -17,6 +17,9 @@ const defaultProjectData: ProjectData = {
 const sanitizeProjectData = (data: any): ProjectData => {
   const sanitized = JSON.parse(JSON.stringify(defaultProjectData));
   if (data?.settings?.theme) sanitized.settings.theme = data.settings.theme as Theme;
+  if (typeof data?.settings?.baseFontSize === 'number') {
+      sanitized.settings.baseFontSize = data.settings.baseFontSize;
+  }
   if (Array.isArray(data?.novels)) {
     sanitized.novels = data.novels.map((novel: any) => ({
       id: novel.id || crypto.randomUUID(),

@@ -61,6 +61,7 @@ export interface StoryIdea {
 export interface ProjectData {
   settings: {
     theme: Theme;
+    baseFontSize: number;
   };
   novels: Novel[];
   storyIdeas: StoryIdea[];

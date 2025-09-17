@@ -393,13 +393,18 @@ const ChapterEditorPage: React.FC = () => {
     }, []);
 
     const editorStyle = useMemo(() => {
+        const baseFontSize = projectData?.settings?.baseFontSize || 18;
+        const style: React.CSSProperties = {
+            fontSize: `${baseFontSize}px`
+        };
+
         if (theme === 'book') {
             const colorClass = THEME_CONFIG.book.text;
             const colorValue = colorClass.match(/\[(.*?)\]/)?.[1] || '#F5EADD';
-            return { color: colorValue };
+            style.color = colorValue;
         }
-        return { color: 'inherit' };
-    }, [theme]);
+        return style;
+    }, [theme, projectData?.settings?.baseFontSize]);
     
     const colorPalette = useMemo(() => {
         if (theme === 'book') {
