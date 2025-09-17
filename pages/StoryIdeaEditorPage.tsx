@@ -506,7 +506,7 @@ const StoryIdeaEditorPage: React.FC = () => {
                     </div>
                     <div className="px-8 md:px-16 lg:px-24 pt-8 pb-48">
                         <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="Idea Title" className="text-4xl font-bold bg-transparent outline-none w-full mb-8" />
-                        <div ref={editorRef} contentEditable spellCheck={true} suppressContentEditableWarning onInput={handleEditorInput} onKeyDown={handleKeyDown} onPaste={handlePaste} onBlur={cleanupEditor} className="w-full text-lg leading-relaxed outline-none story-content" style={editorStyle} />
+                        <div ref={editorRef} contentEditable spellCheck={true} suppressContentEditableWarning onInput={handleEditorInput} onKeyDown={handleKeyDown} onPaste={handlePaste} onBlur={cleanupEditor} className="w-full leading-relaxed outline-none story-content" style={editorStyle} />
                     </div>
                 </div>
                 <div className={`fixed top-0 right-0 h-full z-40 transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
@@ -572,20 +572,20 @@ const StoryIdeaEditorPage: React.FC = () => {
                             </div>
                         )}
                         <div className="flex items-center space-x-1 p-1 rounded-full shadow-lg bg-stone-900/70 border border-white/10 backdrop-blur-sm" onMouseDown={e => e.preventDefault()}>
-                            <button onClick={() => setIsFormatPanelOpen(p => !p)} className={`p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors ${isFormatPanelOpen ? 'bg-white/20' : ''}`}><TextIcon className="w-5 h-5"/></button>
-                            <button onClick={() => applyCommand('bold')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.isBold ? 'bg-white/20' : ''}`}><BoldIcon className="w-5 h-5"/></button>
-                            <button onClick={() => applyCommand('italic')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.isItalic ? 'bg-white/20' : ''}`}><ItalicIcon className="w-5 h-5"/></button>
+                            <button onClick={() => setIsFormatPanelOpen(p => !p)} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors ${isFormatPanelOpen ? 'text-white bg-white/10' : ''}`}><TextIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyCommand('bold')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors ${activeFormats.isBold ? 'text-white bg-white/10' : ''}`}><BoldIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyCommand('italic')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors ${activeFormats.isItalic ? 'text-white bg-white/10' : ''}`}><ItalicIcon className="w-5 h-5"/></button>
                             <div className="w-px h-5 bg-white/20 mx-1" />
-                            <button onClick={() => applyParagraphStyle('h1')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.currentBlock === 'h1' ? 'bg-white/20' : ''}`}><H1Icon className="w-5 h-5"/></button>
-                            <button onClick={() => applyParagraphStyle('h2')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.currentBlock === 'h2' ? 'bg-white/20' : ''}`}><H2Icon className="w-5 h-5"/></button>
-                            <button onClick={() => applyParagraphStyle('h3')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.currentBlock === 'h3' ? 'bg-white/20' : ''}`}><H3Icon className="w-5 h-5"/></button>
+                            <button onClick={() => applyParagraphStyle('h1')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors ${activeFormats.currentBlock === 'h1' ? 'text-white bg-white/10' : ''}`}><H1Icon className="w-5 h-5"/></button>
+                            <button onClick={() => applyParagraphStyle('h2')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors ${activeFormats.currentBlock === 'h2' ? 'text-white bg-white/10' : ''}`}><H2Icon className="w-5 h-5"/></button>
+                            <button onClick={() => applyParagraphStyle('h3')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors ${activeFormats.currentBlock === 'h3' ? 'text-white bg-white/10' : ''}`}><H3Icon className="w-5 h-5"/></button>
                             <div className="w-px h-5 bg-white/20 mx-1" />
-                            <button onClick={() => applyCommand('insertUnorderedList')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.isUL ? 'bg-white/20' : ''}`}><ListBulletIcon className="w-5 h-5"/></button>
-                            <button onClick={() => applyCommand('insertOrderedList')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.isOL ? 'bg-white/20' : ''}`}><OrderedListIcon className="w-5 h-5"/></button>
-                            <button onClick={() => applyParagraphStyle('blockquote')} className={`p-2 rounded-full text-white/90 hover:bg-white/10 ${activeFormats.currentBlock === 'blockquote' ? 'bg-white/20' : ''}`}><BlockquoteIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyCommand('insertUnorderedList')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors ${activeFormats.isUL ? 'text-white bg-white/10' : ''}`}><ListBulletIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyCommand('insertOrderedList')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors ${activeFormats.isOL ? 'text-white bg-white/10' : ''}`}><OrderedListIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyParagraphStyle('blockquote')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors ${activeFormats.currentBlock === 'blockquote' ? 'text-white bg-white/10' : ''}`}><BlockquoteIcon className="w-5 h-5"/></button>
                             <div className="w-px h-5 bg-white/20 mx-1" />
-                            <button onClick={() => applyCommand('undo')} className="p-2 rounded-full text-white/90 hover:bg-white/10"><UndoIcon className="w-5 h-5"/></button>
-                            <button onClick={() => applyCommand('redo')} className="p-2 rounded-full text-white/90 hover:bg-white/10"><RedoIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyCommand('undo')} className="p-2 rounded-full text-white/70 hover:text-white transition-colors"><UndoIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyCommand('redo')} className="p-2 rounded-full text-white/70 hover:text-white transition-colors"><RedoIcon className="w-5 h-5"/></button>
                         </div>
                     </div>
                 </div>

@@ -172,7 +172,7 @@ const ReadNovelPage: React.FC = () => {
                         </div>
                         
                         <div
-                            className="prose-styles w-full text-lg leading-relaxed story-content"
+                            className="prose-styles w-full leading-relaxed story-content"
                             dangerouslySetInnerHTML={{ __html: enhanceHtml(currentChapter.content || '') }}
                         />
 

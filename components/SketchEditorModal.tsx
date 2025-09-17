@@ -1,3 +1,4 @@
+
 import React, { useState, useContext, useEffect, useRef, useCallback } from 'react';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { NovelSketch } from '../types';
@@ -13,9 +14,8 @@ const ToolbarButton = ({
   isActive: boolean;
   children: React.ReactNode;
 }) => {
-    const { themeClasses } = useContext(ProjectContext);
-    const activeClass = `bg-gray-600 text-white`;
-    const inactiveClass = `hover:bg-gray-700 text-gray-300`;
+    const activeClass = `bg-white/20 text-white`;
+    const inactiveClass = `hover:bg-white/10 text-gray-300`;
 
     return (
         <button
@@ -36,7 +36,7 @@ interface SketchEditorModalProps {
 }
 
 const SketchEditorModal: React.FC<SketchEditorModalProps> = ({ sketch, onClose, onSave, novels, novelId: contextualNovelId }) => {
-    const { themeClasses } = useContext(ProjectContext);
+    const { themeClasses, projectData } = useContext(ProjectContext);
     const isNew = sketch === null;
     
     const [title, setTitle] = useState('');
@@ -46,6 +46,7 @@ const SketchEditorModal: React.FC<SketchEditorModalProps> = ({ sketch, onClose, 
     const [activeFormats, setActiveFormats] = useState({ isBold: false, isItalic: false, isUL: false, isOL: false, currentBlock: 'p' });
     
     const editorRef = useRef<HTMLDivElement>(null);
+    const baseFontSize = projectData?.settings?.baseFontSize || 18;
 
     useEffect(() => {
         if (sketch) {
@@ -199,8 +200,8 @@ const SketchEditorModal: React.FC<SketchEditorModalProps> = ({ sketch, onClose, 
                         <div
                             ref={editorRef}
                             contentEditable
-                            className={`flex-grow outline-none prose-styles story-content text-lg leading-relaxed ${modalTextColor}`}
-                            style={{minHeight: '200px'}}
+                            className={`flex-grow outline-none prose-styles story-content leading-relaxed ${modalTextColor}`}
+                            style={{minHeight: '200px', fontSize: `${baseFontSize}px`}}
                         />
                     </div>
                     <aside className={`w-full md:w-72 border-t md:border-t-0 md:border-l ${themeClasses.border} flex-shrink-0 flex flex-col`}>

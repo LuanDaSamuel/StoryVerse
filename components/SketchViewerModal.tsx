@@ -10,7 +10,8 @@ interface SketchViewerModalProps {
 }
 
 const SketchViewerModal: React.FC<SketchViewerModalProps> = ({ sketch, onClose }) => {
-    const { themeClasses } = useContext(ProjectContext);
+    const { themeClasses, projectData } = useContext(ProjectContext);
+    const baseFontSize = projectData?.settings?.baseFontSize || 18;
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
@@ -49,7 +50,10 @@ const SketchViewerModal: React.FC<SketchViewerModalProps> = ({ sketch, onClose }
                     </button>
                 </header>
                 
-                <main className="flex-1 overflow-y-auto p-6">
+                <main 
+                    className="flex-1 overflow-y-auto p-6"
+                    style={{ fontSize: `${baseFontSize}px` }}
+                >
                     <div 
                         className="prose-styles story-content"
                         dangerouslySetInnerHTML={{ __html: enhanceHtml(sketch.content) }}
