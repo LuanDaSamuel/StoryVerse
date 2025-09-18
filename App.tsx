@@ -3,7 +3,7 @@
 import React, { useMemo, useContext, useEffect, useRef, useState } from 'react';
 // FIX: Changed react-router-dom import to namespace import to fix module resolution issues.
 import * as ReactRouterDOM from 'react-router-dom';
-import { useProjectFile } from './hooks/useProjectFile';
+import { useProject } from './hooks/useProjectFile';
 import { ProjectContext } from './contexts/ProjectContext';
 import WelcomeScreen from './components/WelcomeScreen';
 import Sidebar from './components/Sidebar';
@@ -15,7 +15,7 @@ import ReadNovelPage from './pages/ReadNovelPage';
 import DemosPage from './pages/DemosPage';
 import StoryIdeaEditorPage from './pages/StoryIdeaEditorPage';
 import { THEME_CONFIG } from './constants';
-import { LoadingIcon, Bars3Icon } from './components/Icons';
+import { LoadingIcon, Bars3Icon, DocumentPlusIcon, UploadIcon } from './components/Icons';
 import { Theme } from './types';
 
 const NovelEditRedirect = () => {
@@ -43,17 +43,7 @@ const NovelEditRedirect = () => {
 };
 
 const AppContent = () => {
-    const {
-        projectData,
-        setProjectData,
-        status,
-        saveStatus,
-        projectName,
-        createLocalProject,
-        openLocalProject,
-        downloadProject,
-        closeProject,
-    } = useProjectFile();
+    const project = useProject();
     
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
     const navigate = ReactRouterDOM.useNavigate();
@@ -61,32 +51,27 @@ const AppContent = () => {
 
     // This effect handles redirecting to the home page on initial load or after import.
     useEffect(() => {
-        if (status === 'ready' && !initialLoadHandled.current) {
+        if (project.status === 'ready' && !initialLoadHandled.current) {
             navigate('/', { replace: true });
             initialLoadHandled.current = true;
         }
-    }, [status, navigate]);
+    }, [project.status, navigate]);
 
     const theme = useMemo(() => {
-        const projectTheme = projectData?.settings?.theme || 'book';
+        const projectTheme = project.projectData?.settings?.theme || 'book';
         // Fallback to 'book' theme if the saved theme from a project file is no longer valid.
         return (projectTheme in THEME_CONFIG) ? projectTheme as Theme : 'book';
-    }, [projectData]);
+    }, [project.projectData]);
 
     const themeClasses = useMemo(() => {
         return THEME_CONFIG[theme];
     }, [theme]);
 
     const contextValue = useMemo(() => ({
-        projectData,
-        setProjectData,
-        downloadProject,
-        closeProject,
+        ...project,
         theme,
         themeClasses,
-        saveStatus,
-        projectName,
-    }), [projectData, setProjectData, downloadProject, closeProject, theme, themeClasses, saveStatus, projectName]);
+    }), [project, theme, themeClasses]);
 
     const onEditPage = ReactRouterDOM.useMatch('/novel/:novelId/edit/:chapterId');
     const onReadPage = ReactRouterDOM.useMatch('/novel/:novelId/read/:chapterId?');
@@ -94,7 +79,7 @@ const AppContent = () => {
     const isSidebarPermanentlyHidden = !!onEditPage || !!onReadPage || !!onIdeaEditPage;
 
     const renderContent = () => {
-        switch (status) {
+        switch (project.status) {
             case 'loading':
                 return (
                     <div className={`flex items-center justify-center h-screen ${themeClasses.bg} ${themeClasses.text}`}>
@@ -103,15 +88,41 @@ const AppContent = () => {
                 );
             case 'welcome':
                 return (
-                    <div className={`${themeClasses.bg} ${themeClasses.text}`}>
-                        <WelcomeScreen 
-                          onCreate={createLocalProject}
-                          onOpen={openLocalProject}
-                        />
+                    <WelcomeScreen 
+                        onGoogleSignIn={project.signInWithGoogle}
+                        onUseLocalFile={project.useLocalProject}
+                    />
+                );
+            case 'drive-no-project':
+                return (
+                     <div className={`flex flex-col items-center justify-center h-screen ${themeClasses.bg} ${themeClasses.text}`}>
+                        <div className={`w-full max-w-lg p-8 text-center rounded-lg ${themeClasses.bgSecondary}`}>
+                            <h2 className={`text-2xl font-bold mb-2 ${themeClasses.accentText}`}>Welcome, {project.userProfile?.email}!</h2>
+                            <p className={`${themeClasses.accentText} opacity-80 mb-6`}>
+                            No StoryVerse project was found on your Google Drive. Get started by creating a new project or uploading an existing one.
+                            </p>
+                            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                            <button
+                                // FIX: Wrapped project.createProjectOnDrive in an arrow function to prevent passing the click event as an argument, which caused a type mismatch.
+                                onClick={() => project.createProjectOnDrive()}
+                                className={`flex items-center justify-center w-full sm:w-auto px-6 py-3 text-lg font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}
+                            >
+                                <DocumentPlusIcon className="w-6 h-6 mr-3" />
+                                Create New Project
+                            </button>
+                            <button
+                                onClick={project.uploadProjectToDrive}
+                                className={`flex items-center justify-center w-full sm:w-auto px-6 py-3 text-lg font-semibold rounded-lg ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-80`}
+                            >
+                                <UploadIcon className="w-6 h-6 mr-3" />
+                                Upload Local Project
+                            </button>
+                            </div>
+                        </div>
                     </div>
                 );
             case 'ready':
-                if (!projectData) return null;
+                if (!project.projectData) return null;
                 return (
                     <div className={`flex h-screen ${themeClasses.bg} ${themeClasses.text}`}>
                         {/* Desktop Sidebar */}

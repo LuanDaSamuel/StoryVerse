@@ -1,11 +1,11 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ProjectData, StorageStatus, SaveStatus, Theme, StoryIdeaStatus, NovelSketch } from '../types';
-import { get, set, del } from 'idb-keyval';
+import { ProjectData, StorageStatus, SaveStatus, Theme, StoryIdeaStatus, NovelSketch, UserProfile } from '../types';
+import { get, set } from 'idb-keyval';
+import { useProjectStorage, DRIVE_PROJECT_FILENAME } from './useProjectStorage';
 
 // --- Constants ---
 const LOCAL_BACKUP_KEY = 'storyverse-local-backup';
-const PROJECT_FILE_HANDLE_KEY = 'storyverse-project-file-handle';
 const isFileSystemAccessAPISupported = 'showOpenFilePicker' in window;
 
 const defaultProjectData: ProjectData = {
@@ -14,6 +14,7 @@ const defaultProjectData: ProjectData = {
   storyIdeas: [],
 };
 
+// --- Helper Functions ---
 const sanitizeProjectData = (data: any): ProjectData => {
   const sanitized = JSON.parse(JSON.stringify(defaultProjectData));
   if (data?.settings?.theme) sanitized.settings.theme = data.settings.theme as Theme;
@@ -70,60 +71,57 @@ const sanitizeProjectData = (data: any): ProjectData => {
   return sanitized;
 };
 
-async function verifyPermission(handle: FileSystemHandle) {
-    const options = { mode: 'readwrite' as const };
-    if ((await handle.queryPermission(options)) === 'granted') return true;
-    if ((await handle.requestPermission(options)) === 'granted') return true;
-    return false;
-}
 
-export function useProjectFile() {
+export function useProject() {
   const [projectData, setProjectData] = useState<ProjectData | null>(null);
   const [status, setStatus] = useState<StorageStatus>('loading');
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
   const [projectName, setProjectName] = useState('');
-  
+  const [storageMode, setStorageMode] = useState<'local' | 'drive' | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+
   const saveTimeout = useRef<number | null>(null);
   const dataVersion = useRef(0);
   const lastSavedVersion = useRef(0);
-  
-  const projectFileHandleRef = useRef<FileSystemFileHandle | null>(null);
-
   const projectDataRef = useRef(projectData);
   projectDataRef.current = projectData;
+  const isConnectingLocal = useRef(false);
 
+  const storage = useProjectStorage();
+
+  // --- Main Save Logic ---
   const saveProject = useCallback(async (data: ProjectData, version: number) => {
     setSaveStatus('saving');
     try {
-        await set(LOCAL_BACKUP_KEY, data);
-
-        if (projectFileHandleRef.current) {
-            const writable = await projectFileHandleRef.current.createWritable();
-            await writable.write(JSON.stringify(data, null, 2));
-            await writable.close();
+        if (storageMode === 'drive') {
+            await storage.saveToDrive(data);
+        } else if (storageMode === 'local') {
+            await set(LOCAL_BACKUP_KEY, data); // Backup for non-FSA browsers
+            await storage.saveToFileHandle(data);
         }
-        
         lastSavedVersion.current = version;
         if (dataVersion.current === lastSavedVersion.current) {
             setSaveStatus('saved');
         }
     } catch (error) {
-        console.error('Error saving project:', error);
+        console.error(`Error saving project to ${storageMode}:`, error);
         setSaveStatus('unsaved');
     }
-  }, []);
-
+  }, [storageMode, storage]);
+  
+  // Debounced auto-save
   useEffect(() => {
     if (status === 'ready' && projectData && saveStatus === 'unsaved') {
       if (saveTimeout.current) clearTimeout(saveTimeout.current);
       const versionToSave = dataVersion.current;
       saveTimeout.current = window.setTimeout(() => {
         if (projectDataRef.current) saveProject(projectDataRef.current, versionToSave);
-      }, 1000);
+      }, 1500);
     }
     return () => { if (saveTimeout.current) clearTimeout(saveTimeout.current); };
   }, [projectData, status, saveStatus, saveProject]);
-
+  
+  // Wrapper to trigger save status change
   const setProjectDataWithSave = (updater: React.SetStateAction<ProjectData | null>) => {
     dataVersion.current++;
     setSaveStatus('unsaved');
@@ -132,6 +130,7 @@ export function useProjectFile() {
     setProjectData(newData);
   };
   
+  // Force save (e.g., on close)
   const saveNow = useCallback(async () => {
     if (saveTimeout.current) {
         clearTimeout(saveTimeout.current);
@@ -142,76 +141,131 @@ export function useProjectFile() {
     }
   }, [status, saveStatus, saveProject]);
 
-  // --- Initialization ---
-  useEffect(() => {
-    const initLocal = async () => {
-        if (!isFileSystemAccessAPISupported) {
-          // Check for a local backup if FS API is not supported.
-          const backup: ProjectData | undefined = await get(LOCAL_BACKUP_KEY);
-          if (backup) {
-              setProjectData(sanitizeProjectData(backup));
-              setProjectName('Local Backup');
-              setStatus('ready');
-          } else {
-              setStatus('welcome');
-          }
-          return;
-        }
-        try {
-            const handle: FileSystemFileHandle | undefined = await get(PROJECT_FILE_HANDLE_KEY);
-            if (handle && await verifyPermission(handle)) {
-                projectFileHandleRef.current = handle;
-                setProjectName(handle.name);
-                const file = await handle.getFile();
-                const data = sanitizeProjectData(JSON.parse(await file.text()));
-                setProjectData(data);
-                setStatus('ready');
-            } else {
-                setStatus('welcome');
-            }
-        } catch (error) {
-            console.error('Initial local file load error:', error);
-            setStatus('welcome');
-        }
-    };
-    initLocal();
-  }, []);
-
-  // --- Local File Logic ---
-  const createLocalProject = useCallback(async () => {
-    if (isFileSystemAccessAPISupported) {
-        try {
-            const handle = await window.showSaveFilePicker({ suggestedName: 'StoryVerse-Project.json', types: [{ description: 'StoryVerse Projects', accept: { 'application/json': ['.json'] } }] });
-            const writable = await handle.createWritable();
-            await writable.write(JSON.stringify(defaultProjectData, null, 2));
-            await writable.close();
-            await set(PROJECT_FILE_HANDLE_KEY, handle);
-            projectFileHandleRef.current = handle;
-            setProjectName(handle.name);
-            setProjectData(defaultProjectData);
-            setStatus('ready');
-            return;
-        } catch (error) { if (error instanceof DOMException && error.name === 'AbortError') return; }
+  // --- Google Drive Flow ---
+  const createProjectOnDrive = useCallback(async (initialData: ProjectData = defaultProjectData) => {
+    setStatus('loading');
+    try {
+        const { name } = await storage.createOnDrive(initialData);
+        setProjectName(name);
+        setProjectData(initialData);
+        setStatus('ready');
+    } catch (error) {
+        console.error("Error creating project on Google Drive:", error);
+        alert("Failed to create project on Google Drive.");
+        // Consider signing out or resetting state here
     }
-    // Fallback for non-FS API browsers
-    alert("Your browser doesn't support the File System Access API. Using a temporary in-browser project. Please download to save your work.");
-    setProjectName('Untitled Project.json');
-    setProjectData(defaultProjectData);
-    setStatus('ready');
-  }, []);
+  }, [storage]);
 
-  const openLocalProject = useCallback(async () => {
+  const uploadProjectToDrive = useCallback(async () => {
+    if (!isFileSystemAccessAPISupported) {
+        alert("Your browser doesn't support the File System Access API required for this action.");
+        return;
+    }
     try {
         const [handle] = await window.showOpenFilePicker({ types: [{ description: 'StoryVerse Projects', accept: { 'application/json': ['.json'] } }] });
         const file = await handle.getFile();
         const data = sanitizeProjectData(JSON.parse(await file.text()));
-        await set(PROJECT_FILE_HANDLE_KEY, handle);
-        projectFileHandleRef.current = handle;
+        await createProjectOnDrive(data);
+    } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+        alert('Failed to open local file for upload.');
+    }
+  }, [createProjectOnDrive]);
+
+  const signInWithGoogle = useCallback(() => storage.signIn(), [storage]);
+
+  const connectLocalToDrive = useCallback(() => {
+      isConnectingLocal.current = true;
+      signInWithGoogle();
+  }, [signInWithGoogle]);
+
+  const signOut = useCallback(() => {
+    storage.signOut();
+    setUserProfile(null);
+    setProjectData(null);
+    setProjectName('');
+    setStorageMode(null);
+    setStatus('welcome');
+  }, [storage]);
+  
+  // --- Local File Flow ---
+  const openLocalProject = useCallback(async (handleToOpen?: FileSystemFileHandle) => {
+    if (!isFileSystemAccessAPISupported) return;
+    try {
+        const handle = handleToOpen || (await window.showOpenFilePicker({ types: [{ description: 'StoryVerse Projects', accept: { 'application/json': ['.json'] } }] }))[0];
+        const fileData = await storage.loadFromFileHandle(handle);
+        if (fileData) {
+            const data = sanitizeProjectData(fileData.data);
+            await storage.saveHandleToIdb(handle);
+            setProjectName(fileData.name);
+            setProjectData(data);
+            setStatus('ready');
+        }
+    } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') setStatus('welcome');
+        else alert('Failed to open file.');
+    }
+  }, [storage]);
+  
+  const createLocalProject = useCallback(async () => {
+    if (!isFileSystemAccessAPISupported) return;
+    try {
+        const handle = await window.showSaveFilePicker({ suggestedName: 'StoryVerse-Project.json', types: [{ description: 'StoryVerse Projects', accept: { 'application/json': ['.json'] } }] });
+        await storage.saveHandleToIdb(handle);
         setProjectName(handle.name);
-        setProjectData(data);
+        setProjectData(defaultProjectData);
+        await storage.saveToFileHandle(defaultProjectData); // Initial save
         setStatus('ready');
-    } catch (error) { if (error instanceof DOMException && error.name === 'AbortError') return; alert('Failed to open file.'); }
-  }, []);
+    } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') setStatus('welcome');
+    }
+  }, [storage]);
+  
+  const useLocalProject = useCallback(async () => {
+    setStatus('loading');
+    setStorageMode('local');
+    if (!isFileSystemAccessAPISupported) {
+      const backup: ProjectData | undefined = await get(LOCAL_BACKUP_KEY);
+      if (backup) {
+          setProjectData(sanitizeProjectData(backup));
+          setProjectName('Local Backup');
+      } else {
+          alert("Your browser doesn't support modern file APIs. Using a temporary project. Please download to save your work.");
+          setProjectName('Untitled Project.json');
+          setProjectData(defaultProjectData);
+      }
+      setStatus('ready');
+      return;
+    }
+
+    try {
+        const handle = await storage.getHandleFromIdb();
+        if (handle) {
+            const fileData = await storage.loadFromFileHandle(handle);
+            if(fileData) {
+                setProjectData(sanitizeProjectData(fileData.data));
+                setProjectName(fileData.name);
+                setStatus('ready');
+                return;
+            }
+        }
+        await createLocalProject();
+    } catch (error) {
+        console.error('Error initializing local project:', error);
+        await createLocalProject(); // Fallback
+    }
+  }, [storage, createLocalProject]);
+  
+  const closeProject = useCallback(async () => {
+    await saveNow();
+    if (storageMode === 'local') {
+        await storage.clearHandleFromIdb();
+    }
+    setProjectData(null);
+    setProjectName('');
+    setStorageMode(null);
+    setStatus('welcome');
+  }, [saveNow, storage, storageMode]);
   
   const downloadProject = useCallback(async () => {
     await saveNow();
@@ -227,23 +281,73 @@ export function useProjectFile() {
     URL.revokeObjectURL(url);
   }, [saveNow, projectName]);
 
-  const closeProject = useCallback(async () => {
-    await saveNow();
-    // Clear local handle
-    await del(PROJECT_FILE_HANDLE_KEY);
-    projectFileHandleRef.current = null;
-    // Reset app state
-    setProjectData(null);
-    setProjectName('');
-    setStatus('welcome');
-  }, [saveNow]);
-  
+
+  // --- Initialization Effect ---
+  useEffect(() => {
+    const handleAuthSuccess = async (profile: UserProfile) => {
+        setUserProfile(profile);
+        setStorageMode('drive');
+        setStatus('loading');
+
+        if (isConnectingLocal.current) {
+            isConnectingLocal.current = false; // Reset flag
+            try {
+                if (!projectDataRef.current) {
+                    throw new Error("No local project data to upload.");
+                }
+                // Save current local project to Drive
+                await saveNow();
+                const { name } = await storage.createOnDrive(projectDataRef.current);
+                setProjectName(name);
+                setStatus('ready');
+                // The handle needs to be cleared from IDB so it doesn't try to reopen on next load
+                await storage.clearHandleFromIdb();
+            } catch (error) {
+                console.error("Error connecting local project to Google Drive:", error);
+                alert("Failed to save your project to Google Drive.");
+                signOut(); // Revert on failure
+            }
+        } else {
+            // Standard sign-in from welcome screen
+            try {
+                const driveProject = await storage.loadFromDrive();
+                if (driveProject) {
+                    setProjectData(sanitizeProjectData(driveProject.data));
+                    setProjectName(driveProject.name);
+                    setStatus('ready');
+                } else {
+                    setStatus('drive-no-project');
+                }
+            } catch (error) {
+                console.error("Error loading from Google Drive:", error);
+                alert("Could not load project from Google Drive.");
+                signOut();
+            }
+        }
+    };
+
+    storage.initializeGapiClient(handleAuthSuccess);
+    
+    if (status === 'loading') {
+        setStatus('welcome');
+    }
+  }, [storage, signOut, status, saveNow]);
+
   return { 
     projectData, 
     setProjectData: setProjectDataWithSave, 
     status, 
     saveStatus,
     projectName,
+    storageMode,
+    userProfile,
+    // Methods
+    signInWithGoogle,
+    signOut,
+    createProjectOnDrive,
+    uploadProjectToDrive,
+    connectLocalToDrive,
+    useLocalProject,
     createLocalProject, 
     openLocalProject, 
     downloadProject, 

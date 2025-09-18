@@ -1,4 +1,5 @@
 
+
 import React, { useState, useContext } from 'react';
 // FIX: Changed react-router-dom import to namespace import to fix module resolution issues.
 import * as ReactRouterDOM from 'react-router-dom';
@@ -12,7 +13,7 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ onLinkClick = () => {} }) => {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-    const { theme, themeClasses } = useContext(ProjectContext);
+    const { theme, themeClasses, userProfile, signOut } = useContext(ProjectContext);
 
     const navLinkClasses = ({ isActive }: { isActive: boolean }): string => {
         const baseClasses = `flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors`;
@@ -52,6 +53,22 @@ const Sidebar: React.FC<SidebarProps> = ({ onLinkClick = () => {} }) => {
                         <span>Idea Box</span>
                     </ReactRouterDOM.NavLink>
                 </nav>
+
+                {userProfile && (
+                     <div className={`px-4 pt-4 border-t border-inherit`}>
+                        <div className="flex items-center space-x-3 p-2 rounded-lg bg-black/10">
+                            <img src={userProfile.picture} alt={userProfile.name} className="w-10 h-10 rounded-full" />
+                            <div>
+                                <p className="font-semibold text-sm truncate">{userProfile.name}</p>
+                                <p className={`text-xs truncate ${themeClasses.textSecondary}`}>{userProfile.email}</p>
+                            </div>
+                        </div>
+                         <button onClick={signOut} className={`w-full text-center mt-2 px-3 py-2 rounded-md text-sm font-medium transition-colors hover:${themeClasses.bgTertiary}`}>
+                             Sign Out
+                         </button>
+                     </div>
+                )}
+
                 <div className="p-4 border-t border-inherit">
                     <button onClick={() => setIsSettingsOpen(true)} className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${sidebarTextColor} hover:${themeClasses.bgTertiary}`}>
                         <SettingsIcon className="w-5 h-5" />

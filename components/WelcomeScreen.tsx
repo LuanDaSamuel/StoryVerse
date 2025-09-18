@@ -1,14 +1,14 @@
 
 
 import React from 'react';
-import { AppLogoIcon, DocumentPlusIcon, FolderIcon } from './Icons';
+import { AppLogoIcon, GoogleIcon } from './Icons';
 
 interface WelcomeScreenProps {
-  onCreate: () => void;
-  onOpen: () => void;
+  onGoogleSignIn: () => void;
+  onUseLocalFile: () => void;
 }
 
-const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreate, onOpen }) => {
+const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onGoogleSignIn, onUseLocalFile }) => {
   return (
     <div className="flex flex-col items-center justify-center h-screen w-full p-4 bg-gradient-to-br from-slate-900 to-[#0F172A] text-slate-200">
       <div className="flex flex-col items-center text-center">
@@ -23,24 +23,23 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreate, onOpen }) => {
         <div className="text-center">
             <h2 className="text-2xl font-bold text-white">Welcome, Creator!</h2>
             <p className="mt-4 text-slate-400">
-                Your work is saved directly to a project file on your computer. Create a new project or open an existing one to get started.
+              Sign in with Google to save your work to the cloud, or continue with a local file on your computer.
             </p>
         </div>
 
         <div className="mt-8 flex flex-col space-y-4">
             <button
-              onClick={onCreate}
-              className="flex items-center justify-center w-full px-6 py-4 text-lg font-semibold rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 transition-colors shadow-lg shadow-indigo-600/30"
+              onClick={onGoogleSignIn}
+              className="flex items-center justify-center w-full px-6 py-4 text-lg font-semibold rounded-lg bg-white text-gray-800 hover:bg-gray-200 transition-colors shadow-lg"
             >
-              <DocumentPlusIcon className="w-6 h-6 mr-3" />
-              Create New Project
+              <GoogleIcon className="w-6 h-6 mr-3" />
+              Sign in with Google
             </button>
             <button
-              onClick={onOpen}
-              className="flex items-center justify-center w-full px-6 py-4 text-lg font-semibold rounded-lg bg-slate-700 text-slate-200 hover:bg-slate-600 transition-colors"
+              onClick={onUseLocalFile}
+              className="w-full px-6 py-2 text-sm font-semibold rounded-lg text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition-colors"
             >
-              <FolderIcon className="w-6 h-6 mr-3" />
-              Open Project File
+              Continue with Local File
             </button>
         </div>
       </div>

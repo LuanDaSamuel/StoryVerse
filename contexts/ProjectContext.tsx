@@ -1,5 +1,5 @@
 import React, { createContext } from 'react';
-import { ProjectData, Theme, ThemeConfig, SaveStatus } from '../types';
+import { ProjectData, Theme, ThemeConfig, SaveStatus, UserProfile } from '../types';
 
 interface ProjectContextType {
   projectData: ProjectData | null;
@@ -10,6 +10,14 @@ interface ProjectContextType {
   themeClasses: ThemeConfig;
   saveStatus: SaveStatus;
   projectName: string;
+  // Google Drive & Auth properties
+  storageMode: 'local' | 'drive' | null;
+  userProfile: UserProfile | null;
+  signInWithGoogle: () => void;
+  signOut: () => void;
+  createProjectOnDrive: () => void;
+  uploadProjectToDrive: () => void;
+  connectLocalToDrive: () => void;
 }
 
 export const ProjectContext = createContext<ProjectContextType>({
@@ -33,4 +41,11 @@ export const ProjectContext = createContext<ProjectContextType>({
   },
   saveStatus: 'saved',
   projectName: '',
+  storageMode: null,
+  userProfile: null,
+  signInWithGoogle: () => {},
+  signOut: () => {},
+  createProjectOnDrive: () => {},
+  uploadProjectToDrive: () => {},
+  connectLocalToDrive: () => {},
 });

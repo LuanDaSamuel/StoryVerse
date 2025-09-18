@@ -67,7 +67,13 @@ export interface ProjectData {
   storyIdeas: StoryIdea[];
 }
 
-export type StorageStatus = 'loading' | 'welcome' | 'ready' | 'error';
+export type StorageStatus = 'loading' | 'welcome' | 'ready' | 'error' | 'drive-no-project';
+
+export interface UserProfile {
+  name: string;
+  email: string;
+  picture: string;
+}
 
 export interface ThemeConfig {
     bg: string;

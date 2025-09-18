@@ -2,7 +2,7 @@ import React, { useContext, useState } from 'react';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { Theme } from '../types';
 import { THEME_CONFIG } from '../constants';
-import { CloseIcon, DownloadIcon, TrashIcon } from './Icons';
+import { CloseIcon, DownloadIcon, TrashIcon, GoogleIcon } from './Icons';
 import ConfirmModal from './ConfirmModal';
 
 interface SettingsModalProps {
@@ -17,8 +17,8 @@ const themeOptions: { name: Theme; label: string; colors: string[] }[] = [
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const { 
-      projectData, theme, setProjectData, downloadProject, closeProject, themeClasses, 
-      projectName
+      projectData, theme, setProjectData, downloadProject, closeProject, 
+      themeClasses, projectName, storageMode, signOut, connectLocalToDrive
   } = useContext(ProjectContext);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
@@ -45,8 +45,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
     });
   };
 
-  const handleCloseProject = async () => {
-    await closeProject();
+  const handleCloseOrSignOut = async () => {
+    if (storageMode === 'drive') {
+      await signOut();
+    } else {
+      await closeProject();
+    }
   };
 
   const modalTextColor = theme === 'book' ? themeClasses.accentText : themeClasses.text;
@@ -60,7 +64,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
     return themeClasses.border;
   };
   
-  const storageLocation = 'a local file';
+  const storageLocation = storageMode === 'drive' ? 'Google Drive' : 'a local file';
+  const closeButtonText = storageMode === 'drive' ? 'Sign Out & Close' : 'Close Project';
+  const confirmTitle = storageMode === 'drive' ? 'Sign Out?' : 'Close Project?';
+  const confirmMessage = storageMode === 'drive'
+    ? "Are you sure you want to sign out? Your project is saved on Google Drive. You can sign back in to access it again."
+    : "Are you sure you want to close this project? Any unsaved changes will be saved before closing. You can reopen it later from your files.";
+
 
   return (
     <>
@@ -118,14 +128,20 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                 <p className={`${descriptionColor} text-sm break-words`}>{projectName}</p>
                 <p className="font-semibold mt-3">Storage Location</p>
                 <p className={`${descriptionColor} text-sm`}>Your project is saved in {storageLocation}.</p>
-                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="mt-4 grid grid-cols-1 gap-3">
+                  {storageMode === 'local' && (
+                    <button onClick={connectLocalToDrive} className="w-full flex items-center justify-center space-x-2 px-4 py-2 text-sm font-semibold rounded-lg transition-colors bg-white text-gray-800 hover:bg-gray-200">
+                      <GoogleIcon className="w-4 h-4" />
+                      <span>Connect to Google Drive</span>
+                    </button>
+                  )}
                   <button onClick={downloadProject} className={`w-full flex items-center justify-center space-x-2 px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${themeClasses.bgSecondary} ${themeClasses.accentText} hover:opacity-80`}>
                     <DownloadIcon className="w-4 h-4" />
                     <span>Download a Copy</span>
                   </button>
                   <button onClick={() => setIsConfirmOpen(true)} className="w-full flex items-center justify-center space-x-2 px-4 py-2 text-sm font-semibold rounded-lg transition-colors bg-red-700 text-red-100 hover:bg-red-800">
                     <TrashIcon className="w-4 h-4" />
-                    <span>Close Project</span>
+                    <span>{closeButtonText}</span>
                   </button>
                 </div>
               </div>
@@ -136,9 +152,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
       <ConfirmModal
         isOpen={isConfirmOpen}
         onClose={() => setIsConfirmOpen(false)}
-        onConfirm={handleCloseProject}
-        title="Close Project?"
-        message="Are you sure you want to close this project? Any unsaved changes will be saved before closing. You can reopen it later from your files."
+        onConfirm={handleCloseOrSignOut}
+        title={confirmTitle}
+        message={confirmMessage}
       />
     </>
   );
