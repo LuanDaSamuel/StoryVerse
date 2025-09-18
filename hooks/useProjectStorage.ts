@@ -1,4 +1,5 @@
 
+
 import { useCallback, useRef } from 'react';
 import { get, set, del } from 'idb-keyval';
 import { ProjectData, UserProfile } from '../types';
@@ -75,11 +76,28 @@ export function useProjectStorage() {
     }, []);
 
     const createOnDrive = useCallback(async (data: ProjectData): Promise<{ fileId: string, name: string }> => {
-        const response = await gapi.client.drive.files.create({
-            resource: { name: DRIVE_PROJECT_FILENAME, mimeType: 'application/json' },
-            media: { mimeType: 'application/json', body: JSON.stringify(data, null, 2) },
-            fields: 'id, name',
+        const boundary = '-------314159265358979323846';
+        const delimiter = `\r\n--${boundary}\r\n`;
+        const close_delim = `\r\n--${boundary}--`;
+        
+        const metadata = {
+            name: DRIVE_PROJECT_FILENAME,
+            mimeType: 'application/json',
+        };
+
+        const multipartRequestBody =
+            delimiter + 'Content-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify(metadata) +
+            delimiter + 'Content-Type: application/json\r\n\r\n' + JSON.stringify(data, null, 2) +
+            close_delim;
+            
+        const response = await gapi.client.request({
+            path: '/upload/drive/v3/files',
+            method: 'POST',
+            params: { uploadType: 'multipart' },
+            headers: { 'Content-Type': `multipart/related; boundary="${boundary}"` },
+            body: multipartRequestBody
         });
+
         driveFileIdRef.current = response.result.id;
         return { fileId: response.result.id, name: response.result.name };
     }, []);

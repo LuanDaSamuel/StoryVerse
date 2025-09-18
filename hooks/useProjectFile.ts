@@ -1,6 +1,7 @@
 
 
 
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ProjectData, StorageStatus, SaveStatus, Theme, StoryIdeaStatus, NovelSketch, UserProfile } from '../types';
 import { get, set } from 'idb-keyval';
@@ -144,6 +145,17 @@ export function useProject() {
     }
   }, [status, saveStatus, saveProject]);
 
+  // This needs to be defined before it's used in other callbacks
+  const signOut = useCallback(() => {
+    storage.signOut();
+    setUserProfile(null);
+    setProjectData(null);
+    setProjectName('');
+    setStorageMode(null);
+    setStatus('welcome');
+    setDriveConflict(null);
+  }, [storage]);
+
   // --- Google Drive Flow ---
   const createProjectOnDrive = useCallback(async (initialData: ProjectData = defaultProjectData) => {
     setStatus('loading');
@@ -152,12 +164,16 @@ export function useProject() {
         setProjectName(name);
         setProjectData(initialData);
         setStatus('ready');
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error creating project on Google Drive:", error);
-        alert("Failed to create project on Google Drive.");
-        // Consider signing out or resetting state here
+        let errorMessage = "Failed to create project on Google Drive.";
+        if (error.result?.error?.message) {
+            errorMessage += `\n\nDetails: ${error.result.error.message}`;
+        }
+        alert(errorMessage);
+        signOut();
     }
-  }, [storage]);
+  }, [storage, signOut]);
 
   const uploadProjectToDrive = useCallback(async () => {
     if (!isFileSystemAccessAPISupported) {
@@ -182,16 +198,6 @@ export function useProject() {
       signInWithGoogle();
   }, [signInWithGoogle]);
 
-  const signOut = useCallback(() => {
-    storage.signOut();
-    setUserProfile(null);
-    setProjectData(null);
-    setProjectName('');
-    setStorageMode(null);
-    setStatus('welcome');
-    setDriveConflict(null);
-  }, [storage]);
-
   const overwriteDriveProject = useCallback(async () => {
     if (!driveConflict) return;
     setStatus('loading');
@@ -202,9 +208,13 @@ export function useProject() {
         await storage.clearHandleFromIdb();
         setDriveConflict(null);
         setStatus('ready');
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error overwriting Google Drive project:", error);
-        alert("Failed to overwrite project on Google Drive.");
+        let errorMessage = "Failed to overwrite project on Google Drive.";
+        if (error.result?.error?.message) {
+            errorMessage += `\n\nDetails: ${error.result.error.message}`;
+        }
+        alert(errorMessage);
         signOut();
     }
   }, [driveConflict, storage, signOut]);
@@ -223,9 +233,13 @@ export function useProject() {
           } else {
               throw new Error("Drive project disappeared unexpectedly.");
           }
-      } catch (error) {
+      } catch (error: any) {
           console.error("Error loading from Google Drive:", error);
-          alert("Could not load project from Google Drive.");
+          let errorMessage = "Could not load project from Google Drive.";
+          if (error.result?.error?.message) {
+            errorMessage += `\n\nDetails: ${error.result.error.message}`;
+          }
+          alert(errorMessage);
           signOut();
       }
   }, [driveConflict, storage, signOut]);
@@ -375,9 +389,13 @@ export function useProject() {
                     setStatus('ready');
                     await storage.clearHandleFromIdb();
                 }
-            } catch (error) {
+            } catch (error: any) {
                 console.error("Error connecting local project to Google Drive:", error);
-                alert("Failed to save your project to Google Drive.");
+                let errorMessage = "Failed to save your project to Google Drive.";
+                 if (error.result?.error?.message) {
+                    errorMessage += `\n\nDetails: ${error.result.error.message}`;
+                }
+                alert(errorMessage);
                 signOut(); // Revert on failure
             }
         } else {
@@ -391,9 +409,13 @@ export function useProject() {
                 } else {
                     setStatus('drive-no-project');
                 }
-            } catch (error) {
+            } catch (error: any) {
                 console.error("Error loading from Google Drive:", error);
-                alert("Could not load project from Google Drive.");
+                let errorMessage = "Could not load project from Google Drive.";
+                if (error.result?.error?.message) {
+                    errorMessage += `\n\nDetails: ${error.result.error.message}`;
+                }
+                alert(errorMessage);
                 signOut();
             }
         }
