@@ -1,4 +1,5 @@
 
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ProjectData, StorageStatus, SaveStatus, Theme, StoryIdeaStatus, NovelSketch, UserProfile } from '../types';
 import { get, set } from 'idb-keyval';
@@ -189,72 +190,67 @@ export function useProject() {
   }, [storage]);
   
   // --- Local File Flow ---
-  const openLocalProject = useCallback(async (handleToOpen?: FileSystemFileHandle) => {
-    if (!isFileSystemAccessAPISupported) return;
+  const openLocalProject = useCallback(async () => {
+    if (!isFileSystemAccessAPISupported) {
+        alert("Your browser doesn't support the File System Access API.");
+        return;
+    }
+    setStatus('loading');
     try {
-        const handle = handleToOpen || (await window.showOpenFilePicker({ types: [{ description: 'StoryVerse Projects', accept: { 'application/json': ['.json'] } }] }))[0];
+        const handles = await window.showOpenFilePicker({ types: [{ description: 'StoryVerse Projects', accept: { 'application/json': ['.json'] } }] });
+        const handle = handles[0];
+        if (!handle) {
+            setStatus('welcome');
+            return;
+        }
+
         const fileData = await storage.loadFromFileHandle(handle);
         if (fileData) {
             const data = sanitizeProjectData(fileData.data);
             await storage.saveHandleToIdb(handle);
             setProjectName(fileData.name);
             setProjectData(data);
+            setStorageMode('local');
             setStatus('ready');
+        } else {
+            alert('Permission to read the file was denied.');
+            setStatus('welcome');
         }
     } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') setStatus('welcome');
-        else alert('Failed to open file.');
+        if (error instanceof DOMException && error.name === 'AbortError') {
+            setStatus('welcome');
+        } else {
+            console.error('Failed to open file:', error);
+            alert('Failed to open or read the selected file. It might be corrupted or in use.');
+            setStatus('welcome');
+        }
     }
   }, [storage]);
   
   const createLocalProject = useCallback(async () => {
-    if (!isFileSystemAccessAPISupported) return;
+    if (!isFileSystemAccessAPISupported) {
+        alert("Your browser doesn't support the File System Access API.");
+        return;
+    }
+    setStatus('loading');
     try {
         const handle = await window.showSaveFilePicker({ suggestedName: 'StoryVerse-Project.json', types: [{ description: 'StoryVerse Projects', accept: { 'application/json': ['.json'] } }] });
         await storage.saveHandleToIdb(handle);
         setProjectName(handle.name);
         setProjectData(defaultProjectData);
         await storage.saveToFileHandle(defaultProjectData); // Initial save
+        setStorageMode('local');
         setStatus('ready');
     } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') setStatus('welcome');
+        if (error instanceof DOMException && error.name === 'AbortError') {
+            setStatus('welcome');
+        } else {
+            console.error('Error creating local project:', error);
+            alert('Could not create the project file.');
+            setStatus('welcome');
+        }
     }
   }, [storage]);
-  
-  const useLocalProject = useCallback(async () => {
-    setStatus('loading');
-    setStorageMode('local');
-    if (!isFileSystemAccessAPISupported) {
-      const backup: ProjectData | undefined = await get(LOCAL_BACKUP_KEY);
-      if (backup) {
-          setProjectData(sanitizeProjectData(backup));
-          setProjectName('Local Backup');
-      } else {
-          alert("Your browser doesn't support modern file APIs. Using a temporary project. Please download to save your work.");
-          setProjectName('Untitled Project.json');
-          setProjectData(defaultProjectData);
-      }
-      setStatus('ready');
-      return;
-    }
-
-    try {
-        const handle = await storage.getHandleFromIdb();
-        if (handle) {
-            const fileData = await storage.loadFromFileHandle(handle);
-            if(fileData) {
-                setProjectData(sanitizeProjectData(fileData.data));
-                setProjectName(fileData.name);
-                setStatus('ready');
-                return;
-            }
-        }
-        await createLocalProject();
-    } catch (error) {
-        console.error('Error initializing local project:', error);
-        await createLocalProject(); // Fallback
-    }
-  }, [storage, createLocalProject]);
   
   const closeProject = useCallback(async () => {
     await saveNow();
@@ -281,6 +277,34 @@ export function useProject() {
     URL.revokeObjectURL(url);
   }, [saveNow, projectName]);
 
+  const checkForRecentLocalProject = useCallback(async () => {
+    if (isFileSystemAccessAPISupported) {
+        const handle = await storage.getHandleFromIdb();
+        if (handle) {
+            setStatus('loading');
+            setStorageMode('local');
+            const fileData = await storage.loadFromFileHandle(handle);
+            if(fileData) {
+                setProjectData(sanitizeProjectData(fileData.data));
+                setProjectName(fileData.name);
+                setStatus('ready');
+                return true;
+            } else {
+                await storage.clearHandleFromIdb();
+            }
+        }
+    } else {
+        const backup: ProjectData | undefined = await get(LOCAL_BACKUP_KEY);
+        if (backup) {
+            setProjectData(sanitizeProjectData(backup));
+            setProjectName('Local Backup');
+            setStatus('ready');
+            setStorageMode('local');
+            return true;
+        }
+    }
+    return false;
+  }, [storage]);
 
   // --- Initialization Effect ---
   useEffect(() => {
@@ -326,12 +350,18 @@ export function useProject() {
         }
     };
 
-    storage.initializeGapiClient(handleAuthSuccess);
+    const initializeApp = async () => {
+        storage.initializeGapiClient(handleAuthSuccess);
+        const loaded = await checkForRecentLocalProject();
+        if (!loaded) {
+            setStatus('welcome');
+        }
+    }
     
     if (status === 'loading') {
-        setStatus('welcome');
+        initializeApp();
     }
-  }, [storage, signOut, status, saveNow]);
+  }, [storage, signOut, status, saveNow, checkForRecentLocalProject]);
 
   return { 
     projectData, 
@@ -347,7 +377,6 @@ export function useProject() {
     createProjectOnDrive,
     uploadProjectToDrive,
     connectLocalToDrive,
-    useLocalProject,
     createLocalProject, 
     openLocalProject, 
     downloadProject, 

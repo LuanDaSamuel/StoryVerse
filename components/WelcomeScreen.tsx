@@ -1,14 +1,15 @@
 
 
 import React from 'react';
-import { AppLogoIcon, GoogleIcon } from './Icons';
+import { AppLogoIcon, GoogleIcon, DocumentPlusIcon, FolderIcon } from './Icons';
 
 interface WelcomeScreenProps {
   onGoogleSignIn: () => void;
-  onUseLocalFile: () => void;
+  onCreateLocalProject: () => void;
+  onOpenLocalProject: () => void;
 }
 
-const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onGoogleSignIn, onUseLocalFile }) => {
+const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onGoogleSignIn, onCreateLocalProject, onOpenLocalProject }) => {
   return (
     <div className="flex flex-col items-center justify-center h-screen w-full p-4 bg-gradient-to-br from-slate-900 to-[#0F172A] text-slate-200">
       <div className="flex flex-col items-center text-center">
@@ -23,7 +24,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onGoogleSignIn, onUseLoca
         <div className="text-center">
             <h2 className="text-2xl font-bold text-white">Welcome, Creator!</h2>
             <p className="mt-4 text-slate-400">
-              Sign in with Google to save your work to the cloud, or continue with a local file on your computer.
+              Sign in with Google to save your work to the cloud, or work with a local file on your computer.
             </p>
         </div>
 
@@ -35,12 +36,29 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onGoogleSignIn, onUseLoca
               <GoogleIcon className="w-6 h-6 mr-3" />
               Sign in with Google
             </button>
-            <button
-              onClick={onUseLocalFile}
-              className="w-full px-6 py-2 text-sm font-semibold rounded-lg text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition-colors"
-            >
-              Continue with Local File
-            </button>
+
+            <div className="relative flex py-2 items-center">
+                <div className="flex-grow border-t border-slate-600"></div>
+                <span className="flex-shrink mx-4 text-slate-400 text-sm">OR</span>
+                <div className="flex-grow border-t border-slate-600"></div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-4">
+                <button
+                  onClick={onCreateLocalProject}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 font-semibold rounded-lg bg-slate-700 text-slate-200 hover:bg-slate-600 transition-colors shadow"
+                >
+                  <DocumentPlusIcon className="w-5 h-5" />
+                  Create New
+                </button>
+                <button
+                  onClick={onOpenLocalProject}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 font-semibold rounded-lg bg-slate-700 text-slate-200 hover:bg-slate-600 transition-colors shadow"
+                >
+                  <FolderIcon className="w-5 h-5" />
+                  Open Local File
+                </button>
+            </div>
         </div>
       </div>
     </div>

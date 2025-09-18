@@ -90,7 +90,8 @@ const AppContent = () => {
                 return (
                     <WelcomeScreen 
                         onGoogleSignIn={project.signInWithGoogle}
-                        onUseLocalFile={project.useLocalProject}
+                        onCreateLocalProject={project.createLocalProject}
+                        onOpenLocalProject={project.openLocalProject}
                     />
                 );
             case 'drive-no-project':
@@ -117,6 +118,11 @@ const AppContent = () => {
                                 <UploadIcon className="w-6 h-6 mr-3" />
                                 Upload Local Project
                             </button>
+                            </div>
+                            <div className="mt-8 text-center">
+                                <button onClick={project.signOut} className={`text-sm ${themeClasses.textSecondary} hover:underline`}>
+                                    Sign Out & Use Local File
+                                </button>
                             </div>
                         </div>
                     </div>
