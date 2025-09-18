@@ -1,7 +1,3 @@
-
-
-
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ProjectData, StorageStatus, SaveStatus, Theme, StoryIdeaStatus, NovelSketch, UserProfile } from '../types';
 import { get, set } from 'idb-keyval';
@@ -361,78 +357,85 @@ export function useProject() {
     return false;
   }, [storage]);
 
-  // --- Initialization Effect ---
-  useEffect(() => {
-    const handleAuthSuccess = async (profile: UserProfile) => {
-        setUserProfile(profile);
-        setStorageMode('drive');
-        setStatus('loading');
+  // --- Initialization Callbacks & Effect ---
 
-        if (isConnectingLocal.current) {
-            isConnectingLocal.current = false; // Reset flag
-            try {
-                if (!projectDataRef.current) {
-                    throw new Error("No local project data to upload.");
-                }
-                // Save any pending changes to memory before checking drive
-                await saveNow();
-                const localDataToUpload = projectDataRef.current;
-                
-                const existingDriveProject = await storage.loadFromDrive();
+  const handleAuthSuccess = useCallback(async (profile: UserProfile) => {
+    setUserProfile(profile);
+    setStorageMode('drive');
+    setStatus('loading');
 
-                if (existingDriveProject) {
-                    setDriveConflict({ localData: localDataToUpload });
-                    setStatus('drive-conflict');
-                } else {
-                    const { name } = await storage.createOnDrive(localDataToUpload);
-                    setProjectName(name);
-                    setStatus('ready');
-                    await storage.clearHandleFromIdb();
-                }
-            } catch (error: any) {
-                console.error("Error connecting local project to Google Drive:", error);
-                let errorMessage = "Failed to save your project to Google Drive.";
-                 if (error.result?.error?.message) {
-                    errorMessage += `\n\nDetails: ${error.result.error.message}`;
-                }
-                alert(errorMessage);
-                signOut(); // Revert on failure
+    if (isConnectingLocal.current) {
+        isConnectingLocal.current = false; // Reset flag
+        try {
+            if (!projectDataRef.current) {
+                throw new Error("No local project data to upload.");
             }
-        } else {
-            // Standard sign-in from welcome screen
-            try {
-                const driveProject = await storage.loadFromDrive();
-                if (driveProject) {
-                    setProjectData(sanitizeProjectData(driveProject.data));
-                    setProjectName(driveProject.name);
-                    setStatus('ready');
-                } else {
-                    setStatus('drive-no-project');
-                }
-            } catch (error: any) {
-                console.error("Error loading from Google Drive:", error);
-                let errorMessage = "Could not load project from Google Drive.";
-                if (error.result?.error?.message) {
-                    errorMessage += `\n\nDetails: ${error.result.error.message}`;
-                }
-                alert(errorMessage);
-                signOut();
+            await saveNow();
+            const localDataToUpload = projectDataRef.current;
+            
+            const existingDriveProject = await storage.loadFromDrive();
+
+            if (existingDriveProject) {
+                setDriveConflict({ localData: localDataToUpload });
+                setStatus('drive-conflict');
+            } else {
+                const { name } = await storage.createOnDrive(localDataToUpload);
+                setProjectName(name);
+                setStatus('ready');
+                await storage.clearHandleFromIdb();
             }
+        } catch (error: any) {
+            console.error("Error connecting local project to Google Drive:", error);
+            let errorMessage = "Failed to save your project to Google Drive.";
+             if (error.result?.error?.message) {
+                errorMessage += `\n\nDetails: ${error.result.error.message}`;
+            }
+            alert(errorMessage);
+            signOut(); // Revert on failure
         }
-    };
-
-    const initializeApp = async () => {
-        storage.initializeGapiClient(handleAuthSuccess);
-        const loaded = await checkForRecentLocalProject();
-        if (!loaded) {
-            setStatus('welcome');
+    } else {
+        // Standard sign-in from welcome screen or silent sign-in
+        try {
+            const driveProject = await storage.loadFromDrive();
+            if (driveProject) {
+                setProjectData(sanitizeProjectData(driveProject.data));
+                setProjectName(driveProject.name);
+                setStatus('ready');
+            } else {
+                setStatus('drive-no-project');
+            }
+        } catch (error: any) {
+            console.error("Error loading from Google Drive:", error);
+            let errorMessage = "Could not load project from Google Drive.";
+            if (error.result?.error?.message) {
+                errorMessage += `\n\nDetails: ${error.result.error.message}`;
+            }
+            alert(errorMessage);
+            signOut();
         }
     }
+  }, [saveNow, storage, signOut]);
+
+  const handleAuthFailure = useCallback(async () => {
+    // This is the fallback path when silent sign-in fails.
+    const loaded = await checkForRecentLocalProject();
+    if (!loaded) {
+        setStatus('welcome');
+    }
+  }, [checkForRecentLocalProject]);
+
+  useEffect(() => {
+    const initializeApp = () => {
+      // Pass both callbacks to the initializer.
+      // The storage hook will attempt silent sign-in and call one of them.
+      storage.initializeGapiClient(handleAuthSuccess, handleAuthFailure);
+    };
     
+    // Only run initialization once when the app is in the initial 'loading' state.
     if (status === 'loading') {
         initializeApp();
     }
-  }, [storage, signOut, status, saveNow, checkForRecentLocalProject]);
+  }, [status, storage, handleAuthSuccess, handleAuthFailure]);
 
   return { 
     projectData, 

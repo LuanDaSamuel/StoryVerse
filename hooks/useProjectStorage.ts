@@ -1,5 +1,3 @@
-
-
 import { useCallback, useRef } from 'react';
 import { get, set, del } from 'idb-keyval';
 import { ProjectData, UserProfile } from '../types';
@@ -105,6 +103,7 @@ export function useProjectStorage() {
     // --- Auth Functions ---
     const signIn = useCallback(() => {
         if (gapiTokenClient.current) {
+            // Use 'consent' to ensure the user sees the auth screen, good for explicit sign-in buttons.
             gapiTokenClient.current.requestAccessToken({ prompt: 'consent' });
         }
     }, []);
@@ -118,7 +117,10 @@ export function useProjectStorage() {
         driveFileIdRef.current = null;
     }, []);
     
-    const initializeGapiClient = useCallback((onAuthSuccess: (profile: UserProfile) => void) => {
+    const initializeGapiClient = useCallback((
+        onAuthSuccess: (profile: UserProfile) => void,
+        onAuthFailure: () => void
+    ) => {
         const initGis = () => {
             try {
                 gapiTokenClient.current = google.accounts.oauth2.initTokenClient({
@@ -135,9 +137,18 @@ export function useProjectStorage() {
                             onAuthSuccess(profile);
                         }
                     },
+                    error_callback: (error: any) => {
+                        console.log('GIS Auth Error during token request:', error);
+                        onAuthFailure();
+                    }
                 });
+                // Attempt silent sign-in right after initialization.
+                // 'none' will fail silently if the user hasn't approved the app before,
+                // triggering the error_callback.
+                gapiTokenClient.current.requestAccessToken({ prompt: 'none' });
             } catch (error) {
                 console.error("Error initializing Google Identity Services", error);
+                onAuthFailure();
             }
         };
 
