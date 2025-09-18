@@ -1,5 +1,6 @@
 
 
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ProjectData, StorageStatus, SaveStatus, Theme, StoryIdeaStatus, NovelSketch, UserProfile } from '../types';
 import { get, set } from 'idb-keyval';
@@ -80,6 +81,7 @@ export function useProject() {
   const [projectName, setProjectName] = useState('');
   const [storageMode, setStorageMode] = useState<'local' | 'drive' | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [driveConflict, setDriveConflict] = useState<{ localData: ProjectData } | null>(null);
 
   const saveTimeout = useRef<number | null>(null);
   const dataVersion = useRef(0);
@@ -187,7 +189,46 @@ export function useProject() {
     setProjectName('');
     setStorageMode(null);
     setStatus('welcome');
+    setDriveConflict(null);
   }, [storage]);
+
+  const overwriteDriveProject = useCallback(async () => {
+    if (!driveConflict) return;
+    setStatus('loading');
+    try {
+        await storage.saveToDrive(driveConflict.localData);
+        setProjectData(driveConflict.localData);
+        setProjectName(DRIVE_PROJECT_FILENAME);
+        await storage.clearHandleFromIdb();
+        setDriveConflict(null);
+        setStatus('ready');
+    } catch (error) {
+        console.error("Error overwriting Google Drive project:", error);
+        alert("Failed to overwrite project on Google Drive.");
+        signOut();
+    }
+  }, [driveConflict, storage, signOut]);
+
+  const loadDriveProjectAndDiscardLocal = useCallback(async () => {
+      if (!driveConflict) return;
+      setStatus('loading');
+      try {
+          const driveProject = await storage.loadFromDrive();
+          if (driveProject) {
+              setProjectData(sanitizeProjectData(driveProject.data));
+              setProjectName(driveProject.name);
+              await storage.clearHandleFromIdb();
+              setDriveConflict(null);
+              setStatus('ready');
+          } else {
+              throw new Error("Drive project disappeared unexpectedly.");
+          }
+      } catch (error) {
+          console.error("Error loading from Google Drive:", error);
+          alert("Could not load project from Google Drive.");
+          signOut();
+      }
+  }, [driveConflict, storage, signOut]);
   
   // --- Local File Flow ---
   const openLocalProject = useCallback(async () => {
@@ -319,13 +360,21 @@ export function useProject() {
                 if (!projectDataRef.current) {
                     throw new Error("No local project data to upload.");
                 }
-                // Save current local project to Drive
+                // Save any pending changes to memory before checking drive
                 await saveNow();
-                const { name } = await storage.createOnDrive(projectDataRef.current);
-                setProjectName(name);
-                setStatus('ready');
-                // The handle needs to be cleared from IDB so it doesn't try to reopen on next load
-                await storage.clearHandleFromIdb();
+                const localDataToUpload = projectDataRef.current;
+                
+                const existingDriveProject = await storage.loadFromDrive();
+
+                if (existingDriveProject) {
+                    setDriveConflict({ localData: localDataToUpload });
+                    setStatus('drive-conflict');
+                } else {
+                    const { name } = await storage.createOnDrive(localDataToUpload);
+                    setProjectName(name);
+                    setStatus('ready');
+                    await storage.clearHandleFromIdb();
+                }
             } catch (error) {
                 console.error("Error connecting local project to Google Drive:", error);
                 alert("Failed to save your project to Google Drive.");
@@ -381,5 +430,7 @@ export function useProject() {
     openLocalProject, 
     downloadProject, 
     closeProject,
+    overwriteDriveProject,
+    loadDriveProjectAndDiscardLocal,
   };
 }

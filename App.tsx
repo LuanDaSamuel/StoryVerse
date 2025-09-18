@@ -1,5 +1,6 @@
 
 
+
 import React, { useMemo, useContext, useEffect, useRef, useState } from 'react';
 // FIX: Changed react-router-dom import to namespace import to fix module resolution issues.
 import * as ReactRouterDOM from 'react-router-dom';
@@ -15,7 +16,7 @@ import ReadNovelPage from './pages/ReadNovelPage';
 import DemosPage from './pages/DemosPage';
 import StoryIdeaEditorPage from './pages/StoryIdeaEditorPage';
 import { THEME_CONFIG } from './constants';
-import { LoadingIcon, Bars3Icon, DocumentPlusIcon, UploadIcon } from './components/Icons';
+import { LoadingIcon, Bars3Icon, DocumentPlusIcon, UploadIcon, CloudIcon } from './components/Icons';
 import { Theme } from './types';
 
 const NovelEditRedirect = () => {
@@ -122,6 +123,44 @@ const AppContent = () => {
                             <div className="mt-8 text-center">
                                 <button onClick={project.signOut} className={`text-sm ${themeClasses.textSecondary} hover:underline`}>
                                     Sign Out & Use Local File
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            case 'drive-conflict':
+                 return (
+                    <div className={`flex flex-col items-center justify-center h-screen ${themeClasses.bg} ${themeClasses.text}`}>
+                        <div className={`w-full max-w-xl p-8 text-center rounded-lg ${themeClasses.bgSecondary}`}>
+                            <h2 className={`text-2xl font-bold mb-2 ${themeClasses.accentText}`}>Project Conflict</h2>
+                            <p className={`${themeClasses.accentText} opacity-80 mb-6`}>
+                                You have a project saved locally and another on Google Drive. How would you like to proceed?
+                            </p>
+                            <div className="space-y-4">
+                                <button
+                                    onClick={project.overwriteDriveProject}
+                                    className={`flex flex-col items-center justify-center w-full px-6 py-4 text-lg font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}
+                                >
+                                    <div className="flex items-center">
+                                        <UploadIcon className="w-6 h-6 mr-3" />
+                                        <span>Upload Local Project</span>
+                                    </div>
+                                    <span className="text-sm font-normal opacity-80 mt-1">This will overwrite the project on Google Drive.</span>
+                                </button>
+                                <button
+                                    onClick={project.loadDriveProjectAndDiscardLocal}
+                                    className={`flex flex-col items-center justify-center w-full px-6 py-4 text-lg font-semibold rounded-lg ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-80`}
+                                >
+                                    <div className="flex items-center">
+                                        <CloudIcon className="w-6 h-6 mr-3" />
+                                        <span>Use Cloud Project</span>
+                                    </div>
+                                    <span className="text-sm font-normal opacity-80 mt-1">Your local changes will not be uploaded.</span>
+                                </button>
+                            </div>
+                             <div className="mt-8 text-center">
+                                <button onClick={project.signOut} className={`text-sm ${themeClasses.textSecondary} hover:underline`}>
+                                    Sign Out & Cancel
                                 </button>
                             </div>
                         </div>

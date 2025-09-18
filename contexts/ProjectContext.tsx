@@ -18,6 +18,9 @@ interface ProjectContextType {
   createProjectOnDrive: () => void;
   uploadProjectToDrive: () => void;
   connectLocalToDrive: () => void;
+  // Drive Conflict Resolution
+  overwriteDriveProject: () => void;
+  loadDriveProjectAndDiscardLocal: () => void;
 }
 
 export const ProjectContext = createContext<ProjectContextType>({
@@ -48,4 +51,6 @@ export const ProjectContext = createContext<ProjectContextType>({
   createProjectOnDrive: () => {},
   uploadProjectToDrive: () => {},
   connectLocalToDrive: () => {},
+  overwriteDriveProject: () => {},
+  loadDriveProjectAndDiscardLocal: () => {},
 });
