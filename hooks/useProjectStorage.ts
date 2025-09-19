@@ -1,5 +1,4 @@
 
-
 import { useCallback, useRef } from 'react';
 import { get, set, del } from 'idb-keyval';
 import { ProjectData, UserProfile } from '../types';
@@ -55,23 +54,22 @@ export function useProjectStorage() {
     }, []);
 
     const saveToDrive = useCallback(async (data: ProjectData) => {
-        if (!driveFileIdRef.current) throw new Error("No Google Drive file ID.");
+        if (!driveFileIdRef.current) {
+            throw new Error("No Google Drive file ID available for saving.");
+        }
         
-        const boundary = '-------314159265358979323846';
-        const delimiter = `\r\n--${boundary}\r\n`;
-        const close_delim = `\r\n--${boundary}--`;
-        const metadata = { 'mimeType': 'application/json' };
-        const multipartRequestBody =
-            delimiter + 'Content-Type: application/json\r\n\r\n' + JSON.stringify(metadata) +
-            delimiter + 'Content-Type: application/json\r\n\r\n' + JSON.stringify(data, null, 2) +
-            close_delim;
-
+        // FIX: Replaced the complex and error-prone multipart upload with a simpler 'media' upload.
+        // This is the recommended approach for updating only the file's content, making the save operation more reliable.
         await gapi.client.request({
-            'path': `/upload/drive/v3/files/${driveFileIdRef.current}`,
-            'method': 'PATCH',
-            'params': { 'uploadType': 'multipart' },
-            'headers': { 'Content-Type': `multipart/related; boundary="${boundary}"` },
-            'body': multipartRequestBody
+            path: `/upload/drive/v3/files/${driveFileIdRef.current}`,
+            method: 'PATCH',
+            params: {
+                uploadType: 'media'
+            },
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data, null, 2)
         });
     }, []);
 
@@ -105,7 +103,11 @@ export function useProjectStorage() {
     // --- Auth Functions ---
     const signIn = useCallback(() => {
         if (gapiTokenClient.current) {
-            gapiTokenClient.current.requestAccessToken({ prompt: 'consent' });
+            // By removing `prompt: 'consent'`, Google's library will automatically
+            // attempt a silent sign-in if the user has previously granted consent.
+            // The consent screen will only appear for new users or if permissions
+            // need to be re-approved, streamlining the login for returning users.
+            gapiTokenClient.current.requestAccessToken({});
         }
     }, []);
 
