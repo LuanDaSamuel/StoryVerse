@@ -58,18 +58,24 @@ export function useProjectStorage() {
             throw new Error("No Google Drive file ID available for saving.");
         }
         
-        // FIX: Replaced the complex and error-prone multipart upload with a simpler 'media' upload.
-        // This is the recommended approach for updating only the file's content, making the save operation more reliable.
+        const boundary = '-------314159265358979323846';
+        const delimiter = `\r\n--${boundary}\r\n`;
+        const close_delim = `\r\n--${boundary}--`;
+        
+        // An empty metadata part is needed for the multipart request.
+        const metadata = {};
+
+        const multipartRequestBody =
+            delimiter + 'Content-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify(metadata) +
+            delimiter + 'Content-Type: application/json\r\n\r\n' + JSON.stringify(data, null, 2) +
+            close_delim;
+            
         await gapi.client.request({
             path: `/upload/drive/v3/files/${driveFileIdRef.current}`,
             method: 'PATCH',
-            params: {
-                uploadType: 'media'
-            },
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data, null, 2)
+            params: { uploadType: 'multipart' },
+            headers: { 'Content-Type': `multipart/related; boundary="${boundary}"` },
+            body: multipartRequestBody
         });
     }, []);
 
@@ -103,10 +109,6 @@ export function useProjectStorage() {
     // --- Auth Functions ---
     const signIn = useCallback(() => {
         if (gapiTokenClient.current) {
-            // By removing `prompt: 'consent'`, Google's library will automatically
-            // attempt a silent sign-in if the user has previously granted consent.
-            // The consent screen will only appear for new users or if permissions
-            // need to be re-approved, streamlining the login for returning users.
             gapiTokenClient.current.requestAccessToken({});
         }
     }, []);
@@ -188,10 +190,16 @@ export function useProjectStorage() {
     }, []);
 
     const saveToFileHandle = useCallback(async (data: ProjectData) => {
-        if (projectFileHandleRef.current && await verifyPermission(projectFileHandleRef.current)) {
+        if (!projectFileHandleRef.current) {
+            throw new Error("Save failed: No file handle is available. Please open the project file again.");
+        }
+        
+        if (await verifyPermission(projectFileHandleRef.current)) {
             const writable = await projectFileHandleRef.current.createWritable();
             await writable.write(JSON.stringify(data, null, 2));
             await writable.close();
+        } else {
+            throw new Error("Save failed: Permission to write to the file was denied.");
         }
     }, []);
 

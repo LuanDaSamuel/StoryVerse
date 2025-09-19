@@ -1,10 +1,7 @@
 
-
-
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ProjectData, StorageStatus, SaveStatus, Theme, StoryIdeaStatus, NovelSketch, UserProfile } from '../types';
-import { get, set } from 'idb-keyval';
+import { get, set, del } from 'idb-keyval';
 import { useProjectStorage, DRIVE_PROJECT_FILENAME } from './useProjectStorage';
 
 // --- Constants ---
@@ -84,68 +81,78 @@ export function useProject() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [driveConflict, setDriveConflict] = useState<{ localData: ProjectData } | null>(null);
 
-  const saveTimeout = useRef<number | null>(null);
-  const dataVersion = useRef(0);
-  const lastSavedVersion = useRef(0);
   const projectDataRef = useRef(projectData);
   projectDataRef.current = projectData;
   const isConnectingLocal = useRef(false);
+  const saveTimeout = useRef<number | null>(null);
+  const isInitialLoadRef = useRef(true);
 
   const storage = useProjectStorage();
 
-  // --- Main Save Logic ---
-  const saveProject = useCallback(async (data: ProjectData, version: number) => {
+  const performSave = useCallback(async () => {
+    const dataToSave = projectDataRef.current;
+    if (!dataToSave) return;
+    
     setSaveStatus('saving');
     try {
         if (storageMode === 'drive') {
-            await storage.saveToDrive(data);
+            await storage.saveToDrive(dataToSave);
         } else if (storageMode === 'local') {
-            await set(LOCAL_BACKUP_KEY, data); // Backup for non-FSA browsers
-            await storage.saveToFileHandle(data);
+            await set(LOCAL_BACKUP_KEY, dataToSave);
+            await storage.saveToFileHandle(dataToSave);
         }
-        lastSavedVersion.current = version;
-        if (dataVersion.current === lastSavedVersion.current) {
-            setSaveStatus('saved');
-        }
+        setSaveStatus('saved');
     } catch (error) {
-        console.error(`Error saving project to ${storageMode}:`, error);
+        console.error(`Save failed:`, error);
         setSaveStatus('unsaved');
+        throw error;
     }
-  }, [storageMode, storage]);
-  
-  // Debounced auto-save
+  }, [storage, storageMode]);
+
   useEffect(() => {
-    if (status === 'ready' && projectData && saveStatus === 'unsaved') {
-      if (saveTimeout.current) clearTimeout(saveTimeout.current);
-      const versionToSave = dataVersion.current;
-      saveTimeout.current = window.setTimeout(() => {
-        if (projectDataRef.current) saveProject(projectDataRef.current, versionToSave);
-      }, 1500);
+    if (status === 'ready') {
+      isInitialLoadRef.current = true;
     }
-    return () => { if (saveTimeout.current) clearTimeout(saveTimeout.current); };
-  }, [projectData, status, saveStatus, saveProject]);
-  
-  // Wrapper to trigger save status change
-  const setProjectDataWithSave = (updater: React.SetStateAction<ProjectData | null>) => {
-    dataVersion.current++;
+  }, [status]);
+
+  useEffect(() => {
+    if (status !== 'ready' || !projectData) {
+      return;
+    }
+    if (isInitialLoadRef.current) {
+        isInitialLoadRef.current = false;
+        return;
+    }
     setSaveStatus('unsaved');
-    const newData = typeof updater === 'function' ? (updater as (prevState: ProjectData | null) => ProjectData | null)(projectDataRef.current) : updater;
-    projectDataRef.current = newData;
-    setProjectData(newData);
+    if (saveTimeout.current) clearTimeout(saveTimeout.current);
+    saveTimeout.current = window.setTimeout(async () => {
+      try {
+        await performSave();
+      } catch (e) { /* Error handled in performSave */ }
+    }, 1500);
+    return () => {
+      if (saveTimeout.current) clearTimeout(saveTimeout.current);
+    };
+  }, [projectData, status, performSave]);
+
+  const setProjectDataWithSave = (updater: React.SetStateAction<ProjectData | null>) => {
+    setProjectData(updater);
   };
   
-  // Force save (e.g., on close)
   const saveNow = useCallback(async () => {
     if (saveTimeout.current) {
         clearTimeout(saveTimeout.current);
         saveTimeout.current = null;
     }
-    if (status === 'ready' && projectDataRef.current && saveStatus !== 'saved') {
-        await saveProject(projectDataRef.current, dataVersion.current);
+    if (saveStatus !== 'saved' && projectDataRef.current) {
+        try {
+            await performSave();
+        } catch (error) {
+            console.error("Immediate save failed", error);
+        }
     }
-  }, [status, saveStatus, saveProject]);
+  }, [saveStatus, performSave]);
 
-  // This needs to be defined before it's used in other callbacks
   const signOut = useCallback(() => {
     storage.signOut();
     setUserProfile(null);
@@ -156,7 +163,6 @@ export function useProject() {
     setDriveConflict(null);
   }, [storage]);
 
-  // --- Google Drive Flow ---
   const createProjectOnDrive = useCallback(async (initialData: ProjectData = defaultProjectData) => {
     setStatus('loading');
     try {
@@ -244,7 +250,6 @@ export function useProject() {
       }
   }, [driveConflict, storage, signOut]);
   
-  // --- Local File Flow ---
   const openLocalProject = useCallback(async () => {
     if (!isFileSystemAccessAPISupported) {
         alert("Your browser doesn't support the File System Access API.");
@@ -361,7 +366,6 @@ export function useProject() {
     return false;
   }, [storage]);
 
-  // --- Initialization Effect ---
   useEffect(() => {
     const handleAuthSuccess = async (profile: UserProfile) => {
         setUserProfile(profile);
@@ -369,14 +373,13 @@ export function useProject() {
         setStatus('loading');
 
         if (isConnectingLocal.current) {
-            isConnectingLocal.current = false; // Reset flag
+            isConnectingLocal.current = false;
             try {
-                if (!projectDataRef.current) {
-                    throw new Error("No local project data to upload.");
-                }
-                // Save any pending changes to memory before checking drive
                 await saveNow();
                 const localDataToUpload = projectDataRef.current;
+                if (!localDataToUpload) {
+                    throw new Error("No local project data to upload.");
+                }
                 
                 const existingDriveProject = await storage.loadFromDrive();
 
@@ -396,10 +399,9 @@ export function useProject() {
                     errorMessage += `\n\nDetails: ${error.result.error.message}`;
                 }
                 alert(errorMessage);
-                signOut(); // Revert on failure
+                signOut();
             }
         } else {
-            // Standard sign-in from welcome screen
             try {
                 const driveProject = await storage.loadFromDrive();
                 if (driveProject) {
@@ -442,7 +444,6 @@ export function useProject() {
     projectName,
     storageMode,
     userProfile,
-    // Methods
     signInWithGoogle,
     signOut,
     createProjectOnDrive,
