@@ -1,6 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { NavLink } from 'react-router-dom';
-import { AppLogoIcon, HomeIcon, PlusIcon, SettingsIcon, LightbulbIcon, QuillPenIcon, LoadingIcon, CloudIcon, CheckIcon } from './Icons';
+import { AppLogoIcon, HomeIcon, PlusIcon, SettingsIcon, LightbulbIcon, QuillPenIcon, LoadingIcon, CloudIcon, CheckIcon, ExclamationTriangleIcon } from './Icons';
 import SettingsModal from './SettingsModal';
 import { ProjectContext } from '../contexts/ProjectContext';
 
@@ -39,6 +39,14 @@ const SaveStatusIndicator: React.FC = () => {
                 <div className={`flex items-center space-x-2 text-xs font-semibold ${savedColor}`}>
                     <CheckIcon className={`w-4 h-4`} />
                     <span>Saved</span>
+                </div>
+            );
+        case 'error':
+            const errorColor = theme === 'dark' ? 'text-red-400' : 'text-red-600';
+            return (
+                <div className={`flex items-center space-x-2 text-xs font-semibold ${errorColor}`}>
+                    <ExclamationTriangleIcon className="w-4 h-4" />
+                    <span>Save failed</span>
                 </div>
             );
         case 'idle':

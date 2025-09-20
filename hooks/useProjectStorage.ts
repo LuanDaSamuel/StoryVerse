@@ -41,7 +41,7 @@ export function useProjectStorage() {
             `--${boundary}`,
             'Content-Type: application/json',
             '',
-            JSON.stringify(data, null, 2),
+            JSON.stringify(data), // Use compact JSON
             `--${boundary}--`
         ].join('\r\n');
 
@@ -65,36 +65,58 @@ export function useProjectStorage() {
     }, []);
 
     const saveToDrive = useCallback(async (data: ProjectData) => {
-        const fileId = driveFileIdRef.current || await idbGet<string>(DRIVE_FILE_ID_KEY);
-        if (!fileId) {
-            console.log("No Drive file ID found locally, creating a new file...");
-            await createOnDrive(data);
-            console.log("New file created on Drive.");
-        } else {
-            driveFileIdRef.current = fileId;
-            console.log(`Updating existing Drive file with media upload: ${fileId}`);
-            try {
-                await gapi.client.request({
-                    path: `https://www.googleapis.com/upload/drive/v3/files/${fileId}`,
-                    method: 'PATCH',
-                    params: { uploadType: 'media' },
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data, null, 2),
-                });
+        let fileId = driveFileIdRef.current || await idbGet<string>(DRIVE_FILE_ID_KEY);
     
-                console.log("File updated successfully via media upload.");
-            } catch (error: any) {
-                console.error("Failed to update Drive file:", error);
-                // If the file was not found (e.g., deleted by the user), create a new one.
-                if (error.status === 404) {
-                    console.log("File not found on Drive, creating a new one.");
-                    await idbDel(DRIVE_FILE_ID_KEY); // Clear the stale ID
-                    driveFileIdRef.current = null;
-                    await createOnDrive(data);
-                } else {
-                    throw error; // Re-throw other errors
-                }
+        const token = gapi.client.getToken();
+        if (!token || !token.access_token) {
+            throw new Error("User not authenticated for saving to Drive.");
+        }
+    
+        // If there's no file ID, it's the first save. Create the file.
+        if (!fileId) {
+            console.log("No Drive file ID found, creating a new file...");
+            const { fileId: newFileId } = await createOnDrive(data);
+            driveFileIdRef.current = newFileId;
+            console.log(`New file created on Drive with ID: ${newFileId}.`);
+            return;
+        }
+        
+        driveFileIdRef.current = fileId;
+    
+        try {
+            console.log(`Initiating simple upload for Drive file: ${fileId}`);
+            const fileContent = JSON.stringify(data); // Use compact JSON
+            
+            // Use a simple media upload, which is a single request and faster for smaller files.
+            const response = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bearer ${token.access_token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: fileContent,
+            });
+    
+            // Handle cases where the file might have been deleted on Drive.
+            if (response.status === 404) {
+                 console.log("File not found on Drive. Creating a new one.");
+                 await idbDel(DRIVE_FILE_ID_KEY); // Clear the stale ID
+                 driveFileIdRef.current = null;
+                 await createOnDrive(data);
+                 return; // Stop execution, the new file has been created.
             }
+    
+            if (!response.ok) {
+                const errorBody = await response.text();
+                throw new Error(`Failed to update file with simple upload. Status: ${response.status}. Body: ${errorBody}`);
+            }
+    
+            console.log("File updated successfully via simple upload.");
+    
+        } catch (error) {
+            console.error("Failed to update Drive file:", error);
+            // Re-throw the error so the calling hook (useProjectFile) can handle the UI state.
+            throw error;
         }
     }, [createOnDrive]);
 
@@ -263,7 +285,7 @@ export function useProjectStorage() {
         if (handle && await verifyPermission(handle)) {
             projectFileHandleRef.current = handle;
             const writable = await handle.createWritable();
-            await writable.write(JSON.stringify(data, null, 2));
+            await writable.write(JSON.stringify(data)); // Use compact JSON
             await writable.close();
         } else {
              console.error("No file handle available or permission denied.");

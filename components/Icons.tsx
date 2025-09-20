@@ -223,6 +223,12 @@ export const CloudIcon = (props: React.SVGProps<SVGSVGElement>) => (
     </svg>
 );
 
+export const ExclamationTriangleIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
+      <path fillRule="evenodd" d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003zM12 15.75a.75.75 0 01.75-.75h.008a.75.75 0 01.75.75v.008a.75.75 0 01-.75.75h-.008a.75.75 0 01-.75-.75v-.008zm.01-6.742a.75.75 0 00-1.5 0v4.493a.75.75 0 001.5 0V9.008z" clipRule="evenodd" />
+    </svg>
+);
+
 // FIX: Added missing CheckIcon for save status indicator.
 export const CheckIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>

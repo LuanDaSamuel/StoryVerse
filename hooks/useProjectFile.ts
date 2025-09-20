@@ -90,88 +90,152 @@ export function useProject() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
 
+  const saveStatusRef = useRef(saveStatus);
+  useEffect(() => {
+      saveStatusRef.current = saveStatus;
+  }, [saveStatus]);
+
   const isInitialLoadRef = useRef(true);
   const isDirtyRef = useRef(false);
-  const saveTimeoutRef = useRef<number | null>(null);
   const isSavingRef = useRef(false);
   const projectDataRef = useRef(projectData);
   projectDataRef.current = projectData;
 
   const storage = useProjectStorage();
+  const saveProjectRef = useRef<() => Promise<void>>(async () => {});
+  const saveTimeoutRef = useRef<number | null>(null);
 
-    const saveProject = useCallback(async () => {
-        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-        saveTimeoutRef.current = null;
-        
-        if (!isDirtyRef.current || !projectDataRef.current || isSavingRef.current) {
-            return;
-        }
+  const saveProject = useCallback(async () => {
+    // Guard against concurrent saves or saving when there's nothing to save.
+    if (isSavingRef.current || !isDirtyRef.current) {
+      return;
+    }
 
-        isSavingRef.current = true;
-        setSaveStatus('saving');
-        try {
-            const dataToSave = projectDataRef.current;
-            if (storageMode === 'drive') {
-                await storage.saveToDrive(dataToSave);
-            } else if (storageMode === 'local') {
-                await set(LOCAL_BACKUP_KEY, dataToSave);
-                await storage.saveToFileHandle(dataToSave);
-            }
-            isDirtyRef.current = false;
-            setSaveStatus('saved');
-        } catch (error) {
-            console.error(`Error saving project to ${storageMode}:`, error);
-            setSaveStatus('unsaved');
-        } finally {
-            isSavingRef.current = false;
-        }
-    }, [storageMode, storage]);
-  
+    isSavingRef.current = true;
+    const dataToSave = projectDataRef.current;
+    
+    setSaveStatus('saving');
+
+    try {
+      if (!dataToSave) throw new Error("No project data to save.");
+
+      if (storageMode === 'drive') {
+        await storage.saveToDrive(dataToSave);
+      } else if (storageMode === 'local') {
+        await set(LOCAL_BACKUP_KEY, dataToSave);
+        await storage.saveToFileHandle(dataToSave);
+      }
+      
+      // If no new changes occurred during the save, mark as clean and saved.
+      // We check isDirtyRef again in case a new change came in during the await.
+      if (!isDirtyRef.current) {
+        setSaveStatus('saved');
+      }
+    } catch (error) {
+      console.error(`Error saving project to ${storageMode}:`, error);
+      // On failure, the data is still dirty.
+      isDirtyRef.current = true;
+      setSaveStatus('error');
+    } finally {
+      isSavingRef.current = false;
+      
+      // If new changes came in while saving, isDirtyRef will be true.
+      // The `setProjectDataAndMarkDirty` function will have already scheduled
+      // a new debounced save. We don't need to do anything here, preventing
+      // an immediate re-save and respecting the user's typing flow.
+    }
+  }, [storage, storageMode]);
+
+  // Keep the ref updated with the latest version of the save function
+  useEffect(() => {
+    saveProjectRef.current = saveProject;
+  }, [saveProject]);
+
   const setProjectDataAndMarkDirty = useCallback((updater: React.SetStateAction<ProjectData | null>) => {
     setProjectData(prevData => {
         const newData = typeof updater === 'function' ? updater(prevData) : updater;
         if (JSON.stringify(newData) !== JSON.stringify(prevData)) {
             isDirtyRef.current = true;
+            
+            // Immediately show "Unsaved" to give instant feedback.
             setSaveStatus('unsaved');
+
+            // Clear any existing timer to reset the debounce period.
+            if (saveTimeoutRef.current) {
+                clearTimeout(saveTimeoutRef.current);
+            }
+
+            // Set a new timer to save after 1 second of inactivity.
+            saveTimeoutRef.current = window.setTimeout(() => {
+                saveProjectRef.current?.();
+            }, 1000); // 1-second delay
         }
         return newData;
     });
   }, []);
 
-  // Debounce effect for saving
-  useEffect(() => {
-    if (saveStatus === 'unsaved') {
-        if (saveTimeoutRef.current) {
-            clearTimeout(saveTimeoutRef.current);
-        }
-        saveTimeoutRef.current = window.setTimeout(saveProject, 1000); // 1-second debounce
-    }
-    return () => {
-        if (saveTimeoutRef.current) {
-            clearTimeout(saveTimeoutRef.current);
-        }
-    };
-  }, [saveStatus, saveProject]);
-
   // Effect to revert 'saved' status to 'idle'
   useEffect(() => {
       if (saveStatus === 'saved') {
-          const timeoutId = setTimeout(() => setSaveStatus('idle'), 1500); // Back to idle after 1.5s
+          // Once saved, we can consider the content clean.
+          isDirtyRef.current = false;
+          const timeoutId = setTimeout(() => setSaveStatus('idle'), 500);
           return () => clearTimeout(timeoutId);
       }
   }, [saveStatus]);
     
-    const flushChanges = useCallback(async () => {
-        // This function immediately triggers a save if there are pending changes,
-        // and waits for it to complete. It's used before closing or downloading.
-        if (saveTimeoutRef.current) {
-            clearTimeout(saveTimeoutRef.current);
-            saveTimeoutRef.current = null;
-        }
-        if (isDirtyRef.current) {
-            await saveProject();
-        }
-    }, [saveProject]);
+  const flushChanges = useCallback(async () => {
+    // This function ensures all pending changes are saved before an action like closing or downloading.
+    
+    // Cancel any scheduled debounced save.
+    if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+    }
+  
+    // If a save isn't in progress but there are pending changes, start one immediately.
+    if (!isSavingRef.current && isDirtyRef.current) {
+      await saveProjectRef.current?.();
+    }
+  
+    // Wait for the save we just kicked off (if any) to complete.
+    while (isSavingRef.current) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  }, []);
+
+    // Save on visibility change (e.g., switching tabs)
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'hidden') {
+                flushChanges();
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [flushChanges]);
+
+    // Save on closing tab and warn only on critical states
+    useEffect(() => {
+        const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+            if (saveStatusRef.current === 'saving' || saveStatusRef.current === 'error') {
+                 const message = "A save is in progress or has failed. Closing now may result in data loss.";
+                 event.preventDefault();
+                 event.returnValue = message;
+                 return message;
+            }
+            if (isDirtyRef.current) {
+                flushChanges();
+            }
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+        };
+    }, [flushChanges]);
 
   const resetState = useCallback(() => {
     setProjectData(null);

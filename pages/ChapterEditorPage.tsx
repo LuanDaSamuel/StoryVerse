@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
-import { BackIcon, BookOpenIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, TextIcon, SearchIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, CloseIcon, Bars3Icon, DownloadIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, LoadingIcon, CheckIcon, CloudIcon } from '../components/Icons';
+import { BackIcon, BookOpenIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, TextIcon, SearchIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, CloseIcon, Bars3Icon, DownloadIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, LoadingIcon, CheckIcon, CloudIcon, ExclamationTriangleIcon } from '../components/Icons';
 import { enhancePlainText, enhanceHtml, THEME_CONFIG } from '../constants';
 import ExportModal from '../components/ExportModal';
 
@@ -37,13 +37,22 @@ const SaveStatusIndicator: React.FC = () => {
                     <span>Saved</span>
                 </div>
             );
+        case 'error':
+            const errorColor = theme === 'dark' ? 'text-red-400' : 'text-red-600';
+            return (
+                <div className={`flex items-center space-x-2 text-sm font-sans font-semibold ${errorColor}`}>
+                    <ExclamationTriangleIcon className="w-4 h-4" />
+                    <span>Save failed</span>
+                </div>
+            );
         case 'idle':
         default:
             const Icon = storageMode === 'drive' ? CloudIcon : CheckIcon;
+            const text = storageMode === 'drive' ? "Saved to Drive" : "Saved Locally";
             return (
                 <div className={`flex items-center space-x-2 text-sm font-sans ${themeClasses.textSecondary}`}>
                     <Icon className={`w-4 h-4`} />
-                    <span>All changes saved</span>
+                    <span>{text}</span>
                 </div>
             );
     }
@@ -365,7 +374,6 @@ const ChapterEditorPage: React.FC = () => {
     const editorContentRef = useRef<string>("");
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const toolbarRef = useRef<HTMLDivElement>(null);
-    const saveStatusRef = useRef(saveStatus);
     
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isFindReplaceOpen, setIsFindReplaceOpen] = useState(false);
@@ -379,26 +387,6 @@ const ChapterEditorPage: React.FC = () => {
         size: '18px',
         paragraphSpacing: '1em',
     });
-
-    useEffect(() => {
-        saveStatusRef.current = saveStatus;
-    }, [saveStatus]);
-
-    useEffect(() => {
-        const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-            if (saveStatusRef.current === 'saving') {
-                const message = "Changes are still being saved. Are you sure you want to leave?";
-                event.returnValue = message; // Standard for most browsers
-                return message; // For some older browsers
-            }
-        };
-
-        window.addEventListener('beforeunload', handleBeforeUnload);
-
-        return () => {
-            window.removeEventListener('beforeunload', handleBeforeUnload);
-        };
-    }, []);
 
     const cleanupEditor = useCallback(() => {
         if (!editorRef.current) return;

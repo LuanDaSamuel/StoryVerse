@@ -1,6 +1,6 @@
 export type Theme = 'dark' | 'book';
 
-export type SaveStatus = 'idle' | 'unsaved' | 'saving' | 'saved';
+export type SaveStatus = 'idle' | 'unsaved' | 'saving' | 'saved' | 'error';
 
 export interface ChapterHistory {
   timestamp: string;
