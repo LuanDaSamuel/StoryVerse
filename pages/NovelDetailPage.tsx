@@ -468,9 +468,7 @@ const NovelDetailPage: React.FC = () => {
                         <textarea
                             ref={descriptionTextareaRef}
                             value={novel.description}
-                            onChange={(e) => {
-                                updateNovelDetails({ description: e.target.value });
-                            }}
+                            onChange={(e) => updateNovelDetails({ description: e.target.value })}
                             onBlur={(e) => {
                                 const enhanced = enhancePlainText(e.target.value);
                                 if (enhanced !== e.target.value) {
@@ -478,7 +476,7 @@ const NovelDetailPage: React.FC = () => {
                                 }
                             }}
                             placeholder="A short, captivating description of your novel..."
-                            className={`text-lg mt-1 bg-transparent outline-none w-full resize-none min-h-[7rem] ${themeClasses.textSecondary}`}
+                            className={`text-lg mt-1 bg-transparent outline-none w-full resize-none min-h-[7rem] max-h-96 ${themeClasses.textSecondary}`}
                         />
                     </div>
                     <div className={`rounded-lg ${themeClasses.bgSecondary}`}>

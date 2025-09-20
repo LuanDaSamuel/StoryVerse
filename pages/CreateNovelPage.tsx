@@ -176,7 +176,7 @@ const CreateNovelPage: React.FC = () => {
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
                             placeholder="A short, captivating description of your novel..."
-                            className={`text-lg mt-1 bg-transparent outline-none w-full resize-none min-h-[6rem] ${themeClasses.textSecondary} ${placeholderClass}`}
+                            className={`text-lg mt-1 bg-transparent outline-none w-full resize-none min-h-[6rem] max-h-96 ${themeClasses.textSecondary} ${placeholderClass}`}
                         />
                     </div>
                     <div className={`p-6 mt-6 rounded-lg ${themeClasses.bgTertiary}`}>

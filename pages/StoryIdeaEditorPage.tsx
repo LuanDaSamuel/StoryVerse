@@ -527,7 +527,7 @@ const StoryIdeaEditorPage: React.FC = () => {
                         </button>
                     </div>
                     <div className="px-8 md:px-16 lg:px-24 pt-8 pb-48">
-                        <input type="text" value={idea.title} onChange={e => updateIdea({ title: e.target.value })} placeholder="Idea Title" className="text-4xl font-bold bg-transparent outline-none w-full mb-8" />
+                        <input type="text" value={idea.title} onChange={e => updateIdea({ title: e.target.value })} onBlur={(e) => updateIdea({ title: enhancePlainText(e.target.value) })} placeholder="Idea Title" className="text-4xl font-bold bg-transparent outline-none w-full mb-8" />
                         <div ref={editorRef} contentEditable spellCheck={true} suppressContentEditableWarning onInput={handleEditorInput} onKeyDown={handleKeyDown} onPaste={handlePaste} onBlur={cleanupEditor} className="w-full leading-relaxed outline-none story-content" style={editorStyle} />
                     </div>
                 </div>
