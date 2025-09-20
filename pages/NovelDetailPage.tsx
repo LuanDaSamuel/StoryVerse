@@ -36,44 +36,18 @@ const NovelDetailPage: React.FC = () => {
         };
     }, [projectData, novelId]);
     
-    const [editableTitle, setEditableTitle] = useState(novel?.title || '');
-    const [editableDescription, setEditableDescription] = useState(novel?.description || '');
-    const saveTimeout = useRef<number | null>(null);
-
-    // Sync local state when the novel ID changes to handle navigation between different novels.
-    useEffect(() => {
-        if (novel) {
-            setEditableTitle(novel.title);
-            setEditableDescription(novel.description);
-        }
-    }, [novel?.id]);
-
-    // Debounced save effect for title and description
-    useEffect(() => {
-        if (saveTimeout.current) clearTimeout(saveTimeout.current);
-
-        saveTimeout.current = window.setTimeout(() => {
-            if (novelIndex === -1 || !projectData) return;
-
-            const currentNovelInState = projectData.novels[novelIndex];
-            if (currentNovelInState.title !== editableTitle || currentNovelInState.description !== editableDescription) {
-                 setProjectData(currentData => {
-                    if (!currentData || !currentData.novels[novelIndex]) return currentData;
-                    const updatedNovels = [...currentData.novels];
-                    updatedNovels[novelIndex] = {
-                        ...updatedNovels[novelIndex],
-                        title: editableTitle,
-                        description: editableDescription,
-                    };
-                    return { ...currentData, novels: updatedNovels };
-                });
-            }
-        }, 1000);
-
-        return () => {
-            if (saveTimeout.current) clearTimeout(saveTimeout.current);
-        };
-    }, [editableTitle, editableDescription, novelIndex, projectData, setProjectData]);
+    const updateNovelDetails = (details: Partial<Pick<Novel, 'title' | 'description'>>) => {
+        if (novelIndex === -1) return;
+        setProjectData(currentData => {
+            if (!currentData || !currentData.novels[novelIndex]) return currentData;
+            const updatedNovels = [...currentData.novels];
+            updatedNovels[novelIndex] = {
+                ...updatedNovels[novelIndex],
+                ...details,
+            };
+            return { ...currentData, novels: updatedNovels };
+        });
+    };
 
     // Auto-resize the description textarea to fit its content.
     useEffect(() => {
@@ -82,7 +56,7 @@ const NovelDetailPage: React.FC = () => {
             textarea.style.height = 'auto'; // Reset height to allow shrinking
             textarea.style.height = `${textarea.scrollHeight}px`;
         }
-    }, [editableDescription]);
+    }, [novel?.description]);
     
     useEffect(() => {
         if (novelIndex === -1) return;
@@ -480,12 +454,12 @@ const NovelDetailPage: React.FC = () => {
                     <div className={`p-6 rounded-lg ${themeClasses.bgSecondary}`}>
                         <input
                             type="text"
-                            value={editableTitle}
-                            onChange={(e) => setEditableTitle(e.target.value)}
-                            onBlur={() => {
-                                const enhanced = enhancePlainText(editableTitle);
-                                if (enhanced !== editableTitle) {
-                                    setEditableTitle(enhanced);
+                            value={novel.title}
+                            onChange={(e) => updateNovelDetails({ title: e.target.value })}
+                            onBlur={(e) => {
+                                const enhanced = enhancePlainText(e.target.value);
+                                if (enhanced !== e.target.value) {
+                                    updateNovelDetails({ title: enhanced });
                                 }
                             }}
                             placeholder="Novel Title"
@@ -493,14 +467,14 @@ const NovelDetailPage: React.FC = () => {
                         />
                         <textarea
                             ref={descriptionTextareaRef}
-                            value={editableDescription}
+                            value={novel.description}
                             onChange={(e) => {
-                                setEditableDescription(e.target.value);
+                                updateNovelDetails({ description: e.target.value });
                             }}
-                            onBlur={() => {
-                                const enhanced = enhancePlainText(editableDescription);
-                                if (enhanced !== editableDescription) {
-                                    setEditableDescription(enhanced);
+                            onBlur={(e) => {
+                                const enhanced = enhancePlainText(e.target.value);
+                                if (enhanced !== e.target.value) {
+                                    updateNovelDetails({ description: enhanced });
                                 }
                             }}
                             placeholder="A short, captivating description of your novel..."

@@ -45,7 +45,7 @@ const StoryIdeaEditorPage: React.FC = () => {
     const { projectData, setProjectData, theme, themeClasses } = useContext(ProjectContext);
     
     const editorRef = useRef<HTMLDivElement>(null);
-    const saveTimeout = useRef<number | null>(null);
+    const editorContentRef = useRef<string>("");
     const toolbarRef = useRef<HTMLDivElement>(null);
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -57,12 +57,6 @@ const StoryIdeaEditorPage: React.FC = () => {
         const iIndex = projectData.storyIdeas.findIndex(i => i.id === ideaId);
         return iIndex === -1 ? { idea: null, ideaIndex: -1 } : { idea: projectData.storyIdeas[iIndex], ideaIndex: iIndex };
     }, [projectData, ideaId]);
-
-    const [title, setTitle] = useState(idea?.title || '');
-    const [synopsis, setSynopsis] = useState(idea?.synopsis || '');
-    const [tags, setTags] = useState<string[]>(idea?.tags || []);
-    const [status, setStatus] = useState<StoryIdeaStatus>(idea?.status || 'Seedling');
-    const [wordCount, setWordCount] = useState(idea?.wordCount || 0);
 
     const [documentOutline, setDocumentOutline] = useState<{ id: string; text: string; level: number }[]>([]);
     const [activeFormats, setActiveFormats] = useState({ isBold: false, isItalic: false, isUL: false, isOL: false, currentBlock: 'p' });
@@ -79,53 +73,32 @@ const StoryIdeaEditorPage: React.FC = () => {
         editor.normalize();
     }, []);
 
-    useEffect(() => {
-        if (idea) {
-            setTitle(idea.title);
-            setTags(idea.tags);
-            setStatus(idea.status);
-            setWordCount(idea.wordCount);
-            if (editorRef.current && idea.synopsis !== editorRef.current.innerHTML) {
-                const enhancedContent = enhanceHtml(idea.synopsis || '<p><br></p>');
-                editorRef.current.innerHTML = enhancedContent;
-                setSynopsis(enhancedContent);
-            }
-        }
-    }, [idea]);
+    const updateIdea = useCallback((updates: Partial<Omit<StoryIdea, 'id' | 'createdAt'>>) => {
+        if (ideaIndex === -1) return;
 
-    useEffect(() => {
-        if (!idea) return;
-        if (saveTimeout.current) clearTimeout(saveTimeout.current);
-    
-        saveTimeout.current = window.setTimeout(() => {
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = synopsis;
-            const text = tempDiv.textContent || "";
-            const currentWordCount = text.trim().split(/\s+/).filter(Boolean).length;
-    
-            setProjectData(currentData => {
-                if (!currentData || ideaIndex === -1) return currentData;
-                const updatedIdeas = [...currentData.storyIdeas];
-                const currentIdea = updatedIdeas[ideaIndex];
-                if (currentIdea.title !== title || currentIdea.synopsis !== synopsis || JSON.stringify(currentIdea.tags) !== JSON.stringify(tags) || currentIdea.status !== status) {
-                    updatedIdeas[ideaIndex] = {
-                        ...currentIdea,
-                        title,
-                        synopsis,
-                        tags,
-                        status,
-                        wordCount: currentWordCount,
-                        updatedAt: new Date().toISOString(),
-                    };
-                    return { ...currentData, storyIdeas: updatedIdeas };
-                }
-                return currentData;
-            });
-            setWordCount(currentWordCount);
-        }, 1000);
-    
-        return () => { if (saveTimeout.current) clearTimeout(saveTimeout.current); };
-    }, [title, synopsis, tags, status, idea, ideaIndex, setProjectData]);
+        setProjectData(currentData => {
+            if (!currentData || !currentData.storyIdeas[ideaIndex]) return currentData;
+            const updatedIdeas = [...currentData.storyIdeas];
+            const currentIdea = updatedIdeas[ideaIndex];
+
+            const newSynopsis = updates.synopsis !== undefined ? updates.synopsis : currentIdea.synopsis;
+            let newWordCount = currentIdea.wordCount;
+            if (updates.synopsis !== undefined) {
+                 const tempDiv = document.createElement('div');
+                 tempDiv.innerHTML = newSynopsis;
+                 const text = tempDiv.textContent || "";
+                 newWordCount = text.trim().split(/\s+/).filter(Boolean).length;
+            }
+
+            updatedIdeas[ideaIndex] = {
+                ...currentIdea,
+                ...updates,
+                wordCount: newWordCount,
+                updatedAt: new Date().toISOString(),
+            };
+            return { ...currentData, storyIdeas: updatedIdeas };
+        });
+    }, [ideaIndex, setProjectData]);
 
     const updateDocumentOutline = useCallback(() => {
         if (!editorRef.current) return;
@@ -220,6 +193,45 @@ const StoryIdeaEditorPage: React.FC = () => {
     }, [updateActiveFormats, updateCurrentFormat]);
 
     useEffect(() => {
+        if (editorRef.current && idea) {
+            const initialContent = idea.synopsis || '<p><br></p>';
+            const enhancedContent = enhanceHtml(initialContent);
+            editorRef.current.innerHTML = enhancedContent;
+            editorContentRef.current = initialContent;
+    
+            editorRef.current.focus();
+            const selection = window.getSelection();
+            if (selection) {
+                const range = document.createRange();
+                range.selectNodeContents(editorRef.current);
+                range.collapse(false);
+                selection.removeAllRanges();
+                selection.addRange(range);
+            }
+        }
+    }, [ideaId]);
+    
+    useEffect(() => {
+        if (idea && editorRef.current) {
+            const contentFromState = idea.synopsis || '<p><br></p>';
+            if (contentFromState !== editorContentRef.current) {
+                const enhancedContent = enhanceHtml(contentFromState);
+                editorRef.current.innerHTML = enhancedContent;
+                editorContentRef.current = contentFromState;
+    
+                const selection = window.getSelection();
+                if (selection) {
+                    const range = document.createRange();
+                    range.selectNodeContents(editorRef.current);
+                    range.collapse(false);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                }
+            }
+        }
+    }, [idea?.synopsis]);
+
+    useEffect(() => {
         updateDocumentOutline();
         const editorEl = editorRef.current;
         document.addEventListener('selectionchange', handleSelectionChange);
@@ -236,10 +248,12 @@ const StoryIdeaEditorPage: React.FC = () => {
                 editorEl.removeEventListener('focus', handleSelectionChange);
             }
         };
-    }, [synopsis, updateDocumentOutline, handleSelectionChange]);
+    }, [idea?.synopsis, updateDocumentOutline, handleSelectionChange]);
 
     const handleEditorInput = (e: React.FormEvent<HTMLDivElement>) => {
-        setSynopsis(e.currentTarget.innerHTML);
+        const newHTML = e.currentTarget.innerHTML;
+        editorContentRef.current = newHTML;
+        updateIdea({ synopsis: newHTML });
     };
 
     const applyAndSaveFormat = useCallback((formatAction: () => void) => {
@@ -473,8 +487,19 @@ const StoryIdeaEditorPage: React.FC = () => {
         return () => { document.removeEventListener('mousedown', handleClickOutside); };
     }, [isFormatPanelOpen]);
     
-    const handleTagClick = (tag: string) => { setTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : prev.length < 6 ? [...prev, tag] : prev); };
-    const handleDelete = () => { if (!idea) return; setProjectData(d => d ? { ...d, storyIdeas: d.storyIdeas.filter(i => i.id !== idea.id) } : null); navigate('/demos'); };
+    const handleTagClick = (tag: string) => {
+        const currentTags = idea?.tags || [];
+        const newTags = currentTags.includes(tag) ? currentTags.filter(t => t !== tag) : currentTags.length < 6 ? [...currentTags, tag] : currentTags;
+        if (JSON.stringify(newTags) !== JSON.stringify(currentTags)) {
+            updateIdea({ tags: newTags });
+        }
+    };
+
+    const handleDelete = () => {
+        if (!idea) return;
+        setProjectData(d => d ? { ...d, storyIdeas: d.storyIdeas.filter(i => i.id !== idea.id) } : null);
+        navigate('/demos');
+    };
     
     const editorStyle = useMemo(() => {
         const baseFontSize = projectData?.settings?.baseFontSize || 18;
@@ -502,7 +527,7 @@ const StoryIdeaEditorPage: React.FC = () => {
                         </button>
                     </div>
                     <div className="px-8 md:px-16 lg:px-24 pt-8 pb-48">
-                        <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="Idea Title" className="text-4xl font-bold bg-transparent outline-none w-full mb-8" />
+                        <input type="text" value={idea.title} onChange={e => updateIdea({ title: e.target.value })} placeholder="Idea Title" className="text-4xl font-bold bg-transparent outline-none w-full mb-8" />
                         <div ref={editorRef} contentEditable spellCheck={true} suppressContentEditableWarning onInput={handleEditorInput} onKeyDown={handleKeyDown} onPaste={handlePaste} onBlur={cleanupEditor} className="w-full leading-relaxed outline-none story-content" style={editorStyle} />
                     </div>
                 </div>
@@ -512,7 +537,7 @@ const StoryIdeaEditorPage: React.FC = () => {
                             <span className="font-bold text-base">IDEA DETAILS</span><button onClick={() => setIsSidebarOpen(false)}><ChevronLeftIcon className="w-5 h-5"/></button>
                         </div>
                         <div className={`px-4 py-4 border-b ${themeClasses.border}`}>
-                            <p className="text-3xl font-bold">{wordCount.toLocaleString()}</p><p className={themeClasses.textSecondary}>WORDS</p>
+                            <p className="text-3xl font-bold">{(idea.wordCount || 0).toLocaleString()}</p><p className={themeClasses.textSecondary}>WORDS</p>
                         </div>
                         <div className="flex-1 p-4 space-y-6 overflow-y-auto">
                             <div>
@@ -524,12 +549,12 @@ const StoryIdeaEditorPage: React.FC = () => {
                             <div>
                                 <h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Status</h3>
                                 <div className={`flex rounded-md overflow-hidden border ${themeClasses.border}`}>
-                                    {(['Seedling', 'Developing', 'Archived'] as StoryIdeaStatus[]).map(o => <button key={o} onClick={() => setStatus(o)} className={`flex-1 py-2 text-sm font-semibold ${status === o ? `${themeClasses.accent} ${themeClasses.accentText}` : `hover:${themeClasses.bgTertiary}`}`}>{o}</button>)}
+                                    {(['Seedling', 'Developing', 'Archived'] as StoryIdeaStatus[]).map(o => <button key={o} onClick={() => updateIdea({ status: o })} className={`flex-1 py-2 text-sm font-semibold ${idea.status === o ? `${themeClasses.accent} ${themeClasses.accentText}` : `hover:${themeClasses.bgTertiary}`}`}>{o}</button>)}
                                 </div>
                             </div>
                             <div>
                                 <h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Tags</h3>
-                                <div className="flex flex-wrap gap-1.5">{SKETCH_TAG_OPTIONS.map(t => <button key={t} onClick={() => handleTagClick(t)} className={`px-2 py-1 text-xs rounded-full font-semibold ${tags.includes(t) ? `${themeClasses.accent} ${themeClasses.accentText}` : `${themeClasses.bgTertiary} hover:opacity-80`}`}>{t}</button>)}</div>
+                                <div className="flex flex-wrap gap-1.5">{SKETCH_TAG_OPTIONS.map(t => <button key={t} onClick={() => handleTagClick(t)} className={`px-2 py-1 text-xs rounded-full font-semibold ${idea.tags.includes(t) ? `${themeClasses.accent} ${themeClasses.accentText}` : `${themeClasses.bgTertiary} hover:opacity-80`}`}>{t}</button>)}</div>
                             </div>
                             <div>
                                 <h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Actions</h3>
