@@ -93,29 +93,39 @@ export function useProject() {
   const isInitialLoadRef = useRef(true);
   const isDirtyRef = useRef(false);
   const saveTimeoutRef = useRef<number | null>(null);
+  const isSavingRef = useRef(false);
   const projectDataRef = useRef(projectData);
   projectDataRef.current = projectData;
 
   const storage = useProjectStorage();
 
-  const saveProject = useCallback(async () => {
-    if (!isDirtyRef.current || !projectDataRef.current) return;
-    
-    setSaveStatus('saving');
-    try {
-        if (storageMode === 'drive') {
-            await storage.saveToDrive(projectDataRef.current);
-        } else if (storageMode === 'local') {
-            await set(LOCAL_BACKUP_KEY, projectDataRef.current);
-            await storage.saveToFileHandle(projectDataRef.current);
+    const saveProject = useCallback(async () => {
+        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+        
+        if (!isDirtyRef.current || !projectDataRef.current || isSavingRef.current) {
+            return;
         }
-        isDirtyRef.current = false;
-        setSaveStatus('saved');
-    } catch (error) {
-        console.error(`Error saving project to ${storageMode}:`, error);
-        setSaveStatus('unsaved'); // Revert to unsaved on error
-    }
-  }, [storageMode, storage]);
+
+        isSavingRef.current = true;
+        setSaveStatus('saving');
+        try {
+            const dataToSave = projectDataRef.current;
+            if (storageMode === 'drive') {
+                await storage.saveToDrive(dataToSave);
+            } else if (storageMode === 'local') {
+                await set(LOCAL_BACKUP_KEY, dataToSave);
+                await storage.saveToFileHandle(dataToSave);
+            }
+            isDirtyRef.current = false;
+            setSaveStatus('saved');
+        } catch (error) {
+            console.error(`Error saving project to ${storageMode}:`, error);
+            setSaveStatus('unsaved');
+        } finally {
+            isSavingRef.current = false;
+        }
+    }, [storageMode, storage]);
   
   const setProjectDataAndMarkDirty = useCallback((updater: React.SetStateAction<ProjectData | null>) => {
     setProjectData(prevData => {
@@ -134,14 +144,14 @@ export function useProject() {
         if (saveTimeoutRef.current) {
             clearTimeout(saveTimeoutRef.current);
         }
-        saveTimeoutRef.current = window.setTimeout(saveProject, 500); // 0.5-second debounce
+        saveTimeoutRef.current = window.setTimeout(saveProject, 1000); // 1-second debounce
     }
     return () => {
         if (saveTimeoutRef.current) {
             clearTimeout(saveTimeoutRef.current);
         }
     };
-  }, [projectData, saveStatus, saveProject]);
+  }, [saveStatus, saveProject]);
 
   // Effect to revert 'saved' status to 'idle'
   useEffect(() => {
@@ -150,6 +160,18 @@ export function useProject() {
           return () => clearTimeout(timeoutId);
       }
   }, [saveStatus]);
+    
+    const flushChanges = useCallback(async () => {
+        // This function immediately triggers a save if there are pending changes,
+        // and waits for it to complete. It's used before closing or downloading.
+        if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current);
+            saveTimeoutRef.current = null;
+        }
+        if (isDirtyRef.current) {
+            await saveProject();
+        }
+    }, [saveProject]);
 
   const resetState = useCallback(() => {
     setProjectData(null);
@@ -162,11 +184,11 @@ export function useProject() {
   
   const signOut = useCallback(async () => {
     setStatus('loading');
-    if (isDirtyRef.current) await saveProject();
+    await flushChanges();
     await storage.signOut();
     resetState();
     setStatus('welcome');
-  }, [saveProject, storage, resetState]);
+  }, [flushChanges, storage, resetState]);
   
   const handleDriveProject = (driveProject: { name: string, data: any } | null) => {
     if (driveProject) {
@@ -341,8 +363,7 @@ export function useProject() {
   }, [storage]);
   
   const closeProject = useCallback(async () => {
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    if (isDirtyRef.current) await saveProject();
+    await flushChanges();
 
     if (storageMode === 'local') {
         await storage.clearHandleFromIdb();
@@ -350,11 +371,10 @@ export function useProject() {
     }
     resetState();
     setStatus('welcome');
-  }, [saveProject, storageMode, storage, resetState]);
+  }, [flushChanges, storageMode, storage, resetState]);
   
   const downloadProject = useCallback(async () => {
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    if (isDirtyRef.current) await saveProject();
+    await flushChanges();
 
     if (!projectDataRef.current) return;
     const blob = new Blob([JSON.stringify(projectDataRef.current, null, 2)], { type: 'application/json' });
@@ -365,7 +385,7 @@ export function useProject() {
     a.click();
     URL.revokeObjectURL(url);
     a.remove();
-  }, [saveProject, projectName]);
+  }, [flushChanges, projectName]);
 
   const uploadProjectToDrive = useCallback(async () => {
         if (!projectDataRef.current) return;
