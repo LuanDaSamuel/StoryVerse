@@ -1,15 +1,58 @@
-
-
 import React, { useState, useContext } from 'react';
-// FIX: Changed react-router-dom import to namespace import to fix module resolution issues.
-import * as ReactRouterDOM from 'react-router-dom';
-import { AppLogoIcon, HomeIcon, PlusIcon, SettingsIcon, LightbulbIcon, QuillPenIcon } from './Icons';
+import { NavLink } from 'react-router-dom';
+import { AppLogoIcon, HomeIcon, PlusIcon, SettingsIcon, LightbulbIcon, QuillPenIcon, LoadingIcon, CloudIcon, CheckIcon } from './Icons';
 import SettingsModal from './SettingsModal';
 import { ProjectContext } from '../contexts/ProjectContext';
 
 interface SidebarProps {
     onLinkClick?: () => void;
 }
+
+const SaveStatusIndicator: React.FC = () => {
+    // FIX: Destructure 'theme' from context to use for conditional styling.
+    const { storageMode, theme, themeClasses, saveStatus } = useContext(ProjectContext);
+
+    if (!storageMode) {
+        return null;
+    }
+
+    switch (saveStatus) {
+        case 'saving':
+            return (
+                <div className={`flex items-center space-x-2 text-xs ${themeClasses.textSecondary}`}>
+                    <LoadingIcon className={`w-4 h-4 animate-spin`} />
+                    <span>Saving...</span>
+                </div>
+            );
+        case 'unsaved':
+            // FIX: Use 'theme' from context instead of 'themeClasses.theme'.
+            const unsavedColor = theme === 'dark' ? 'text-amber-400' : 'text-amber-600';
+            return (
+                <div className={`flex items-center space-x-2 text-xs font-semibold ${unsavedColor}`}>
+                    <span>Unsaved changes</span>
+                </div>
+            );
+        case 'saved':
+            // FIX: Use 'theme' from context instead of 'themeClasses.theme'.
+            const savedColor = theme === 'dark' ? 'text-green-400' : 'text-green-700';
+            return (
+                <div className={`flex items-center space-x-2 text-xs font-semibold ${savedColor}`}>
+                    <CheckIcon className={`w-4 h-4`} />
+                    <span>Saved</span>
+                </div>
+            );
+        case 'idle':
+        default:
+            const Icon = storageMode === 'drive' ? CloudIcon : CheckIcon;
+            const text = storageMode === 'drive' ? "Saved to Drive" : "Saved Locally";
+            return (
+                <div className={`flex items-center space-x-2 text-xs ${themeClasses.textSecondary}`}>
+                    <Icon className={`w-4 h-4`} />
+                    <span>{text}</span>
+                </div>
+            );
+    }
+};
 
 const Sidebar: React.FC<SidebarProps> = ({ onLinkClick = () => {} }) => {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -40,18 +83,22 @@ const Sidebar: React.FC<SidebarProps> = ({ onLinkClick = () => {} }) => {
                     <span className="text-xl font-bold">StoryVerse</span>
                 </div>
                 <nav className="flex-1 p-4 space-y-2">
-                    <ReactRouterDOM.NavLink to="/" className={navLinkClasses} onClick={onLinkClick}>
+                    <NavLink to="/" className={navLinkClasses} onClick={onLinkClick}>
                         <HomeIcon className="w-5 h-5" />
                         <span>Home page</span>
-                    </ReactRouterDOM.NavLink>
-                    <ReactRouterDOM.NavLink to="/create-novel" className={navLinkClasses} onClick={onLinkClick}>
+                    </NavLink>
+                    <NavLink to="/create-novel" className={navLinkClasses} onClick={onLinkClick}>
                         <PlusIcon className="w-5 h-5" />
                         <span>Create Novel</span>
-                    </ReactRouterDOM.NavLink>
-                    <ReactRouterDOM.NavLink to="/demos" className={navLinkClasses} onClick={onLinkClick}>
+                    </NavLink>
+                    <NavLink to="/demos" className={navLinkClasses} onClick={onLinkClick}>
                         <LightbulbIcon className="w-5 h-5" />
                         <span>Idea Box</span>
-                    </ReactRouterDOM.NavLink>
+                    </NavLink>
+                    <NavLink to="/sketches" className={navLinkClasses} onClick={onLinkClick}>
+                        <QuillPenIcon className="w-5 h-5" />
+                        <span>Sketches</span>
+                    </NavLink>
                 </nav>
 
                 {userProfile && (
@@ -70,11 +117,14 @@ const Sidebar: React.FC<SidebarProps> = ({ onLinkClick = () => {} }) => {
                 )}
 
                 <div className="p-4 border-t border-inherit">
-                    <button onClick={() => setIsSettingsOpen(true)} className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${sidebarTextColor} hover:${themeClasses.bgTertiary}`}>
+                    <div className="h-5">
+                        <SaveStatusIndicator />
+                    </div>
+                    <button onClick={() => setIsSettingsOpen(true)} className={`mt-2 w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${sidebarTextColor} hover:${themeClasses.bgTertiary}`}>
                         <SettingsIcon className="w-5 h-5" />
                         <span>Settings</span>
                     </button>
-                    <p className={`mt-6 text-xs text-center ${themeClasses.textSecondary}`}>
+                    <p className={`mt-4 text-xs text-center ${themeClasses.textSecondary}`}>
                         &copy; {new Date().getFullYear()} StoryVerse
                     </p>
                 </div>

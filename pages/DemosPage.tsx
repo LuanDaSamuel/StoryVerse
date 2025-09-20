@@ -1,7 +1,5 @@
-
 import React, { useContext, useMemo, useRef, useState } from 'react';
-// FIX: Changed react-router-dom import to namespace import to fix module resolution issues.
-import * as ReactRouterDOM from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { StoryIdea } from '../types';
 import { PlusIcon, UploadIcon, BackIcon, TrashIcon } from '../components/Icons';
@@ -9,10 +7,9 @@ import ConfirmModal from '../components/ConfirmModal';
 import { enhancePlainText } from '../constants';
 import * as mammoth from 'mammoth';
 
-// FIX: Removed React.FC type, which is discouraged and was causing a type error.
 const DemosPage = () => {
     const { projectData, setProjectData, themeClasses } = useContext(ProjectContext);
-    const navigate = ReactRouterDOM.useNavigate();
+    const navigate = useNavigate();
     const [isDocxConfirmOpen, setIsDocxConfirmOpen] = useState(false);
     const [pendingImportData, setPendingImportData] = useState<{ title: string; synopsisHtml: string; originalFilename: string } | null>(null);
     const docxInputRef = useRef<HTMLInputElement>(null);
@@ -112,7 +109,6 @@ const DemosPage = () => {
                     storyIdeas: [newIdea, ...currentData.storyIdeas],
                 };
             });
-        // FIX: Corrected syntax for catch block from `catch() => {}` to `catch() {}`
         } catch (error) {
             console.error(`Error importing file:`, error);
             alert(`Failed to import the story idea.`);
@@ -181,10 +177,10 @@ const DemosPage = () => {
                         <p className={`${themeClasses.accentText} opacity-80 mb-6`}>
                             Click 'New Idea' to capture your first story concept, or import an idea from a DOCX file.
                         </p>
-                        <ReactRouterDOM.Link to="/" className={`inline-flex items-center space-x-2 px-4 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}>
+                        <Link to="/" className={`inline-flex items-center space-x-2 px-4 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}>
                             <BackIcon className="w-5 h-5" />
                             <span>Go to Home page</span>
-                        </ReactRouterDOM.Link>
+                        </Link>
                     </div>
                 </div>
             ) : (

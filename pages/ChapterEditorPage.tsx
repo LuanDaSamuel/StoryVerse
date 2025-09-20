@@ -1,7 +1,5 @@
-
 import React, { useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
-// FIX: Changed react-router-dom import to namespace import to fix module resolution issues.
-import * as ReactRouterDOM from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { BackIcon, BookOpenIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, TextIcon, SearchIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, CloseIcon, Bars3Icon, DownloadIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon } from '../components/Icons';
 import { enhancePlainText, enhanceHtml, THEME_CONFIG } from '../constants';
@@ -39,13 +37,13 @@ const ChapterListModal: React.FC<{
                     <ul className="space-y-1">
                         {novel.chapters.map(c => (
                             <li key={c.id}>
-                                <ReactRouterDOM.Link
+                                <Link
                                     to={`/novel/${novel.id}/edit/${c.id}`}
                                     onClick={onClose}
                                     className={`block w-full text-left px-3 py-2 rounded-md transition-colors ${c.id === currentChapterId ? `${themeClasses.bgTertiary}` : `hover:${themeClasses.bgTertiary}`}`}
                                 >
                                     {enhancePlainText(c.title || 'Untitled Chapter')}
-                                </ReactRouterDOM.Link>
+                                </Link>
                             </li>
                         ))}
                     </ul>
@@ -317,8 +315,8 @@ const FindReplaceModal: React.FC<{
 
 // --- Main Page Component ---
 const ChapterEditorPage: React.FC = () => {
-    const { novelId, chapterId } = ReactRouterDOM.useParams<{ novelId: string; chapterId: string }>();
-    const navigate = ReactRouterDOM.useNavigate();
+    const { novelId, chapterId } = useParams<{ novelId: string; chapterId: string }>();
+    const navigate = useNavigate();
     const { projectData, setProjectData, theme, themeClasses } = useContext(ProjectContext);
     
     const editorRef = useRef<HTMLDivElement>(null);

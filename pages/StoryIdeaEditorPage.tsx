@@ -1,8 +1,5 @@
-
-
 import React, { useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
-// FIX: Changed react-router-dom import to namespace import to fix module resolution issues.
-import * as ReactRouterDOM from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { BackIcon, ChevronLeftIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, TrashIcon, H1Icon, H2Icon, H3Icon, TextIcon, ChevronDownIcon } from '../components/Icons';
 import { enhanceHtml, enhancePlainText, SKETCH_TAG_OPTIONS, THEME_CONFIG } from '../constants';
@@ -43,8 +40,8 @@ const ToolbarDropdown: React.FC<ToolbarDropdownProps> = ({ label, value, onChang
 
 
 const StoryIdeaEditorPage: React.FC = () => {
-    const { ideaId } = ReactRouterDOM.useParams<{ ideaId: string }>();
-    const navigate = ReactRouterDOM.useNavigate();
+    const { ideaId } = useParams<{ ideaId: string }>();
+    const navigate = useNavigate();
     const { projectData, setProjectData, theme, themeClasses } = useContext(ProjectContext);
     
     const editorRef = useRef<HTMLDivElement>(null);

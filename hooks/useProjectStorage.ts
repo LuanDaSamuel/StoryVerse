@@ -1,21 +1,20 @@
-
 import { useCallback, useRef } from 'react';
-import { get, set, del } from 'idb-keyval';
+import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
 import { ProjectData, UserProfile } from '../types';
 
 // --- Constants ---
 const PROJECT_FILE_HANDLE_KEY = 'storyverse-project-file-handle';
 export const DRIVE_PROJECT_FILENAME = 'StoryVerse-Project.json';
+const GAPI_AUTH_TOKEN_KEY = 'storyverse-gapi-auth-token';
+const DRIVE_FILE_ID_KEY = 'storyverse-drive-file-id';
+const CLIENT_ID = '54041417021-36ab4qaddnugncdodmpbafss1rjvttak.apps.googleusercontent.com';
+const API_KEY = 'AIzaSyBZ-CWnQ9-Jm4Y6kRpCXPDRXMH4S-zCVh8';
+const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email';
 
-// --- Type definitions for Google APIs ---
+// --- Type definitions ---
 declare const google: any;
 declare const gapi: any;
-
-interface TokenResponse {
-  access_token: string;
-  expires_in: number;
-  scope: string;
-}
+type TokenResponse = any;
 
 // --- Helper Functions ---
 async function verifyPermission(handle: FileSystemHandle) {
@@ -26,160 +25,246 @@ async function verifyPermission(handle: FileSystemHandle) {
 }
 
 export function useProjectStorage() {
-    const projectFileHandleRef = useRef<FileSystemFileHandle | null>(null);
     const driveFileIdRef = useRef<string | null>(null);
-    const gapiTokenClient = useRef<any>(null);
-
-    // --- Google Drive API Functions ---
-    
-    const loadFromDrive = useCallback(async (): Promise<{ fileId: string, name: string, data: ProjectData } | null> => {
-        const response = await gapi.client.drive.files.list({
-            'q': `name='${DRIVE_PROJECT_FILENAME}' and trashed=false`,
-            'fields': 'files(id, name)',
-            'spaces': 'drive'
-        });
-
-        if (response.result.files && response.result.files.length > 0) {
-            const file = response.result.files[0];
-            driveFileIdRef.current = file.id;
-            
-            const fileContentResponse = await gapi.client.drive.files.get({
-                fileId: file.id,
-                alt: 'media'
-            });
-            
-            return { fileId: file.id, name: file.name, data: fileContentResponse.result };
-        }
-        return null;
-    }, []);
-
-    const saveToDrive = useCallback(async (data: ProjectData) => {
-        if (!driveFileIdRef.current) {
-            throw new Error("No Google Drive file ID available for saving.");
-        }
-        
-        const boundary = '-------314159265358979323846';
-        const delimiter = `\r\n--${boundary}\r\n`;
-        const close_delim = `\r\n--${boundary}--`;
-        
-        // An empty metadata part is needed for the multipart request.
-        const metadata = {};
-
-        const multipartRequestBody =
-            delimiter + 'Content-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify(metadata) +
-            delimiter + 'Content-Type: application/json\r\n\r\n' + JSON.stringify(data, null, 2) +
-            close_delim;
-            
-        await gapi.client.request({
-            path: `/upload/drive/v3/files/${driveFileIdRef.current}`,
-            method: 'PATCH',
-            params: { uploadType: 'multipart' },
-            headers: { 'Content-Type': `multipart/related; boundary="${boundary}"` },
-            body: multipartRequestBody
-        });
-    }, []);
+    const projectFileHandleRef = useRef<FileSystemFileHandle | null>(null);
 
     const createOnDrive = useCallback(async (data: ProjectData): Promise<{ fileId: string, name: string }> => {
+        console.log("Creating new file on Google Drive...");
         const boundary = '-------314159265358979323846';
-        const delimiter = `\r\n--${boundary}\r\n`;
-        const close_delim = `\r\n--${boundary}--`;
-        
-        const metadata = {
-            name: DRIVE_PROJECT_FILENAME,
-            mimeType: 'application/json',
-        };
+        const delimiter = "\r\n--" + boundary + "\r\n";
+        const close_delim = "\r\n--" + boundary + "--";
+
+        const metadata = { name: DRIVE_PROJECT_FILENAME, mimeType: 'application/json' };
 
         const multipartRequestBody =
-            delimiter + 'Content-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify(metadata) +
-            delimiter + 'Content-Type: application/json\r\n\r\n' + JSON.stringify(data, null, 2) +
+            delimiter +
+            'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+            JSON.stringify(metadata) +
+            delimiter +
+            'Content-Type: application/json\r\n\r\n' +
+            JSON.stringify(data, null, 2) +
             close_delim;
-            
+
         const response = await gapi.client.request({
-            path: '/upload/drive/v3/files',
+            path: 'https://www.googleapis.com/upload/drive/v3/files',
             method: 'POST',
             params: { uploadType: 'multipart' },
-            headers: { 'Content-Type': `multipart/related; boundary="${boundary}"` },
+            headers: { 'Content-Type': 'multipart/related; boundary="' + boundary + '"' },
             body: multipartRequestBody
         });
 
+        if (!response.result.id) {
+            throw new Error("File creation failed: No ID returned from Drive API.");
+        }
+        
+        console.log("File created successfully on Drive:", response.result);
         driveFileIdRef.current = response.result.id;
+        await idbSet(DRIVE_FILE_ID_KEY, response.result.id);
         return { fileId: response.result.id, name: response.result.name };
     }, []);
 
-    // --- Auth Functions ---
-    const signIn = useCallback(() => {
-        if (gapiTokenClient.current) {
-            gapiTokenClient.current.requestAccessToken({});
+    const saveToDrive = useCallback(async (data: ProjectData) => {
+        const fileId = driveFileIdRef.current || await idbGet<string>(DRIVE_FILE_ID_KEY);
+        if (!fileId) {
+            console.log("No Drive file ID found locally, creating a new file...");
+            await createOnDrive(data);
+            console.log("New file created on Drive.");
+        } else {
+            driveFileIdRef.current = fileId;
+            console.log(`Updating existing Drive file with multipart upload: ${fileId}`);
+            try {
+                const boundary = '-------314159265358979323846';
+                const delimiter = "\r\n--" + boundary + "\r\n";
+                const close_delim = "\r\n--" + boundary + "--";
+    
+                // For a content-only update, the metadata part is empty.
+                const metadata = {};
+    
+                const multipartRequestBody =
+                    delimiter +
+                    'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+                    JSON.stringify(metadata) +
+                    delimiter +
+                    'Content-Type: application/json\r\n\r\n' +
+                    JSON.stringify(data, null, 2) +
+                    close_delim;
+                
+                await gapi.client.request({
+                    path: `https://www.googleapis.com/upload/drive/v3/files/${fileId}`,
+                    method: 'PATCH',
+                    params: { uploadType: 'multipart' },
+                    headers: { 'Content-Type': 'multipart/related; boundary="' + boundary + '"' },
+                    body: multipartRequestBody
+                });
+    
+                console.log("File updated successfully via multipart.");
+            } catch (error: any) {
+                console.error("Failed to update Drive file:", error);
+                // If the file was not found (e.g., deleted by the user), create a new one.
+                if (error.status === 404) {
+                    console.log("File not found on Drive, creating a new one.");
+                    await idbDel(DRIVE_FILE_ID_KEY); // Clear the stale ID
+                    driveFileIdRef.current = null;
+                    await createOnDrive(data);
+                } else {
+                    throw error; // Re-throw other errors
+                }
+            }
         }
+    }, [createOnDrive]);
+
+    const loadFromDrive = useCallback(async (): Promise<{ name: string, data: ProjectData } | null> => {
+        // First, try to load using a stored file ID for efficiency and robustness.
+        const storedFileId = await idbGet<string>(DRIVE_FILE_ID_KEY);
+        if (storedFileId) {
+            console.log(`Attempting to load project file from stored ID: ${storedFileId}`);
+            try {
+                const fileMetadata = await gapi.client.request({
+                    path: `https://www.googleapis.com/drive/v3/files/${storedFileId}`,
+                    params: { fields: 'id, name, trashed' }
+                });
+
+                if (fileMetadata.result && !fileMetadata.result.trashed) {
+                    const contentResponse = await gapi.client.request({
+                        path: `https://www.googleapis.com/drive/v3/files/${storedFileId}`,
+                        params: { alt: 'media' }
+                    });
+                    driveFileIdRef.current = storedFileId;
+                    console.log(`Successfully loaded file from stored ID.`);
+                    return { name: fileMetadata.result.name, data: contentResponse.result };
+                } else {
+                    console.log("Stored file ID was trashed or invalid. Clearing it.");
+                    await idbDel(DRIVE_FILE_ID_KEY);
+                }
+            } catch (error: any) {
+                 console.error("Failed to load file from stored ID, it might have been deleted. Clearing ID.", error);
+                 await idbDel(DRIVE_FILE_ID_KEY);
+            }
+        }
+
+        // If loading by ID fails, fall back to searching by name.
+        console.log("Searching for project file by name on Google Drive...");
+        const listResponse = await gapi.client.request({
+            path: 'https://www.googleapis.com/drive/v3/files',
+            params: {
+                q: `name='${DRIVE_PROJECT_FILENAME}' and trashed=false`,
+                fields: 'files(id, name)',
+                spaces: 'drive'
+            }
+        });
+
+        if (listResponse.result.files && listResponse.result.files.length > 0) {
+            const file = listResponse.result.files[0];
+            console.log(`Found project file by name with ID: ${file.id}`);
+            driveFileIdRef.current = file.id;
+            await idbSet(DRIVE_FILE_ID_KEY, file.id); // Store the found ID for next time
+            
+            const contentResponse = await gapi.client.request({
+                path: `https://www.googleapis.com/drive/v3/files/${file.id}`,
+                params: { alt: 'media' }
+            });
+
+            return { name: file.name, data: contentResponse.result };
+        }
+        console.log("No project file found on Google Drive.");
+        return null;
     }, []);
 
-    const signOut = useCallback(() => {
-        const token = gapi.client.getToken();
-        if (token) {
-            google.accounts.oauth2.revoke(token.access_token, () => {});
+    const signIn = useCallback(async (): Promise<UserProfile> => {
+      return new Promise((resolve, reject) => {
+        try {
+            const tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID,
+                scope: SCOPES,
+                callback: async (tokenResponse: TokenResponse) => {
+                    if (tokenResponse && tokenResponse.access_token) {
+                        await idbSet(GAPI_AUTH_TOKEN_KEY, tokenResponse);
+                        gapi.client.setToken(tokenResponse);
+                        const userInfo = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                            headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+                        }).then(res => res.json());
+                        const profile = { name: userInfo.name, email: userInfo.email, picture: userInfo.picture };
+                        resolve(profile);
+                    } else {
+                        reject(new Error("Sign in failed: No access token received."));
+                    }
+                },
+                error_callback: (error: any) => {
+                    console.error("Google Sign-In Error:", error);
+                    reject(new Error(`Sign in failed: ${error.type || 'Unknown error'}`));
+                }
+            });
+            tokenClient.requestAccessToken({ prompt: 'consent' });
+        } catch (error) {
+            reject(error);
+        }
+      });
+    }, []);
+
+    const signOut = useCallback(async () => {
+        const token = gapi.client?.getToken();
+        if (token && token.access_token) {
+            google.accounts.oauth2.revoke(token.access_token, () => {
+                console.log('Google token revoked.');
+            });
+        }
+        if (gapi.client) {
             gapi.client.setToken('');
         }
+        await idbDel(GAPI_AUTH_TOKEN_KEY);
+        await idbDel(DRIVE_FILE_ID_KEY);
         driveFileIdRef.current = null;
+        google.accounts.id.disableAutoSelect();
+        console.log('User signed out and session data cleared.');
     }, []);
     
-    const initializeGapiClient = useCallback((onAuthSuccess: (profile: UserProfile) => void) => {
-        const initGis = () => {
+    const initAndRestoreSession = useCallback(async (): Promise<UserProfile | null> => {
+        console.log("Initializing GAPI client and attempting to restore session...");
+        await new Promise<void>((resolve, reject) => gapi.load('client', () => resolve()));
+        await gapi.client.init({ apiKey: API_KEY }).catch((err: any) => {
+            console.error("GAPI client init failed:", err);
+            throw new Error(`Initialization failed:\n${err.details || 'Unknown error.'}`);
+        });
+
+        const token = await idbGet<TokenResponse>(GAPI_AUTH_TOKEN_KEY);
+        if (token && token.access_token) {
+            console.log("Found saved auth token, verifying...");
+            gapi.client.setToken(token);
             try {
-                gapiTokenClient.current = google.accounts.oauth2.initTokenClient({
-                    client_id: '54041417021-36ab4qaddnugncdodmpbafss1rjvttak.apps.googleusercontent.com',
-                    scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
-                    callback: async (tokenResponse: TokenResponse) => {
-                        if (tokenResponse && tokenResponse.access_token) {
-                            gapi.client.setToken(tokenResponse);
-                            const userInfo = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-                                headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-                            }).then(res => res.json());
-
-                            const profile = { name: userInfo.name, email: userInfo.email, picture: userInfo.picture };
-                            onAuthSuccess(profile);
-                        }
-                    },
+                // Verify the token is still valid by making a lightweight API call
+                const userInfo = await gapi.client.request({
+                    path: 'https://www.googleapis.com/oauth2/v3/userinfo'
                 });
-            } catch (error) {
-                console.error("Error initializing Google Identity Services", error);
+
+                if (userInfo.result && userInfo.result.email) {
+                    console.log("Session restored successfully for:", userInfo.result.email);
+                    return { name: userInfo.result.name, email: userInfo.result.email, picture: userInfo.result.picture };
+                } else {
+                    console.warn("Token verification failed, user info was invalid.", userInfo);
+                    await signOut();
+                    return null;
+                }
+            } catch (error: any) {
+                console.warn("Restoring session failed, token is likely expired or invalid. Signing out.", error);
+                await signOut();
+                return null;
             }
-        };
-
-        const initGapi = () => {
-            gapi.load('client', async () => {
-                await gapi.client.init({
-                    apiKey: 'AIzaSyBZ-CWnQ9-Jm4Y6kRpCXPDRXMH4S-zCVh8',
-                    discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
-                });
-                initGis();
-            });
-        };
-
-        const checkApisLoaded = setInterval(() => {
-            if (typeof google !== 'undefined' && typeof gapi !== 'undefined') {
-                clearInterval(checkApisLoaded);
-                initGapi();
-            }
-        }, 100);
-    }, []);
-
+        }
+        console.log("No saved session found.");
+        return null;
+    }, [signOut]);
 
     // --- Local File System Functions ---
-    const getHandleFromIdb = useCallback(async () => {
-        return await get<FileSystemFileHandle>(PROJECT_FILE_HANDLE_KEY);
-    }, []);
-
-    const saveHandleToIdb = useCallback(async (handle: FileSystemFileHandle) => {
+    const getHandleFromIdb = async () => idbGet<FileSystemFileHandle>(PROJECT_FILE_HANDLE_KEY);
+    const saveHandleToIdb = async (handle: FileSystemFileHandle) => {
         projectFileHandleRef.current = handle;
-        await set(PROJECT_FILE_HANDLE_KEY, handle);
-    }, []);
-    
-    const clearHandleFromIdb = useCallback(async () => {
+        await idbSet(PROJECT_FILE_HANDLE_KEY, handle);
+    };
+    const clearHandleFromIdb = async () => {
         projectFileHandleRef.current = null;
-        await del(PROJECT_FILE_HANDLE_KEY);
-    }, []);
-
-    const loadFromFileHandle = useCallback(async (handle: FileSystemFileHandle): Promise<{ name: string; data: any } | null> => {
+        await idbDel(PROJECT_FILE_HANDLE_KEY);
+    };
+    const loadFromFileHandle = async (handle: FileSystemFileHandle): Promise<{ name: string; data: any } | null> => {
         if (await verifyPermission(handle)) {
             projectFileHandleRef.current = handle;
             const file = await handle.getFile();
@@ -187,32 +272,26 @@ export function useProjectStorage() {
             return { name: handle.name, data: JSON.parse(content) };
         }
         return null;
-    }, []);
-
-    const saveToFileHandle = useCallback(async (data: ProjectData) => {
-        if (!projectFileHandleRef.current) {
-            throw new Error("Save failed: No file handle is available. Please open the project file again.");
-        }
-        
-        if (await verifyPermission(projectFileHandleRef.current)) {
-            const writable = await projectFileHandleRef.current.createWritable();
+    };
+    const saveToFileHandle = async (data: ProjectData) => {
+        const handle = projectFileHandleRef.current ?? await getHandleFromIdb();
+        if (handle && await verifyPermission(handle)) {
+            projectFileHandleRef.current = handle;
+            const writable = await handle.createWritable();
             await writable.write(JSON.stringify(data, null, 2));
             await writable.close();
         } else {
-            throw new Error("Save failed: Permission to write to the file was denied.");
+             console.error("No file handle available or permission denied.");
         }
-    }, []);
+    };
 
     return {
-        // Drive
+        initAndRestoreSession,
+        signIn,
+        signOut,
         loadFromDrive,
         saveToDrive,
         createOnDrive,
-        // Auth
-        initializeGapiClient,
-        signIn,
-        signOut,
-        // Local
         getHandleFromIdb,
         saveHandleToIdb,
         clearHandleFromIdb,

@@ -1,9 +1,5 @@
-
-
-
 import React, { useMemo, useContext, useEffect, useRef, useState } from 'react';
-// FIX: Changed react-router-dom import to namespace import to fix module resolution issues.
-import * as ReactRouterDOM from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, useParams, useNavigate, useMatch } from 'react-router-dom';
 import { useProject } from './hooks/useProjectFile';
 import { ProjectContext } from './contexts/ProjectContext';
 import WelcomeScreen from './components/WelcomeScreen';
@@ -15,39 +11,40 @@ import NovelDetailPage from './pages/NovelDetailPage';
 import ReadNovelPage from './pages/ReadNovelPage';
 import DemosPage from './pages/DemosPage';
 import StoryIdeaEditorPage from './pages/StoryIdeaEditorPage';
+import SketchesPage from './pages/SketchesPage'; // Import the new Sketches page
 import { THEME_CONFIG } from './constants';
 import { LoadingIcon, Bars3Icon, DocumentPlusIcon, UploadIcon, CloudIcon } from './components/Icons';
 import { Theme } from './types';
 
 const NovelEditRedirect = () => {
-    const { novelId } = ReactRouterDOM.useParams<{ novelId: string }>();
+    const { novelId } = useParams<{ novelId: string }>();
     const { projectData } = useContext(ProjectContext);
 
     if (!projectData || !novelId) {
-        return <ReactRouterDOM.Navigate to="/" replace />; 
+        return <Navigate to="/" replace />; 
     }
 
     const novel = projectData.novels.find(n => n.id === novelId);
     
     if (!novel) {
         // Novel was not found, safely redirect to home.
-        return <ReactRouterDOM.Navigate to="/" replace />;
+        return <Navigate to="/" replace />;
     }
 
     if (novel.chapters.length === 0) {
         // If novel has no chapters, redirect to novel detail page.
-        return <ReactRouterDOM.Navigate to={`/novel/${novelId}`} replace />;
+        return <Navigate to={`/novel/${novelId}`} replace />;
     }
 
     const firstChapterId = novel.chapters[0].id;
-    return <ReactRouterDOM.Navigate to={`/novel/${novelId}/edit/${firstChapterId}`} replace />;
+    return <Navigate to={`/novel/${novelId}/edit/${firstChapterId}`} replace />;
 };
 
 const AppContent = () => {
     const project = useProject();
     
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-    const navigate = ReactRouterDOM.useNavigate();
+    const navigate = useNavigate();
     const initialLoadHandled = useRef(false);
 
     // This effect handles redirecting to the home page on initial load or after import.
@@ -74,9 +71,9 @@ const AppContent = () => {
         themeClasses,
     }), [project, theme, themeClasses]);
 
-    const onEditPage = ReactRouterDOM.useMatch('/novel/:novelId/edit/:chapterId');
-    const onReadPage = ReactRouterDOM.useMatch('/novel/:novelId/read/:chapterId?');
-    const onIdeaEditPage = ReactRouterDOM.useMatch('/idea/:ideaId/edit');
+    const onEditPage = useMatch('/novel/:novelId/edit/:chapterId');
+    const onReadPage = useMatch('/novel/:novelId/read/:chapterId?');
+    const onIdeaEditPage = useMatch('/idea/:ideaId/edit');
     const isSidebarPermanentlyHidden = !!onEditPage || !!onReadPage || !!onIdeaEditPage;
 
     const renderContent = () => {
@@ -105,7 +102,6 @@ const AppContent = () => {
                             </p>
                             <div className="flex flex-col sm:flex-row gap-4 justify-center">
                             <button
-                                // FIX: Wrapped project.createProjectOnDrive in an arrow function to prevent passing the click event as an argument, which caused a type mismatch.
                                 onClick={() => project.createProjectOnDrive()}
                                 className={`flex items-center justify-center w-full sm:w-auto px-6 py-3 text-lg font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}
                             >
@@ -204,16 +200,17 @@ const AppContent = () => {
                                 </header>
                             )}
 
-                            <ReactRouterDOM.Routes>
-                                <ReactRouterDOM.Route path="/" element={<HomePage />} />
-                                <ReactRouterDOM.Route path="/create-novel" element={<CreateNovelPage />} />
-                                <ReactRouterDOM.Route path="/demos" element={<DemosPage />} />
-                                <ReactRouterDOM.Route path="/idea/:ideaId/edit" element={<StoryIdeaEditorPage />} />
-                                <ReactRouterDOM.Route path="/novel/:novelId" element={<NovelDetailPage />} />
-                                <ReactRouterDOM.Route path="/novel/:novelId/read/:chapterId?" element={<ReadNovelPage />} />
-                                <ReactRouterDOM.Route path="/novel/:novelId/edit" element={<NovelEditRedirect />} />
-                                <ReactRouterDOM.Route path="/novel/:novelId/edit/:chapterId" element={<ChapterEditorPage />} />
-                            </ReactRouterDOM.Routes>
+                            <Routes>
+                                <Route path="/" element={<HomePage />} />
+                                <Route path="/create-novel" element={<CreateNovelPage />} />
+                                <Route path="/demos" element={<DemosPage />} />
+                                <Route path="/sketches" element={<SketchesPage />} />
+                                <Route path="/idea/:ideaId/edit" element={<StoryIdeaEditorPage />} />
+                                <Route path="/novel/:novelId" element={<NovelDetailPage />} />
+                                <Route path="/novel/:novelId/read/:chapterId?" element={<ReadNovelPage />} />
+                                <Route path="/novel/:novelId/edit" element={<NovelEditRedirect />} />
+                                <Route path="/novel/:novelId/edit/:chapterId" element={<ChapterEditorPage />} />
+                            </Routes>
                         </main>
                     </div>
                 );
@@ -235,9 +232,9 @@ const AppContent = () => {
 function App(): React.ReactNode {
   return (
     <React.StrictMode>
-      <ReactRouterDOM.HashRouter>
+      <HashRouter>
         <AppContent />
-      </ReactRouterDOM.HashRouter>
+      </HashRouter>
     </React.StrictMode>
   );
 }

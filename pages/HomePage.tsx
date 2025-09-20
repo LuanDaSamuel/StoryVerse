@@ -1,8 +1,5 @@
-
-
 import React, { useContext } from 'react';
-// FIX: Changed react-router-dom import to namespace import to fix module resolution issues.
-import * as ReactRouterDOM from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { enhancePlainText } from '../constants';
 import { Novel } from '../types';
@@ -43,7 +40,7 @@ const HomePage = () => {
                         : `/novel/${novel.id}`;
 
                     return (
-                        <ReactRouterDOM.Link
+                        <Link
                             to={linkTo}
                             key={novel.id}
                             className={`group relative flex flex-col rounded-lg overflow-hidden transition-all duration-300 ease-in-out transform hover:-translate-y-1 hover:shadow-2xl ${themeClasses.bgSecondary}`}
@@ -80,7 +77,7 @@ const HomePage = () => {
                                     </p>
                                 </div>
                             )}
-                        </ReactRouterDOM.Link>
+                        </Link>
                     );
                 })}
             </div>

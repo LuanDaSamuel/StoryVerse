@@ -1,7 +1,5 @@
-
 import React, { useState, useContext, useRef, useEffect, useMemo } from 'react';
-// FIX: Changed react-router-dom import to namespace import to fix module resolution issues.
-import * as ReactRouterDOM from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { TAG_OPTIONS } from '../constants';
 import { Novel } from '../types';
@@ -11,7 +9,7 @@ const DRAFT_KEY = 'storyverse-novel-draft';
 
 const CreateNovelPage: React.FC = () => {
     const { setProjectData, themeClasses } = useContext(ProjectContext);
-    const navigate = ReactRouterDOM.useNavigate();
+    const navigate = useNavigate();
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [coverImage, setCoverImage] = useState<string | null>(null);
