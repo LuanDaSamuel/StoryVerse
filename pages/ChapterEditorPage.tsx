@@ -1,11 +1,53 @@
 import React, { useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
-import { BackIcon, BookOpenIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, TextIcon, SearchIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, CloseIcon, Bars3Icon, DownloadIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon } from '../components/Icons';
+import { BackIcon, BookOpenIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, TextIcon, SearchIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, CloseIcon, Bars3Icon, DownloadIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, LoadingIcon, CheckIcon, CloudIcon } from '../components/Icons';
 import { enhancePlainText, enhanceHtml, THEME_CONFIG } from '../constants';
 import ExportModal from '../components/ExportModal';
 
 // --- Reusable Components ---
+
+const SaveStatusIndicator: React.FC = () => {
+    const { storageMode, theme, themeClasses, saveStatus } = useContext(ProjectContext);
+
+    if (!storageMode) {
+        return null;
+    }
+
+    switch (saveStatus) {
+        case 'saving':
+            return (
+                <div className={`flex items-center space-x-2 text-sm font-sans ${themeClasses.textSecondary}`}>
+                    <LoadingIcon className={`w-4 h-4 animate-spin`} />
+                    <span>Saving...</span>
+                </div>
+            );
+        case 'unsaved':
+            const unsavedColor = theme === 'dark' ? 'text-amber-400' : 'text-amber-600';
+            return (
+                <div className={`flex items-center space-x-2 text-sm font-sans font-semibold ${unsavedColor}`}>
+                    <span>Unsaved changes</span>
+                </div>
+            );
+        case 'saved':
+            const savedColor = theme === 'dark' ? 'text-green-400' : 'text-green-700';
+            return (
+                <div className={`flex items-center space-x-2 text-sm font-sans font-semibold ${savedColor}`}>
+                    <CheckIcon className={`w-4 h-4`} />
+                    <span>Saved</span>
+                </div>
+            );
+        case 'idle':
+        default:
+            const Icon = storageMode === 'drive' ? CloudIcon : CheckIcon;
+            return (
+                <div className={`flex items-center space-x-2 text-sm font-sans ${themeClasses.textSecondary}`}>
+                    <Icon className={`w-4 h-4`} />
+                    <span>All changes saved</span>
+                </div>
+            );
+    }
+};
 
 const ChapterListModal: React.FC<{
     isOpen: boolean;
@@ -317,12 +359,13 @@ const FindReplaceModal: React.FC<{
 const ChapterEditorPage: React.FC = () => {
     const { novelId, chapterId } = useParams<{ novelId: string; chapterId: string }>();
     const navigate = useNavigate();
-    const { projectData, setProjectData, theme, themeClasses } = useContext(ProjectContext);
+    const { projectData, setProjectData, theme, themeClasses, saveStatus } = useContext(ProjectContext);
     
     const editorRef = useRef<HTMLDivElement>(null);
     const editorContentRef = useRef<string>("");
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const toolbarRef = useRef<HTMLDivElement>(null);
+    const saveStatusRef = useRef(saveStatus);
     
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isFindReplaceOpen, setIsFindReplaceOpen] = useState(false);
@@ -336,6 +379,26 @@ const ChapterEditorPage: React.FC = () => {
         size: '18px',
         paragraphSpacing: '1em',
     });
+
+    useEffect(() => {
+        saveStatusRef.current = saveStatus;
+    }, [saveStatus]);
+
+    useEffect(() => {
+        const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+            if (saveStatusRef.current === 'saving') {
+                const message = "Changes are still being saved. Are you sure you want to leave?";
+                event.returnValue = message; // Standard for most browsers
+                return message; // For some older browsers
+            }
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+        };
+    }, []);
 
     const cleanupEditor = useCallback(() => {
         if (!editorRef.current) return;
@@ -1135,11 +1198,12 @@ const ChapterEditorPage: React.FC = () => {
                 )}
                 
                 <div ref={scrollContainerRef} className="flex-1 overflow-y-auto relative">
-                     <div className={`sticky top-0 z-10 px-8 md:px-16 lg:px-24 pt-6 pb-4 ${themeClasses.bg} bg-opacity-80 backdrop-blur-sm border-b ${themeClasses.border}`}>
+                     <div className={`sticky top-0 z-10 px-8 md:px-16 lg:px-24 pt-6 pb-4 ${themeClasses.bg} bg-opacity-80 backdrop-blur-sm border-b ${themeClasses.border} flex justify-between items-center`}>
                         <button onClick={() => navigate(`/novel/${novelId}`)} className={`flex items-center space-x-2 ${themeClasses.text} opacity-70 hover:opacity-100`}>
                             <BackIcon className="w-5 h-5" />
                             <span className="font-sans">Return to Details</span>
                         </button>
+                        <SaveStatusIndicator />
                     </div>
                     
                     <div className="px-8 md:px-16 lg:px-24 pt-8 pb-48">
