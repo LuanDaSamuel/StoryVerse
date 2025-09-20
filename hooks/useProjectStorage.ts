@@ -31,19 +31,20 @@ export function useProjectStorage() {
     const createOnDrive = useCallback(async (data: ProjectData): Promise<{ fileId: string, name: string }> => {
         console.log("Creating new file on Google Drive...");
         const boundary = '-------314159265358979323846';
-        const delimiter = "\r\n--" + boundary + "\r\n";
-        const close_delim = "\r\n--" + boundary + "--";
-
         const metadata = { name: DRIVE_PROJECT_FILENAME, mimeType: 'application/json' };
 
-        const multipartRequestBody =
-            delimiter +
-            'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
-            JSON.stringify(metadata) +
-            delimiter +
-            'Content-Type: application/json\r\n\r\n' +
-            JSON.stringify(data, null, 2) +
-            close_delim;
+        const multipartRequestBody = [
+            `--${boundary}`,
+            'Content-Type: application/json; charset=UTF-8',
+            '',
+            JSON.stringify(metadata),
+            `--${boundary}`,
+            'Content-Type: application/json',
+            '',
+            JSON.stringify(data, null, 2),
+            `--${boundary}--`
+        ].join('\r\n');
+
 
         const response = await gapi.client.request({
             path: 'https://www.googleapis.com/upload/drive/v3/files',
@@ -71,33 +72,17 @@ export function useProjectStorage() {
             console.log("New file created on Drive.");
         } else {
             driveFileIdRef.current = fileId;
-            console.log(`Updating existing Drive file with multipart upload: ${fileId}`);
+            console.log(`Updating existing Drive file with media upload: ${fileId}`);
             try {
-                const boundary = '-------314159265358979323846';
-                const delimiter = "\r\n--" + boundary + "\r\n";
-                const close_delim = "\r\n--" + boundary + "--";
-    
-                // For a content-only update, the metadata part is empty.
-                const metadata = {};
-    
-                const multipartRequestBody =
-                    delimiter +
-                    'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
-                    JSON.stringify(metadata) +
-                    delimiter +
-                    'Content-Type: application/json\r\n\r\n' +
-                    JSON.stringify(data, null, 2) +
-                    close_delim;
-                
                 await gapi.client.request({
                     path: `https://www.googleapis.com/upload/drive/v3/files/${fileId}`,
                     method: 'PATCH',
-                    params: { uploadType: 'multipart' },
-                    headers: { 'Content-Type': 'multipart/related; boundary="' + boundary + '"' },
-                    body: multipartRequestBody
+                    params: { uploadType: 'media' },
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data, null, 2),
                 });
     
-                console.log("File updated successfully via multipart.");
+                console.log("File updated successfully via media upload.");
             } catch (error: any) {
                 console.error("Failed to update Drive file:", error);
                 // If the file was not found (e.g., deleted by the user), create a new one.
