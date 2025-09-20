@@ -165,10 +165,10 @@ export function useProject() {
                 clearTimeout(saveTimeoutRef.current);
             }
 
-            // Set a new timer to save after 1 second of inactivity.
+            // Set a new timer to save after a brief period of inactivity.
             saveTimeoutRef.current = window.setTimeout(() => {
                 saveProjectRef.current?.();
-            }, 1000); // 1-second delay
+            }, 300); // 0.3-second delay
         }
         return newData;
     });
