@@ -15,6 +15,11 @@ const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapi
 declare const google: any;
 declare const gapi: any;
 type TokenResponse = any;
+// Add a type for the stored token to include expiration data.
+interface StoredToken extends TokenResponse {
+    expires_at: number;
+}
+
 
 // --- Helper Functions ---
 async function verifyPermission(handle: FileSystemHandle) {
@@ -185,7 +190,11 @@ export function useProjectStorage() {
                 scope: SCOPES,
                 callback: async (tokenResponse: TokenResponse) => {
                     if (tokenResponse && tokenResponse.access_token) {
-                        await idbSet(GAPI_AUTH_TOKEN_KEY, tokenResponse);
+                        // Calculate expiration time and store it with the token.
+                        const expires_at = Date.now() + (tokenResponse.expires_in * 1000);
+                        const storedToken: StoredToken = { ...tokenResponse, expires_at };
+                        await idbSet(GAPI_AUTH_TOKEN_KEY, storedToken);
+
                         gapi.client.setToken(tokenResponse);
                         const userInfo = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
                             headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
@@ -201,7 +210,8 @@ export function useProjectStorage() {
                     reject(new Error(`Sign in failed: ${error.type || 'Unknown error'}`));
                 }
             });
-            tokenClient.requestAccessToken({ prompt: 'consent' });
+            // Remove `prompt: 'consent'` for better UX on subsequent sign-ins.
+            tokenClient.requestAccessToken();
         } catch (error) {
             reject(error);
         }
@@ -233,9 +243,10 @@ export function useProjectStorage() {
             throw new Error(`Initialization failed:\n${err.details || 'Unknown error.'}`);
         });
 
-        const token = await idbGet<TokenResponse>(GAPI_AUTH_TOKEN_KEY);
-        if (token && token.access_token) {
-            console.log("Found saved auth token, verifying...");
+        const token = await idbGet<StoredToken>(GAPI_AUTH_TOKEN_KEY);
+        // Check if token exists and has not expired.
+        if (token && token.access_token && Date.now() < token.expires_at) {
+            console.log("Found valid, non-expired auth token, verifying...");
             gapi.client.setToken(token);
             try {
                 // Verify the token is still valid by making a lightweight API call
@@ -256,8 +267,12 @@ export function useProjectStorage() {
                 await signOut();
                 return null;
             }
+        } else if (token) {
+            console.log("Found expired auth token. Clearing session.");
+            await signOut();
         }
-        console.log("No saved session found.");
+        
+        console.log("No valid session found.");
         return null;
     }, [signOut]);
 
