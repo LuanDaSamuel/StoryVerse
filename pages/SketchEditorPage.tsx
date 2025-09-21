@@ -1,9 +1,9 @@
 import React, { useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
-import { BackIcon, ChevronLeftIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, TrashIcon, H1Icon, H2Icon, H3Icon, TextIcon, ChevronDownIcon, SearchIcon, LoadingIcon, CheckIcon, ExclamationTriangleIcon, CloseIcon } from '../components/Icons';
-import { enhanceHtml, enhancePlainText, SKETCH_TAG_OPTIONS, THEME_CONFIG } from '../constants';
-import { StoryIdea, StoryIdeaStatus } from '../types';
+import { BackIcon, ChevronLeftIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, TrashIcon, H1Icon, H2Icon, H3Icon, SearchIcon, LoadingIcon, CheckIcon, ExclamationTriangleIcon, CloseIcon } from '../components/Icons';
+import { enhanceHtml, enhancePlainText, SKETCH_TAG_OPTIONS } from '../constants';
+import { NovelSketch } from '../types';
 import ConfirmModal from '../components/ConfirmModal';
 
 const SaveStatusIndicator: React.FC = () => {
@@ -17,20 +17,6 @@ const SaveStatusIndicator: React.FC = () => {
         default: return null;
     }
 };
-
-const fontOptions = [
-    { name: 'Times New Roman', value: '"Times New Roman", Times, serif' }, { name: 'Arial', value: 'Arial, sans-serif' }, { name: 'Georgia', value: 'Georgia, serif' }, { name: 'Verdana', value: 'Verdana, sans-serif' },
-];
-
-const ToolbarDropdown: React.FC<{ label: string, value: string, onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void, children: React.ReactNode }> = ({ label, value, onChange, children }) => (
-    <div>
-        <label className="block text-xs font-semibold mb-1 text-white/70">{label}</label>
-        <div className="relative">
-            <select value={value} onChange={onChange} className="w-full appearance-none px-3 py-2 text-sm rounded-md bg-white/10 text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-white/50">{children}</select>
-            <ChevronDownIcon className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-white/70" />
-        </div>
-    </div>
-);
 
 const FindReplaceModal: React.FC<{ isOpen: boolean, onClose: () => void, editorRef: React.RefObject<HTMLDivElement> }> = ({ isOpen, onClose, editorRef }) => {
   const { themeClasses } = useContext(ProjectContext);
@@ -117,69 +103,56 @@ const FindReplaceModal: React.FC<{ isOpen: boolean, onClose: () => void, editorR
   );
 };
 
-const StoryIdeaEditorPage: React.FC = () => {
-    const { ideaId } = useParams<{ ideaId: string }>();
+const SketchEditorPage: React.FC = () => {
+    const { novelId, sketchId } = useParams<{ novelId: string; sketchId: string }>();
     const navigate = useNavigate();
-    const { projectData, setProjectData, theme, themeClasses } = useContext(ProjectContext);
+    const { projectData, setProjectData, themeClasses } = useContext(ProjectContext);
     
     const editorRef = useRef<HTMLDivElement>(null);
     const editorContentRef = useRef<string>("");
-    const toolbarRef = useRef<HTMLDivElement>(null);
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-    const [isFormatPanelOpen, setIsFormatPanelOpen] = useState(false);
     const [isFindReplaceOpen, setIsFindReplaceOpen] = useState(false);
     const [documentOutline, setDocumentOutline] = useState<{ id: string; text: string; level: number }[]>([]);
     const [activeFormats, setActiveFormats] = useState({ isBold: false, isItalic: false, isUL: false, isOL: false, currentBlock: 'p' });
-    const [currentFormat, setCurrentFormat] = useState({ paragraphStyle: 'p', font: fontOptions[0].value, size: '18px', paragraphSpacing: '1em' });
 
-    const { idea, ideaIndex } = useMemo(() => {
-        if (!projectData?.storyIdeas || !ideaId) return { idea: null, ideaIndex: -1 };
-        const iIndex = projectData.storyIdeas.findIndex(i => i.id === ideaId);
-        return iIndex === -1 ? { idea: null, ideaIndex: -1 } : { idea: projectData.storyIdeas[iIndex], ideaIndex: iIndex };
-    }, [projectData, ideaId]);
+    const { novel, sketch, novelIndex, sketchIndex } = useMemo(() => {
+        if (!projectData?.novels || !novelId || !sketchId) return { novel: null, sketch: null, novelIndex: -1, sketchIndex: -1 };
+        const nIndex = projectData.novels.findIndex(n => n.id === novelId);
+        if (nIndex === -1) return { novel: null, sketch: null, novelIndex: -1, sketchIndex: -1 };
+        const n = projectData.novels[nIndex];
+        const sIndex = n.sketches.findIndex(s => s.id === sketchId);
+        return sIndex === -1 ? { novel: n, sketch: null, novelIndex: nIndex, sketchIndex: -1 } : { novel: n, sketch: n.sketches[sIndex], novelIndex: nIndex, sketchIndex: sIndex };
+    }, [projectData, novelId, sketchId]);
 
     const cleanupEditor = useCallback(() => { if (editorRef.current) editorRef.current.normalize(); }, []);
 
-    const updateIdea = useCallback((updates: Partial<Omit<StoryIdea, 'id' | 'createdAt'>>) => {
-        if (ideaIndex === -1) return;
+    const updateSketch = useCallback((updates: Partial<Omit<NovelSketch, 'id' | 'createdAt'>>) => {
+        if (novelIndex === -1 || sketchIndex === -1) return;
         setProjectData(currentData => {
-            if (!currentData?.storyIdeas[ideaIndex]) return currentData;
-            const updatedIdeas = [...currentData.storyIdeas];
-            const currentIdea = updatedIdeas[ideaIndex];
-            const newSynopsis = updates.synopsis !== undefined ? updates.synopsis : currentIdea.synopsis;
-            let newWordCount = currentIdea.wordCount;
-            if (updates.synopsis !== undefined) {
-                 const tempDiv = document.createElement('div'); tempDiv.innerHTML = newSynopsis;
-                 newWordCount = (tempDiv.textContent || "").trim().split(/\s+/).filter(Boolean).length;
-            }
-            updatedIdeas[ideaIndex] = { ...currentIdea, ...updates, wordCount: newWordCount, updatedAt: new Date().toISOString() };
-            return { ...currentData, storyIdeas: updatedIdeas };
+            if (!currentData) return null;
+            const novels = [...currentData.novels];
+            const novelToUpdate = { ...novels[novelIndex] };
+            const sketches = [...novelToUpdate.sketches];
+            sketches[sketchIndex] = { ...sketches[sketchIndex], ...updates, updatedAt: new Date().toISOString() };
+            novelToUpdate.sketches = sketches;
+            novels[novelIndex] = novelToUpdate;
+            return { ...currentData, novels };
         });
-    }, [ideaIndex, setProjectData]);
-    
-    const handleEditorInput = (e: React.FormEvent<HTMLDivElement>) => {
-        const newHTML = e.currentTarget.innerHTML;
-        editorContentRef.current = newHTML;
-        updateIdea({ synopsis: newHTML });
-        updateDocumentOutline();
-    };
+    }, [novelIndex, sketchIndex, setProjectData]);
 
+    const handleEditorInput = (e: React.FormEvent<HTMLDivElement>) => { const newHTML = e.currentTarget.innerHTML; editorContentRef.current = newHTML; updateSketch({ content: newHTML }); updateDocumentOutline(); };
     const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => { if (e.key === 'Tab') { e.preventDefault(); document.execCommand('insertText', false, '    '); } };
     const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => { e.preventDefault(); const text = e.clipboardData.getData('text/plain'); if (!text) return; const html = text.split(/\r?\n/).map(line => `<p>${enhancePlainText(line) || '<br>'}</p>`).join(''); document.execCommand('insertHTML', false, html); };
-
-    // Initialize and sync editor content
+    
     useEffect(() => {
-        if (editorRef.current && idea && idea.synopsis !== editorContentRef.current) {
-            const initialContent = idea.synopsis || '<p><br></p>';
+        if (editorRef.current && sketch && sketch.content !== editorContentRef.current) {
+            const initialContent = sketch.content || '<p><br></p>';
             editorRef.current.innerHTML = enhanceHtml(initialContent);
             editorContentRef.current = initialContent;
         }
-    }, [idea]);
-
-    const handleSelectionChange = useCallback(() => { /* ... combined format update logic ... */ }, []);
-    useEffect(() => { /* ... setup/teardown selection listeners ... */ }, [handleSelectionChange]);
+    }, [sketch]);
     
     const applyAndSaveFormat = useCallback((formatAction: () => void) => {
         if (!editorRef.current) return;
@@ -191,16 +164,15 @@ const StoryIdeaEditorPage: React.FC = () => {
 
     const applyCommand = (command: string, value?: string) => applyAndSaveFormat(() => document.execCommand(command, false, value));
     const applyParagraphStyle = (style: string) => applyAndSaveFormat(() => document.execCommand('formatBlock', false, style));
-    const handleTagClick = (tag: string) => { const currentTags = idea?.tags || []; const newTags = currentTags.includes(tag) ? currentTags.filter(t => t !== tag) : [...currentTags, tag].slice(0, 6); updateIdea({ tags: newTags }); };
-    const handleDelete = () => { if (!idea) return; setProjectData(d => d ? { ...d, storyIdeas: d.storyIdeas.filter(i => i.id !== idea.id) } : null); navigate('/demos'); };
+    const handleTagClick = (tag: string) => { const currentTags = sketch?.tags || []; const newTags = currentTags.includes(tag) ? currentTags.filter(t => t !== tag) : [...currentTags, tag].slice(0, 6); updateSketch({ tags: newTags }); };
+    const handleDelete = () => { if (!sketch || novelIndex === -1) return; setProjectData(d => { if (!d) return null; const novels = [...d.novels]; const novelToUpdate = { ...novels[novelIndex] }; novelToUpdate.sketches = novelToUpdate.sketches.filter(s => s.id !== sketch.id); novels[novelIndex] = novelToUpdate; return { ...d, novels }; }); navigate('/sketches'); };
     
     const updateDocumentOutline = useCallback(() => { if (!editorRef.current) return; const headings = Array.from(editorRef.current.querySelectorAll('h1, h2, h3')); setDocumentOutline(headings.map((h, i) => { const id = h.id || `h-${i}`; h.id = id; return { id, text: h.textContent || '', level: parseInt(h.tagName[1]) }; })); }, []);
-    useEffect(updateDocumentOutline, [idea?.synopsis, updateDocumentOutline]);
+    useEffect(updateDocumentOutline, [sketch?.content, updateDocumentOutline]);
 
-    const editorStyle = useMemo(() => ({ fontSize: `${projectData?.settings?.baseFontSize || 18}px`, color: theme === 'book' ? (THEME_CONFIG.book.text.match(/\[(.*?)\]/)?.[1] || '#F5EADD') : undefined }), [theme, projectData?.settings?.baseFontSize]);
-    const colorPalette = useMemo(() => theme === 'book' ? ['#F5EADD', '#3B82F6', '#FBBF24', '#22C55E', '#EC4899'] : ['#3B2F27', '#3B82F6', '#FBBF24', '#22C55E', '#EC4899'], [theme]);
-
-    if (!idea) return <div className={`flex h-screen items-center justify-center ${themeClasses.bg}`}><p>Loading idea...</p></div>;
+    const editorStyle = useMemo(() => ({ fontSize: `${projectData?.settings?.baseFontSize || 18}px` }), [projectData?.settings?.baseFontSize]);
+    
+    if (!sketch || !novel) return <div className={`flex h-screen items-center justify-center ${themeClasses.bg}`}><p>Loading sketch...</p></div>;
 
     return (
         <>
@@ -208,29 +180,30 @@ const StoryIdeaEditorPage: React.FC = () => {
                 {isSidebarOpen && <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-black/50 z-30" />}
                 <div className="flex-1 overflow-y-auto relative">
                     <div className={`sticky top-0 z-10 px-8 md:px-16 lg:px-24 pt-6 pb-4 ${themeClasses.bg} bg-opacity-80 backdrop-blur-sm border-b ${themeClasses.border} flex justify-between items-center`}>
-                        <button onClick={() => navigate(`/demos`)} className={`flex items-center space-x-2 ${themeClasses.text} opacity-70 hover:opacity-100`}><BackIcon className="w-5 h-5" /><span className="font-sans">Return to Idea Box</span></button>
+                        <button onClick={() => navigate('/sketches')} className={`flex items-center space-x-2 ${themeClasses.text} opacity-70 hover:opacity-100`}><BackIcon className="w-5 h-5" /><span className="font-sans">Return to Sketches</span></button>
                         <SaveStatusIndicator />
                     </div>
                     <div className="px-8 md:px-16 lg:px-24 pt-8 pb-48">
-                        <input type="text" value={idea.title} onChange={e => updateIdea({ title: e.target.value })} onBlur={(e) => updateIdea({ title: enhancePlainText(e.target.value) })} placeholder="Idea Title" className="text-4xl font-bold bg-transparent outline-none w-full mb-8" />
+                        <input type="text" value={sketch.title} onChange={e => updateSketch({ title: e.target.value })} onBlur={(e) => updateSketch({ title: enhancePlainText(e.target.value) })} placeholder="Sketch Title" className="text-4xl font-bold bg-transparent outline-none w-full mb-8" />
                         <div ref={editorRef} contentEditable spellCheck={true} suppressContentEditableWarning onInput={handleEditorInput} onKeyDown={handleKeyDown} onPaste={handlePaste} onBlur={cleanupEditor} className="w-full leading-relaxed outline-none story-content" style={editorStyle} />
                     </div>
                 </div>
                 <div className={`fixed top-0 right-0 h-full z-40 transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
                     <div className={`w-80 h-full ${themeClasses.bgSecondary} ${themeClasses.accentText} text-sm font-sans border-l ${themeClasses.border} flex flex-col`}>
-                        <div className={`px-4 py-3 flex justify-between items-center border-b ${themeClasses.border}`}><span className="font-bold text-base">IDEA DETAILS</span><button onClick={() => setIsSidebarOpen(false)}><ChevronLeftIcon className="w-5 h-5"/></button></div>
-                        <div className={`px-4 py-4 border-b ${themeClasses.border}`}><p className="text-3xl font-bold">{(idea.wordCount || 0).toLocaleString()}</p><p className={themeClasses.textSecondary}>WORDS</p></div>
+                        <div className={`px-4 py-3 flex justify-between items-center border-b ${themeClasses.border}`}><span className="font-bold text-base">SKETCH DETAILS</span><button onClick={() => setIsSidebarOpen(false)}><ChevronLeftIcon className="w-5 h-5"/></button></div>
+                        <div className={`px-4 py-4 border-b ${themeClasses.border}`}>
+                            <p className={`text-xs font-semibold uppercase tracking-wider mb-1 ${themeClasses.textSecondary}`}>Part of Novel</p>
+                            <p className="font-bold">{enhancePlainText(novel.title)}</p>
+                        </div>
                         <div className="flex-1 p-4 space-y-6 overflow-y-auto">
                             <div><h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Document Outline</h3>{documentOutline.length > 0 ? <ul className="space-y-1">{documentOutline.map(h => <li key={h.id}><button onClick={() => document.getElementById(h.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="w-full text-left px-2 py-1 rounded hover:bg-white/10" style={{ paddingLeft: `${h.level}rem` }}>{h.text}</button></li>)}</ul> : <p className={`text-xs ${themeClasses.textSecondary}`}>No headings found.</p>}</div>
-                            <div><h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Status</h3><div className={`flex rounded-md overflow-hidden border ${themeClasses.border}`}>{(['Seedling', 'Developing', 'Archived'] as StoryIdeaStatus[]).map(o => <button key={o} onClick={() => updateIdea({ status: o })} className={`flex-1 py-2 text-sm font-semibold ${idea.status === o ? `${themeClasses.accent} ${themeClasses.accentText}` : `hover:${themeClasses.bgTertiary}`}`}>{o}</button>)}</div></div>
-                            <div><h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Tags</h3><div className="flex flex-wrap gap-1.5">{SKETCH_TAG_OPTIONS.map(t => <button key={t} onClick={() => handleTagClick(t)} className={`px-2 py-1 text-xs rounded-full font-semibold ${idea.tags.includes(t) ? `${themeClasses.accent} ${themeClasses.accentText}` : `${themeClasses.bgTertiary} hover:opacity-80`}`}>{t}</button>)}</div></div>
-                            <div><h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Actions</h3><button onClick={() => setIsDeleteConfirmOpen(true)} className="w-full flex items-center space-x-3 text-left px-4 py-3 rounded-lg font-semibold bg-red-700 text-red-100 hover:bg-red-800"><TrashIcon className="w-5 h-5"/><span>Delete Idea</span></button></div>
+                            <div><h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Tags</h3><div className="flex flex-wrap gap-1.5">{SKETCH_TAG_OPTIONS.map(t => <button key={t} onClick={() => handleTagClick(t)} className={`px-2 py-1 text-xs rounded-full font-semibold ${sketch.tags.includes(t) ? `${themeClasses.accent} ${themeClasses.accentText}` : `${themeClasses.bgTertiary} hover:opacity-80`}`}>{t}</button>)}</div></div>
+                            <div><h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Actions</h3><button onClick={() => setIsDeleteConfirmOpen(true)} className="w-full flex items-center space-x-3 text-left px-4 py-3 rounded-lg font-semibold bg-red-700 text-red-100 hover:bg-red-800"><TrashIcon className="w-5 h-5"/><span>Delete Sketch</span></button></div>
                         </div>
                     </div>
                 </div>
                 <div className="absolute bottom-0 left-0 w-full flex justify-center pb-4 z-20 pointer-events-none">
-                    <div ref={toolbarRef} className="relative pointer-events-auto">
-                         {isFormatPanelOpen && (<div className="absolute bottom-full mb-2 p-4 rounded-lg shadow-lg bg-stone-900/80 border border-white/10 backdrop-blur-sm w-[320px]"><div className="space-y-4"> {/* Dropdowns would go here */} </div></div>)}
+                    <div className="relative pointer-events-auto">
                         <div className="flex items-center space-x-1 p-1 rounded-full shadow-lg bg-stone-900/70 border border-white/10 backdrop-blur-sm" onMouseDown={e => e.preventDefault()}>
                             <button onClick={() => applyCommand('bold')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors ${activeFormats.isBold ? 'text-white bg-white/10' : ''}`}><BoldIcon className="w-5 h-5"/></button>
                             <button onClick={() => applyCommand('italic')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors ${activeFormats.isItalic ? 'text-white bg-white/10' : ''}`}><ItalicIcon className="w-5 h-5"/></button>
@@ -253,9 +226,9 @@ const StoryIdeaEditorPage: React.FC = () => {
             </div>
             {!isSidebarOpen && <button onClick={() => setIsSidebarOpen(true)} className={`fixed top-4 right-4 z-30 p-2 rounded-md ${themeClasses.bgSecondary} ${themeClasses.accentText} hover:opacity-80 shadow-lg border ${themeClasses.border}`}><ChevronLeftIcon className="w-5 h-5" /></button>}
             <FindReplaceModal isOpen={isFindReplaceOpen} onClose={() => setIsFindReplaceOpen(false)} editorRef={editorRef} />
-            <ConfirmModal isOpen={isDeleteConfirmOpen} onClose={() => setIsDeleteConfirmOpen(false)} onConfirm={handleDelete} title={`Delete "${idea.title}"?`} message="Are you sure you want to delete this story idea? This action is permanent." />
+            <ConfirmModal isOpen={isDeleteConfirmOpen} onClose={() => setIsDeleteConfirmOpen(false)} onConfirm={handleDelete} title={`Delete "${sketch.title}"?`} message="Are you sure you want to delete this sketch? This action is permanent." />
         </>
     );
 };
 
-export default StoryIdeaEditorPage;
+export default SketchEditorPage;

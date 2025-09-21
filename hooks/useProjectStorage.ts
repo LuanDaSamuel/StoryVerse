@@ -219,20 +219,18 @@ export function useProjectStorage() {
     }, []);
 
     const signOut = useCallback(async () => {
-        const token = gapi.client?.getToken();
-        if (token && token.access_token) {
-            google.accounts.oauth2.revoke(token.access_token, () => {
-                console.log('Google token revoked.');
-            });
-        }
+        // We only clear the local session data on sign-out. We do not revoke the token,
+        // as that would force the user to go through the consent screen again on every sign-in,
+        // which is the inconvenient behavior the user reported.
         if (gapi.client) {
             gapi.client.setToken('');
         }
         await idbDel(GAPI_AUTH_TOKEN_KEY);
         await idbDel(DRIVE_FILE_ID_KEY);
         driveFileIdRef.current = null;
+        // Disables automatic sign-in for the next page load.
         google.accounts.id.disableAutoSelect();
-        console.log('User signed out and session data cleared.');
+        console.log('User signed out. Local session data cleared.');
     }, []);
     
     const initAndRestoreSession = useCallback(async (): Promise<UserProfile | null> => {

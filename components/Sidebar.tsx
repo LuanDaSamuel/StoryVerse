@@ -1,6 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { NavLink } from 'react-router-dom';
-import { AppLogoIcon, HomeIcon, PlusIcon, SettingsIcon, LightbulbIcon, QuillPenIcon } from './Icons';
+import { AppLogoIcon, HomeIcon, PlusIcon, SettingsIcon, LightbulbIcon, QuillPenIcon, LoadingIcon, CheckIcon, ExclamationTriangleIcon } from './Icons';
 import SettingsModal from './SettingsModal';
 import { ProjectContext } from '../contexts/ProjectContext';
 
@@ -11,16 +11,24 @@ interface SidebarProps {
 const SaveStatusIndicator: React.FC = () => {
     const { theme, saveStatus } = useContext(ProjectContext);
 
-    if (saveStatus === 'unsaved') {
-        const unsavedColor = theme === 'dark' ? 'text-amber-400' : 'text-amber-600';
-        return (
-            <div className={`flex items-center space-x-2 text-xs font-semibold ${unsavedColor}`}>
-                <span>Unsaved changes</span>
-            </div>
-        );
-    }
+    const baseClasses = 'flex items-center space-x-2 text-xs font-semibold';
 
-    return null;
+    switch (saveStatus) {
+        case 'unsaved':
+            const unsavedColor = theme === 'dark' ? 'text-amber-400' : 'text-amber-600';
+            return <div className={`${baseClasses} ${unsavedColor}`}><span>Unsaved changes</span></div>;
+        case 'saving':
+            const savingColor = theme === 'dark' ? 'text-blue-400' : 'text-blue-600';
+            return <div className={`${baseClasses} ${savingColor}`}><LoadingIcon className="w-4 h-4 animate-spin" /><span>Saving...</span></div>;
+        case 'saved':
+            const savedColor = theme === 'dark' ? 'text-green-400' : 'text-green-600';
+            return <div className={`${baseClasses} ${savedColor}`}><CheckIcon className="w-4 h-4" /><span>Saved!</span></div>;
+        case 'error':
+            const errorColor = theme === 'dark' ? 'text-red-400' : 'text-red-600';
+            return <div className={`${baseClasses} ${errorColor}`}><ExclamationTriangleIcon className="w-4 h-4" /><span>Error saving</span></div>;
+        default:
+            return null; // 'idle'
+    }
 };
 
 const Sidebar: React.FC<SidebarProps> = ({ onLinkClick = () => {} }) => {

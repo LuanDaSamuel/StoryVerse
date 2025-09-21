@@ -11,7 +11,8 @@ import NovelDetailPage from './pages/NovelDetailPage';
 import ReadNovelPage from './pages/ReadNovelPage';
 import DemosPage from './pages/DemosPage';
 import StoryIdeaEditorPage from './pages/StoryIdeaEditorPage';
-import SketchesPage from './pages/SketchesPage'; // Import the new Sketches page
+import SketchesPage from './pages/SketchesPage';
+import SketchEditorPage from './pages/SketchEditorPage';
 import { THEME_CONFIG } from './constants';
 import { LoadingIcon, Bars3Icon, DocumentPlusIcon, UploadIcon, CloudIcon } from './components/Icons';
 import { Theme } from './types';
@@ -74,7 +75,8 @@ const AppContent = () => {
     const onEditPage = useMatch('/novel/:novelId/edit/:chapterId');
     const onReadPage = useMatch('/novel/:novelId/read/:chapterId?');
     const onIdeaEditPage = useMatch('/idea/:ideaId/edit');
-    const isSidebarPermanentlyHidden = !!onEditPage || !!onReadPage || !!onIdeaEditPage;
+    const onSketchEditPage = useMatch('/novel/:novelId/sketch/:sketchId/edit');
+    const isSidebarPermanentlyHidden = !!onEditPage || !!onReadPage || !!onIdeaEditPage || !!onSketchEditPage;
 
     const renderContent = () => {
         switch (project.status) {
@@ -204,8 +206,9 @@ const AppContent = () => {
                                 <Route path="/" element={<HomePage />} />
                                 <Route path="/create-novel" element={<CreateNovelPage />} />
                                 <Route path="/demos" element={<DemosPage />} />
-                                <Route path="/sketches" element={<SketchesPage />} />
                                 <Route path="/idea/:ideaId/edit" element={<StoryIdeaEditorPage />} />
+                                <Route path="/sketches" element={<SketchesPage />} />
+                                <Route path="/novel/:novelId/sketch/:sketchId/edit" element={<SketchEditorPage />} />
                                 <Route path="/novel/:novelId" element={<NovelDetailPage />} />
                                 <Route path="/novel/:novelId/read/:chapterId?" element={<ReadNovelPage />} />
                                 <Route path="/novel/:novelId/edit" element={<NovelEditRedirect />} />

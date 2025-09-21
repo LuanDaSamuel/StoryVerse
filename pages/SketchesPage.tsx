@@ -1,17 +1,18 @@
 import React, { useState, useContext, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { NovelSketch, AggregatedSketch } from '../types';
 import { enhancePlainText } from '../constants';
-import { PlusIcon, TrashIcon } from '../components/Icons';
-import SketchEditorModal from '../components/SketchEditorModal';
+import { PlusIcon } from '../components/Icons';
 import ConfirmModal from '../components/ConfirmModal';
-import SketchViewerModal from '../components/SketchViewerModal';
+import SelectNovelModal from '../components/SelectNovelModal';
 
 const SketchesPage: React.FC = () => {
     const { projectData, setProjectData, themeClasses } = useContext(ProjectContext);
-    const [editingSketch, setEditingSketch] = useState<AggregatedSketch | 'new' | null>(null);
+    const navigate = useNavigate();
+    
+    const [isCreatingSketch, setIsCreatingSketch] = useState(false);
     const [sketchToDelete, setSketchToDelete] = useState<AggregatedSketch | null>(null);
-    const [viewingSketch, setViewingSketch] = useState<AggregatedSketch | null>(null);
 
     const novels = useMemo(() => projectData?.novels || [], [projectData]);
     
@@ -27,25 +28,35 @@ const SketchesPage: React.FC = () => {
 
     const novelsForDropdown = useMemo(() => novels.map(n => ({ id: n.id, title: n.title })), [novels]);
 
-    const handleSaveSketch = (savedSketch: NovelSketch, novelId: string) => {
+    const handleCreateSketch = (selectedNovelId: string) => {
+        if (!selectedNovelId) return;
+    
+        const now = new Date().toISOString();
+        const newSketch: NovelSketch = {
+            id: crypto.randomUUID(),
+            title: 'Untitled Sketch',
+            content: '<p><br></p>',
+            tags: [],
+            createdAt: now,
+            updatedAt: now,
+        };
+    
         setProjectData(currentData => {
             if (!currentData) return null;
-            const novelIndex = currentData.novels.findIndex(n => n.id === novelId);
+            const novelIndex = currentData.novels.findIndex(n => n.id === selectedNovelId);
             if (novelIndex === -1) return currentData;
-            
+    
             const updatedNovels = [...currentData.novels];
-            const currentNovel = { ...updatedNovels[novelIndex] };
-            const sketchIndex = currentNovel.sketches.findIndex(s => s.id === savedSketch.id);
+            const novelToUpdate = { ...updatedNovels[novelIndex] };
             
-            if (sketchIndex > -1) {
-                currentNovel.sketches[sketchIndex] = savedSketch;
-            } else {
-                currentNovel.sketches.unshift(savedSketch);
-            }
-            updatedNovels[novelIndex] = { ...currentNovel, sketches: [...currentNovel.sketches] };
+            novelToUpdate.sketches = [newSketch, ...novelToUpdate.sketches];
+            updatedNovels[novelIndex] = novelToUpdate;
+            
             return { ...currentData, novels: updatedNovels };
         });
-        setEditingSketch(null);
+    
+        setIsCreatingSketch(false);
+        navigate(`/novel/${selectedNovelId}/sketch/${newSketch.id}/edit`);
     };
 
     const handleDeleteSketch = () => {
@@ -77,7 +88,7 @@ const SketchesPage: React.FC = () => {
             <div className="flex justify-between items-center mb-8">
                 <h1 className={`text-3xl font-bold ${themeClasses.text}`}>Sketches</h1>
                 <button 
-                    onClick={() => setEditingSketch('new')} 
+                    onClick={() => setIsCreatingSketch(true)} 
                     className={`flex items-center space-x-2 px-4 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90 disabled:opacity-50`}
                     disabled={novels.length === 0}
                     title={novels.length === 0 ? "You must create a novel first" : "Create a new sketch"}
@@ -101,8 +112,8 @@ const SketchesPage: React.FC = () => {
                     {allSketches.map(sketch => (
                         <div 
                             key={sketch.id} 
-                            className={`group relative p-4 rounded-lg flex flex-col cursor-pointer ${themeClasses.bgSecondary}`}
-                            onClick={() => setViewingSketch(sketch)}
+                            className={`group relative p-4 rounded-lg flex flex-col cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-1 ${themeClasses.bgSecondary}`}
+                            onClick={() => navigate(`/novel/${sketch.novelId}/sketch/${sketch.id}/edit`)}
                         >
                             <div className="flex-grow">
                                 <p className={`text-xs font-semibold uppercase tracking-wider mb-1 ${themeClasses.textSecondary}`}>{enhancePlainText(sketch.novelTitle)}</p>
@@ -116,27 +127,16 @@ const SketchesPage: React.FC = () => {
                                     {getSnippet(sketch.content)}
                                 </p>
                             </div>
-                             <div className="absolute top-3 right-3 flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={(e) => { e.stopPropagation(); setEditingSketch(sketch); }} className={`px-3 py-1 text-sm rounded-md font-semibold ${themeClasses.bg} ${themeClasses.text} hover:opacity-80`}>Edit</button>
-                                <button onClick={(e) => { e.stopPropagation(); setSketchToDelete(sketch); }} className="p-2 rounded-full text-red-500 hover:bg-red-500/10"><TrashIcon className="w-5 h-5" /></button>
-                            </div>
                         </div>
                     ))}
                 </div>
             )}
 
-            {editingSketch && (
-                <SketchEditorModal
-                    sketch={editingSketch === 'new' ? null : editingSketch}
-                    onClose={() => setEditingSketch(null)}
-                    onSave={handleSaveSketch}
-                    novels={editingSketch === 'new' ? novelsForDropdown : undefined}
-                    novelId={editingSketch !== 'new' ? editingSketch.novelId : undefined}
-                />
-            )}
-            <SketchViewerModal
-                sketch={viewingSketch}
-                onClose={() => setViewingSketch(null)}
+            <SelectNovelModal
+                isOpen={isCreatingSketch}
+                onClose={() => setIsCreatingSketch(false)}
+                onConfirm={handleCreateSketch}
+                novels={novelsForDropdown}
             />
             <ConfirmModal
                 isOpen={!!sketchToDelete}

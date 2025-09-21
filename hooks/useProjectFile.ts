@@ -106,43 +106,37 @@ export function useProject() {
   const saveTimeoutRef = useRef<number | null>(null);
 
   const saveProject = useCallback(async () => {
-    // Guard against concurrent saves or saving when there's nothing to save.
     if (isSavingRef.current || !isDirtyRef.current) {
-      return;
+        return;
     }
 
     isSavingRef.current = true;
+    // Mark as clean before saving. Any new edits during the save will set it back to dirty.
+    isDirtyRef.current = false;
+
     const dataToSave = projectDataRef.current;
-    
     setSaveStatus('saving');
 
     try {
-      if (!dataToSave) throw new Error("No project data to save.");
+        if (!dataToSave) throw new Error("No project data to save.");
 
-      if (storageMode === 'drive') {
-        await storage.saveToDrive(dataToSave);
-      } else if (storageMode === 'local') {
-        await set(LOCAL_BACKUP_KEY, dataToSave);
-        await storage.saveToFileHandle(dataToSave);
-      }
-      
-      // If no new changes occurred during the save, mark as clean and saved.
-      // We check isDirtyRef again in case a new change came in during the await.
-      if (!isDirtyRef.current) {
+        if (storageMode === 'drive') {
+            await storage.saveToDrive(dataToSave);
+        } else if (storageMode === 'local') {
+            await set(LOCAL_BACKUP_KEY, dataToSave);
+            await storage.saveToFileHandle(dataToSave);
+        }
+
         setSaveStatus('saved');
-      }
     } catch (error) {
-      console.error(`Error saving project to ${storageMode}:`, error);
-      // On failure, the data is still dirty.
-      isDirtyRef.current = true;
-      setSaveStatus('error');
+        console.error(`Error saving project to ${storageMode}:`, error);
+        // If the save fails, the changes are still unsaved. Mark as dirty again.
+        isDirtyRef.current = true;
+        setSaveStatus('error');
     } finally {
-      isSavingRef.current = false;
-      
-      // If new changes came in while saving, isDirtyRef will be true.
-      // The `setProjectDataAndMarkDirty` function will have already scheduled
-      // a new debounced save. We don't need to do anything here, preventing
-      // an immediate re-save and respecting the user's typing flow.
+        isSavingRef.current = false;
+        // The debouncer in `setProjectDataAndMarkDirty` is responsible for scheduling
+        // the next save if any new edits were made during this save operation.
     }
   }, [storage, storageMode]);
 
@@ -156,16 +150,17 @@ export function useProject() {
         const newData = typeof updater === 'function' ? updater(prevData) : updater;
         if (JSON.stringify(newData) !== JSON.stringify(prevData)) {
             isDirtyRef.current = true;
-            
-            // Immediately show "Unsaved" to give instant feedback.
-            setSaveStatus('unsaved');
 
-            // Clear any existing timer to reset the debounce period.
+            // Only show "unsaved" if a save isn't already in progress.
+            // This prevents the UI from flickering between "Saving..." and "Unsaved".
+            if (!isSavingRef.current) {
+                setSaveStatus('unsaved');
+            }
+
             if (saveTimeoutRef.current) {
                 clearTimeout(saveTimeoutRef.current);
             }
 
-            // Set a new timer to save after 1 second of inactivity.
             saveTimeoutRef.current = window.setTimeout(() => {
                 saveProjectRef.current?.();
             }, 1000); // 1-second delay
@@ -174,14 +169,16 @@ export function useProject() {
     });
   }, []);
 
-  // Effect to revert 'saved' status to 'idle'
+  // Effect to revert 'saved' status to 'idle'.
   useEffect(() => {
-      if (saveStatus === 'saved') {
-          // Once saved, we can consider the content clean.
-          isDirtyRef.current = false;
-          const timeoutId = setTimeout(() => setSaveStatus('idle'), 500);
-          return () => clearTimeout(timeoutId);
-      }
+    if (saveStatus === 'saved') {
+        const timeoutId = setTimeout(() => {
+            // After the 'Saved!' message has been displayed, transition to idle.
+            // The debouncer in `setProjectDataAndMarkDirty` will trigger the next save if needed.
+            setSaveStatus('idle');
+        }, 1500); // Duration to display the "Saved!" message.
+        return () => clearTimeout(timeoutId);
+    }
   }, [saveStatus]);
     
   const flushChanges = useCallback(async () => {

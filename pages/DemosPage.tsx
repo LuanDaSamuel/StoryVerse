@@ -36,10 +36,9 @@ const DemosPage = () => {
             if (!currentData) return null;
             return {
                 ...currentData,
-                storyIdeas: [newIdea, ...(currentData.storyIdeas || [])],
+                storyIdeas: [newIdea, ...currentData.storyIdeas],
             };
         });
-
         navigate(`/idea/${newIdea.id}/edit`);
     };
     
@@ -58,11 +57,9 @@ const DemosPage = () => {
             const { value: html } = await mammoth.convertToHtml({ arrayBuffer }, { styleMap });
             
             const tempDiv = document.createElement('div');
-            // Clean up empty paragraphs that mammoth sometimes creates
             tempDiv.innerHTML = html.replace(/<p>(\s|&nbsp;|<br\s*\/?>)*<\/p>/gi, '').trim();
             
             let ideaTitle = file.name.replace(/\.docx$/, '');
-            // Find the first heading to use as a title, but DON'T remove it from the content.
             const firstHeading = tempDiv.querySelector('h1, h2, h3');
             
             if (firstHeading && firstHeading.textContent) {
@@ -81,7 +78,7 @@ const DemosPage = () => {
             console.error(`Error processing file ${file.name}:`, error);
             alert(`Failed to process ${file.name}. It might be corrupted or not a valid .docx file.`);
         } finally {
-            e.target.value = ''; // Reset file input to allow re-selection
+            e.target.value = '';
         }
     };
 
@@ -95,7 +92,7 @@ const DemosPage = () => {
                 id: crypto.randomUUID(),
                 title: pendingImportData.title,
                 synopsis: pendingImportData.synopsisHtml,
-                wordCount: 0, // Will be calculated in editor
+                wordCount: 0, 
                 tags: [],
                 status: 'Seedling',
                 createdAt: now,
