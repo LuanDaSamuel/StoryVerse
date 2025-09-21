@@ -1,61 +1,25 @@
 import React, { useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
-import { BackIcon, BookOpenIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, TextIcon, SearchIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, CloseIcon, Bars3Icon, DownloadIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, LoadingIcon, CheckIcon, CloudIcon, ExclamationTriangleIcon } from '../components/Icons';
+import { BackIcon, BookOpenIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, TextIcon, SearchIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, CloseIcon, Bars3Icon, DownloadIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon } from '../components/Icons';
 import { enhancePlainText, enhanceHtml, THEME_CONFIG } from '../constants';
 import ExportModal from '../components/ExportModal';
 
 // --- Reusable Components ---
 
 const SaveStatusIndicator: React.FC = () => {
-    const { storageMode, theme, themeClasses, saveStatus } = useContext(ProjectContext);
+    const { theme, saveStatus } = useContext(ProjectContext);
 
-    if (!storageMode) {
-        return null;
+    if (saveStatus === 'unsaved') {
+        const unsavedColor = theme === 'dark' ? 'text-amber-400' : 'text-amber-600';
+        return (
+            <div className={`flex items-center space-x-2 text-sm font-sans font-semibold ${unsavedColor}`}>
+                <span>Unsaved changes</span>
+            </div>
+        );
     }
 
-    switch (saveStatus) {
-        case 'saving':
-            return (
-                <div className={`flex items-center space-x-2 text-sm font-sans ${themeClasses.textSecondary}`}>
-                    <LoadingIcon className={`w-4 h-4 animate-spin`} />
-                    <span>Saving...</span>
-                </div>
-            );
-        case 'unsaved':
-            const unsavedColor = theme === 'dark' ? 'text-amber-400' : 'text-amber-600';
-            return (
-                <div className={`flex items-center space-x-2 text-sm font-sans font-semibold ${unsavedColor}`}>
-                    <span>Unsaved changes</span>
-                </div>
-            );
-        case 'saved':
-            const savedColor = theme === 'dark' ? 'text-green-400' : 'text-green-700';
-            return (
-                <div className={`flex items-center space-x-2 text-sm font-sans font-semibold ${savedColor}`}>
-                    <CheckIcon className={`w-4 h-4`} />
-                    <span>Saved</span>
-                </div>
-            );
-        case 'error':
-            const errorColor = theme === 'dark' ? 'text-red-400' : 'text-red-600';
-            return (
-                <div className={`flex items-center space-x-2 text-sm font-sans font-semibold ${errorColor}`}>
-                    <ExclamationTriangleIcon className="w-4 h-4" />
-                    <span>Save failed</span>
-                </div>
-            );
-        case 'idle':
-        default:
-            const Icon = storageMode === 'drive' ? CloudIcon : CheckIcon;
-            const text = storageMode === 'drive' ? "Saved to Drive" : "Saved Locally";
-            return (
-                <div className={`flex items-center space-x-2 text-sm font-sans ${themeClasses.textSecondary}`}>
-                    <Icon className={`w-4 h-4`} />
-                    <span>{text}</span>
-                </div>
-            );
-    }
+    return null;
 };
 
 const ChapterListModal: React.FC<{

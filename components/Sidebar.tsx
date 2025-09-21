@@ -1,6 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { NavLink } from 'react-router-dom';
-import { AppLogoIcon, HomeIcon, PlusIcon, SettingsIcon, LightbulbIcon, QuillPenIcon, LoadingIcon, CloudIcon, CheckIcon, ExclamationTriangleIcon } from './Icons';
+import { AppLogoIcon, HomeIcon, PlusIcon, SettingsIcon, LightbulbIcon, QuillPenIcon } from './Icons';
 import SettingsModal from './SettingsModal';
 import { ProjectContext } from '../contexts/ProjectContext';
 
@@ -9,57 +9,18 @@ interface SidebarProps {
 }
 
 const SaveStatusIndicator: React.FC = () => {
-    // FIX: Destructure 'theme' from context to use for conditional styling.
-    const { storageMode, theme, themeClasses, saveStatus } = useContext(ProjectContext);
+    const { theme, saveStatus } = useContext(ProjectContext);
 
-    if (!storageMode) {
-        return null;
+    if (saveStatus === 'unsaved') {
+        const unsavedColor = theme === 'dark' ? 'text-amber-400' : 'text-amber-600';
+        return (
+            <div className={`flex items-center space-x-2 text-xs font-semibold ${unsavedColor}`}>
+                <span>Unsaved changes</span>
+            </div>
+        );
     }
 
-    switch (saveStatus) {
-        case 'saving':
-            return (
-                <div className={`flex items-center space-x-2 text-xs ${themeClasses.textSecondary}`}>
-                    <LoadingIcon className={`w-4 h-4 animate-spin`} />
-                    <span>Saving...</span>
-                </div>
-            );
-        case 'unsaved':
-            // FIX: Use 'theme' from context instead of 'themeClasses.theme'.
-            const unsavedColor = theme === 'dark' ? 'text-amber-400' : 'text-amber-600';
-            return (
-                <div className={`flex items-center space-x-2 text-xs font-semibold ${unsavedColor}`}>
-                    <span>Unsaved changes</span>
-                </div>
-            );
-        case 'saved':
-            // FIX: Use 'theme' from context instead of 'themeClasses.theme'.
-            const savedColor = theme === 'dark' ? 'text-green-400' : 'text-green-700';
-            return (
-                <div className={`flex items-center space-x-2 text-xs font-semibold ${savedColor}`}>
-                    <CheckIcon className={`w-4 h-4`} />
-                    <span>Saved</span>
-                </div>
-            );
-        case 'error':
-            const errorColor = theme === 'dark' ? 'text-red-400' : 'text-red-600';
-            return (
-                <div className={`flex items-center space-x-2 text-xs font-semibold ${errorColor}`}>
-                    <ExclamationTriangleIcon className="w-4 h-4" />
-                    <span>Save failed</span>
-                </div>
-            );
-        case 'idle':
-        default:
-            const Icon = storageMode === 'drive' ? CloudIcon : CheckIcon;
-            const text = storageMode === 'drive' ? "Saved to Drive" : "Saved Locally";
-            return (
-                <div className={`flex items-center space-x-2 text-xs ${themeClasses.textSecondary}`}>
-                    <Icon className={`w-4 h-4`} />
-                    <span>{text}</span>
-                </div>
-            );
-    }
+    return null;
 };
 
 const Sidebar: React.FC<SidebarProps> = ({ onLinkClick = () => {} }) => {

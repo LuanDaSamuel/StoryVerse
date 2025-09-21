@@ -216,30 +216,24 @@ export function useProject() {
         };
     }, [flushChanges]);
 
-    // Warn user on closing tab if data is at risk.
-    useEffect(() => {
-        const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-            // The primary condition for showing a warning is if there are unsaved changes (`isDirtyRef.current`)
-            // or if a save has explicitly failed (`saveStatusRef.current === 'error'`).
-            // The `isDirtyRef` flag remains true during a save operation, which is correct because
-            // the data is not yet safely persisted. This covers both the 'unsaved' and 'saving' states.
-            if (isDirtyRef.current || saveStatusRef.current === 'error') {
-                const message = "You have unsaved changes. Are you sure you want to leave?";
-                event.preventDefault();
-                event.returnValue = message;
-                // The 'visibilitychange' event handler is the more reliable way to save on exit.
-                // A best-effort save attempt here is unreliable in modern browsers. The primary
-                // purpose of this handler is to warn the user, giving them a chance to cancel the exit.
-                return message;
-            }
-        };
+  // Warn user before leaving with unsaved changes.
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      // Check ref directly to get the latest status without re-running the effect.
+      if (['unsaved', 'saving', 'error'].includes(saveStatusRef.current)) {
+        event.preventDefault();
+        // Required for legacy browsers.
+        event.returnValue = '';
+        return ''; // Triggers the prompt in modern browsers.
+      }
+    };
 
-        window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('beforeunload', handleBeforeUnload);
 
-        return () => {
-            window.removeEventListener('beforeunload', handleBeforeUnload);
-        };
-    }, []);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []); // Empty dependency array ensures this runs only on mount and unmount.
 
   const resetState = useCallback(() => {
     setProjectData(null);
