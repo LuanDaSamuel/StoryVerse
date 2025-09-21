@@ -216,17 +216,21 @@ export function useProject() {
         };
     }, [flushChanges]);
 
-    // Save on closing tab and warn only on critical states
+    // Warn user on closing tab if data is at risk.
     useEffect(() => {
         const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-            if (saveStatusRef.current === 'saving' || saveStatusRef.current === 'error') {
-                 const message = "A save is in progress or has failed. Closing now may result in data loss.";
-                 event.preventDefault();
-                 event.returnValue = message;
-                 return message;
-            }
-            if (isDirtyRef.current) {
-                flushChanges();
+            // The primary condition for showing a warning is if there are unsaved changes (`isDirtyRef.current`)
+            // or if a save has explicitly failed (`saveStatusRef.current === 'error'`).
+            // The `isDirtyRef` flag remains true during a save operation, which is correct because
+            // the data is not yet safely persisted. This covers both the 'unsaved' and 'saving' states.
+            if (isDirtyRef.current || saveStatusRef.current === 'error') {
+                const message = "You have unsaved changes. Are you sure you want to leave?";
+                event.preventDefault();
+                event.returnValue = message;
+                // The 'visibilitychange' event handler is the more reliable way to save on exit.
+                // A best-effort save attempt here is unreliable in modern browsers. The primary
+                // purpose of this handler is to warn the user, giving them a chance to cancel the exit.
+                return message;
             }
         };
 
@@ -235,7 +239,7 @@ export function useProject() {
         return () => {
             window.removeEventListener('beforeunload', handleBeforeUnload);
         };
-    }, [flushChanges]);
+    }, []);
 
   const resetState = useCallback(() => {
     setProjectData(null);
