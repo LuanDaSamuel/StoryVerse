@@ -105,7 +105,8 @@ const NovelDetailPage: React.FC = () => {
         if (!pendingFiles || novelIndex === -1) return;
         setIsDocxConfirmOpen(false);
 
-        const sortedFiles = Array.from(pendingFiles).sort((a, b) =>
+// FIX: Added explicit types for sort callback arguments to resolve type inference issues.
+        const sortedFiles = Array.from(pendingFiles).sort((a: File, b: File) =>
             a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
         );
 

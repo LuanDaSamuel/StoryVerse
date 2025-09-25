@@ -103,6 +103,7 @@ export function useProject() {
 
   const storage = useProjectStorage();
   const saveProjectRef = useRef<() => Promise<void>>(async () => {});
+// FIX: The type for window.setTimeout is `number` in browsers.
   const saveTimeoutRef = useRef<number | null>(null);
 
   const saveProject = useCallback(async () => {

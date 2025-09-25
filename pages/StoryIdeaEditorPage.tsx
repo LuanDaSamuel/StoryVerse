@@ -194,7 +194,8 @@ const StoryIdeaEditorPage: React.FC = () => {
     const handleTagClick = (tag: string) => { const currentTags = idea?.tags || []; const newTags = currentTags.includes(tag) ? currentTags.filter(t => t !== tag) : [...currentTags, tag].slice(0, 6); updateIdea({ tags: newTags }); };
     const handleDelete = () => { if (!idea) return; setProjectData(d => d ? { ...d, storyIdeas: d.storyIdeas.filter(i => i.id !== idea.id) } : null); navigate('/demos'); };
     
-    const updateDocumentOutline = useCallback(() => { if (!editorRef.current) return; const headings = Array.from(editorRef.current.querySelectorAll('h1, h2, h3')); setDocumentOutline(headings.map((h, i) => { const id = h.id || `h-${i}`; h.id = id; return { id, text: h.textContent || '', level: parseInt(h.tagName[1]) }; })); }, []);
+// FIX: Added generic type to querySelectorAll to ensure correct type inference for heading elements.
+    const updateDocumentOutline = useCallback(() => { if (!editorRef.current) return; const headings = Array.from(editorRef.current.querySelectorAll<HTMLElement>('h1, h2, h3')); setDocumentOutline(headings.map((h, i) => { const id = h.id || `h-${i}`; h.id = id; return { id, text: h.textContent || '', level: parseInt(h.tagName[1]) }; })); }, []);
     useEffect(updateDocumentOutline, [idea?.synopsis, updateDocumentOutline]);
 
     const editorStyle = useMemo(() => ({ fontSize: `${projectData?.settings?.baseFontSize || 18}px`, color: theme === 'book' ? (THEME_CONFIG.book.text.match(/\[(.*?)\]/)?.[1] || '#F5EADD') : undefined }), [theme, projectData?.settings?.baseFontSize]);

@@ -128,7 +128,8 @@ const FindReplaceModal: React.FC<{
 
   const clearHighlights = useCallback(() => {
     if (!editorRef.current) return;
-    const highlights = Array.from(editorRef.current.querySelectorAll('.search-highlight, .current-match'));
+// FIX: Added generic type to querySelectorAll to ensure correct type inference for `node`.
+    const highlights = Array.from(editorRef.current.querySelectorAll<HTMLElement>('.search-highlight, .current-match'));
     highlights.forEach(node => {
         const parent = node.parentNode;
         if (parent) {
@@ -629,7 +630,7 @@ const ChapterEditorPage: React.FC = () => {
             document.execCommand('styleWithCSS', false, 'true');
             document.execCommand('hiliteColor', false, DUMMY_COLOR_RGB);
 
-            // Find all the elements that were just highlighted.
+// FIX: Added generic type to querySelectorAll to ensure correct type inference for `span`.
             const tempSpans = Array.from(editorRef.current.querySelectorAll<HTMLElement>(`span[style*="background-color: ${DUMMY_COLOR_RGB}"]`));
             
             const parentsToClean = new Set<Node>();

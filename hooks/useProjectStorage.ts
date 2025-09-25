@@ -50,23 +50,36 @@ export function useProjectStorage() {
             `--${boundary}--`
         ].join('\r\n');
 
+        const token = gapi.client.getToken();
+        if (!token || !token.access_token) {
+            throw new Error("User not authenticated for creating on Drive.");
+        }
 
-        const response = await gapi.client.request({
-            path: 'https://www.googleapis.com/upload/drive/v3/files',
+        const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
             method: 'POST',
-            params: { uploadType: 'multipart' },
-            headers: { 'Content-Type': 'multipart/related; boundary="' + boundary + '"' },
-            body: multipartRequestBody
+            headers: {
+                'Authorization': `Bearer ${token.access_token}`,
+                'Content-Type': 'multipart/related; boundary="' + boundary + '"',
+            },
+            body: multipartRequestBody,
+            keepalive: true, // This ensures the request continues even if the tab is closed.
         });
 
-        if (!response.result.id) {
+        const result = await response.json();
+
+        if (!response.ok) {
+            console.error("Drive API Error on create:", result);
+            throw new Error(`Failed to create file on Drive. Status: ${response.status}. Message: ${result?.error?.message}`);
+        }
+
+        if (!result.id) {
             throw new Error("File creation failed: No ID returned from Drive API.");
         }
         
-        console.log("File created successfully on Drive:", response.result);
-        driveFileIdRef.current = response.result.id;
-        await idbSet(DRIVE_FILE_ID_KEY, response.result.id);
-        return { fileId: response.result.id, name: response.result.name };
+        console.log("File created successfully on Drive:", result);
+        driveFileIdRef.current = result.id;
+        await idbSet(DRIVE_FILE_ID_KEY, result.id);
+        return { fileId: result.id, name: result.name };
     }, []);
 
     const saveToDrive = useCallback(async (data: ProjectData) => {
@@ -100,6 +113,7 @@ export function useProjectStorage() {
                     'Content-Type': 'application/json',
                 },
                 body: fileContent,
+                keepalive: true, // This ensures the request continues even if the tab is closed.
             });
     
             // Handle cases where the file might have been deleted on Drive.

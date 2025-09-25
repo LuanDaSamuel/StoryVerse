@@ -167,7 +167,8 @@ const SketchEditorPage: React.FC = () => {
     const handleTagClick = (tag: string) => { const currentTags = sketch?.tags || []; const newTags = currentTags.includes(tag) ? currentTags.filter(t => t !== tag) : [...currentTags, tag].slice(0, 6); updateSketch({ tags: newTags }); };
     const handleDelete = () => { if (!sketch || novelIndex === -1) return; setProjectData(d => { if (!d) return null; const novels = [...d.novels]; const novelToUpdate = { ...novels[novelIndex] }; novelToUpdate.sketches = novelToUpdate.sketches.filter(s => s.id !== sketch.id); novels[novelIndex] = novelToUpdate; return { ...d, novels }; }); navigate('/sketches'); };
     
-    const updateDocumentOutline = useCallback(() => { if (!editorRef.current) return; const headings = Array.from(editorRef.current.querySelectorAll('h1, h2, h3')); setDocumentOutline(headings.map((h, i) => { const id = h.id || `h-${i}`; h.id = id; return { id, text: h.textContent || '', level: parseInt(h.tagName[1]) }; })); }, []);
+// FIX: Added generic type to querySelectorAll to ensure correct type inference for heading elements.
+    const updateDocumentOutline = useCallback(() => { if (!editorRef.current) return; const headings = Array.from(editorRef.current.querySelectorAll<HTMLElement>('h1, h2, h3')); setDocumentOutline(headings.map((h, i) => { const id = h.id || `h-${i}`; h.id = id; return { id, text: h.textContent || '', level: parseInt(h.tagName[1]) }; })); }, []);
     useEffect(updateDocumentOutline, [sketch?.content, updateDocumentOutline]);
 
     const editorStyle = useMemo(() => ({ fontSize: `${projectData?.settings?.baseFontSize || 18}px` }), [projectData?.settings?.baseFontSize]);

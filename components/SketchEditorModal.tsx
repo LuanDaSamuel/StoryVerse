@@ -5,14 +5,17 @@ import { NovelSketch } from '../types';
 import { SKETCH_TAG_OPTIONS, enhancePlainText, enhanceHtml } from '../constants';
 import { CloseIcon, BoldIcon, ItalicIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, H1Icon, H2Icon, H3Icon } from './Icons';
 
-const ToolbarButton = ({
-  onClick,
-  isActive,
-  children,
-}: {
+// FIX: Refactored to use a standard interface and React.FC for better type safety and to resolve compiler errors.
+interface ToolbarButtonProps {
   onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
   isActive: boolean;
   children: React.ReactNode;
+}
+
+const ToolbarButton: React.FC<ToolbarButtonProps> = ({
+  onClick,
+  isActive,
+  children,
 }) => {
     const activeClass = `bg-white/20 text-white`;
     const inactiveClass = `hover:bg-white/10 text-gray-300`;
