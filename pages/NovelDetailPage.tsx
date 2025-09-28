@@ -527,7 +527,7 @@ const NovelDetailPage: React.FC = () => {
                 isOpen={isDocxConfirmOpen}
                 onClose={() => { setIsDocxConfirmOpen(false); setPendingFiles(null); }}
                 onConfirm={handleDocxImport}
-                title={`Import from ${pendingFiles?.length === 1 ? `"${pendingFiles[0].name}"` : `${pendingFiles?.length || 0} files`}?`}
+                title={`Import from ${pendingFiles?.length === 1 && pendingFiles.item(0) ? `"${pendingFiles.item(0)!.name}"` : `${pendingFiles?.length || 0} files`}?`}
                 message="This will replace all existing chapters in this novel with the content from the selected DOCX file(s). This action cannot be undone."
                 confirmButtonClass={`px-6 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}
             />

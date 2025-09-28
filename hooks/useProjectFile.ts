@@ -103,41 +103,73 @@ export function useProject() {
 
   const storage = useProjectStorage();
   const saveProjectRef = useRef<() => Promise<void>>(async () => {});
-// FIX: The type for window.setTimeout is `number` in browsers.
+// FIX: The type for window.setTimeout is `number` in browsers, not React.Timeout.
   const saveTimeoutRef = useRef<number | null>(null);
 
   const saveProject = useCallback(async () => {
+    // If a save is already happening, or there are no changes, do nothing.
+    // The debouncer will catch subsequent changes.
     if (isSavingRef.current || !isDirtyRef.current) {
         return;
     }
 
     isSavingRef.current = true;
-    // Mark as clean before saving. Any new edits during the save will set it back to dirty.
+    // Mark as clean *before* saving. Any new edits that occur *during* the save
+    // operation will set this back to true, ensuring the debouncer schedules another save.
     isDirtyRef.current = false;
-
-    const dataToSave = projectDataRef.current;
     setSaveStatus('saving');
 
-    try {
-        if (!dataToSave) throw new Error("No project data to save.");
-
-        if (storageMode === 'drive') {
-            await storage.saveToDrive(dataToSave);
-        } else if (storageMode === 'local') {
-            await set(LOCAL_BACKUP_KEY, dataToSave);
-            await storage.saveToFileHandle(dataToSave);
-        }
-
-        setSaveStatus('saved');
-    } catch (error) {
-        console.error(`Error saving project to ${storageMode}:`, error);
-        // If the save fails, the changes are still unsaved. Mark as dirty again.
-        isDirtyRef.current = true;
+    const dataToSave = projectDataRef.current;
+    if (!dataToSave) {
+        console.error("Attempted to save but no project data was available.");
         setSaveStatus('error');
-    } finally {
         isSavingRef.current = false;
-        // The debouncer in `setProjectDataAndMarkDirty` is responsible for scheduling
-        // the next save if any new edits were made during this save operation.
+        // The data is still "dirty" because the save failed before it began.
+        isDirtyRef.current = true;
+        return;
+    }
+
+    const MAX_RETRIES = 3;
+    const INITIAL_DELAY_MS = 1500; // Start with a slightly longer delay
+
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+            if (storageMode === 'drive') {
+                await storage.saveToDrive(dataToSave);
+            } else if (storageMode === 'local') {
+                // For local files, also update the IndexedDB backup.
+                await set(LOCAL_BACKUP_KEY, dataToSave);
+                await storage.saveToFileHandle(dataToSave);
+            }
+
+            // --- Success ---
+            setSaveStatus('saved');
+            isSavingRef.current = false;
+            // A new save might have been queued by the debouncer if edits happened during this save.
+            // The `saveProject` call from that debouncer will handle it. We are done here.
+            return; 
+
+        } catch (error) {
+            console.error(`Save attempt ${attempt}/${MAX_RETRIES} failed for storage mode '${storageMode}':`, error);
+
+            if (attempt === MAX_RETRIES) {
+                // --- Final Failure ---
+                // All retries have been exhausted. Show the error to the user.
+                setSaveStatus('error');
+                // The changes are still unsaved.
+                isDirtyRef.current = true;
+                isSavingRef.current = false;
+                // Stop the retry loop. The user will need to trigger a new save,
+                // either by editing again or with a manual save button (if we add one).
+                return;
+            }
+
+            // --- Retry ---
+            // Wait before the next attempt, using exponential backoff.
+            const delay = INITIAL_DELAY_MS * Math.pow(2, attempt - 1);
+            console.log(`Will retry in ${delay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
     }
   }, [storage, storageMode]);
 
