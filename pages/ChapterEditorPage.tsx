@@ -128,8 +128,8 @@ const FindReplaceModal: React.FC<{
 
   const clearHighlights = useCallback(() => {
     if (!editorRef.current) return;
-// FIX: Added generic type to querySelectorAll to ensure correct type inference for `node`.
-    const highlights = Array.from(editorRef.current.querySelectorAll<HTMLElement>('.search-highlight, .current-match'));
+// FIX: Changed generic function call to type assertion for compatibility to resolve "Untyped function calls may not accept type arguments" error.
+    const highlights = Array.from(editorRef.current.querySelectorAll('.search-highlight, .current-match') as NodeListOf<HTMLElement>);
     highlights.forEach(node => {
         const parent = node.parentNode;
         if (parent) {
@@ -630,8 +630,8 @@ const ChapterEditorPage: React.FC = () => {
             document.execCommand('styleWithCSS', false, 'true');
             document.execCommand('hiliteColor', false, DUMMY_COLOR_RGB);
 
-// FIX: Added generic type to querySelectorAll to ensure correct type inference for `span`.
-            const tempSpans = Array.from(editorRef.current.querySelectorAll<HTMLElement>(`span[style*="background-color: ${DUMMY_COLOR_RGB}"]`));
+// FIX: Changed generic function call to type assertion for compatibility to resolve "Untyped function calls may not accept type arguments" error.
+            const tempSpans = Array.from(editorRef.current.querySelectorAll(`span[style*="background-color: ${DUMMY_COLOR_RGB}"]`) as NodeListOf<HTMLElement>);
             
             const parentsToClean = new Set<Node>();
 

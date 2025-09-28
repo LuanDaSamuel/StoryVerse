@@ -34,63 +34,42 @@ export function useProjectStorage() {
     const projectFileHandleRef = useRef<FileSystemFileHandle | null>(null);
 
     const createOnDrive = useCallback(async (data: ProjectData): Promise<{ fileId: string, name: string }> => {
-        console.log("Creating new file on Google Drive...");
-        const boundary = '-------314159265358979323846';
-        const metadata = { name: DRIVE_PROJECT_FILENAME, mimeType: 'application/json' };
-
-        const multipartRequestBody = [
-            `--${boundary}`,
-            'Content-Type: application/json; charset=UTF-8',
-            '',
-            JSON.stringify(metadata),
-            `--${boundary}`,
-            'Content-Type: application/json',
-            '',
-            JSON.stringify(data), // Use compact JSON
-            `--${boundary}--`
-        ].join('\r\n');
-
-        const token = gapi.client.getToken();
-        if (!token || !token.access_token) {
-            throw new Error("User not authenticated for creating on Drive.");
-        }
-
-        const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+        console.log("Creating new file on Google Drive via gapi.client.request...");
+        
+        // Step 1: Create the file with metadata only.
+        const createResponse = await gapi.client.request({
+            path: '/drive/v3/files',
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token.access_token}`,
-                'Content-Type': 'multipart/related; boundary="' + boundary + '"',
-            },
-            body: multipartRequestBody,
-            keepalive: true, // This ensures the request continues even if the tab is closed.
+            body: {
+                name: DRIVE_PROJECT_FILENAME,
+                mimeType: 'application/json',
+            }
         });
 
-        const result = await response.json();
-
-        if (!response.ok) {
-            console.error("Drive API Error on create:", result);
-            throw new Error(`Failed to create file on Drive. Status: ${response.status}. Message: ${result?.error?.message}`);
-        }
-
-        if (!result.id) {
+        const fileId = createResponse.result.id;
+        if (!fileId) {
+            console.error("Drive API Error on create:", createResponse.result);
             throw new Error("File creation failed: No ID returned from Drive API.");
         }
+        console.log(`File metadata created with ID: ${fileId}`);
         
-        console.log("File created successfully on Drive:", result);
-        driveFileIdRef.current = result.id;
-        await idbSet(DRIVE_FILE_ID_KEY, result.id);
-        return { fileId: result.id, name: result.name };
+        // Step 2: Upload the content to the newly created file.
+        await gapi.client.request({
+            path: `/upload/drive/v3/files/${fileId}`,
+            method: 'PATCH',
+            params: { uploadType: 'media' },
+            body: JSON.stringify(data)
+        });
+        
+        console.log("File content uploaded successfully.");
+        driveFileIdRef.current = fileId;
+        await idbSet(DRIVE_FILE_ID_KEY, fileId);
+        return { fileId: fileId, name: createResponse.result.name };
     }, []);
 
     const saveToDrive = useCallback(async (data: ProjectData) => {
         let fileId = driveFileIdRef.current || await idbGet<string>(DRIVE_FILE_ID_KEY);
     
-        const token = gapi.client.getToken();
-        if (!token || !token.access_token) {
-            throw new Error("User not authenticated for saving to Drive.");
-        }
-    
-        // If there's no file ID, it's the first save. Create the file.
         if (!fileId) {
             console.log("No Drive file ID found, creating a new file...");
             const { fileId: newFileId } = await createOnDrive(data);
@@ -102,45 +81,35 @@ export function useProjectStorage() {
         driveFileIdRef.current = fileId;
     
         try {
-            console.log(`Initiating simple upload for Drive file: ${fileId}`);
-            const fileContent = JSON.stringify(data); // Use compact JSON
+            console.log(`Initiating upload for Drive file: ${fileId} via gapi.client.request`);
             
-            // Use a simple media upload, which is a single request and faster for smaller files.
-            const response = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+            await gapi.client.request({
+                path: `/upload/drive/v3/files/${fileId}`,
                 method: 'PATCH',
-                headers: {
-                    'Authorization': `Bearer ${token.access_token}`,
-                    'Content-Type': 'application/json',
-                },
-                body: fileContent,
-                keepalive: true, // This ensures the request continues even if the tab is closed.
+                params: { uploadType: 'media' },
+                body: JSON.stringify(data)
             });
     
+            console.log("File updated successfully.");
+    
+        } catch (error: any) {
+            console.error("Failed to update Drive file:", error);
+    
             // Handle cases where the file might have been deleted on Drive.
-            if (response.status === 404) {
+            if (error.status === 404) {
                  console.log("File not found on Drive. Creating a new one.");
-                 await idbDel(DRIVE_FILE_ID_KEY); // Clear the stale ID
+                 await idbDel(DRIVE_FILE_ID_KEY);
                  driveFileIdRef.current = null;
                  await createOnDrive(data);
-                 return; // Stop execution, the new file has been created.
+                 return;
             }
     
-            if (!response.ok) {
-                const errorBody = await response.text();
-                throw new Error(`Failed to update file with simple upload. Status: ${response.status}. Body: ${errorBody}`);
-            }
-    
-            console.log("File updated successfully via simple upload.");
-    
-        } catch (error) {
-            console.error("Failed to update Drive file:", error);
-            // Re-throw the error so the calling hook (useProjectFile) can handle the UI state.
+            // Re-throw other errors so the calling hook (useProjectFile) can handle retries and UI state.
             throw error;
         }
     }, [createOnDrive]);
 
     const loadFromDrive = useCallback(async (): Promise<{ name: string, data: ProjectData } | null> => {
-        // First, try to load using a stored file ID for efficiency and robustness.
         const storedFileId = await idbGet<string>(DRIVE_FILE_ID_KEY);
         if (storedFileId) {
             console.log(`Attempting to load project file from stored ID: ${storedFileId}`);
@@ -163,27 +132,32 @@ export function useProjectStorage() {
                     await idbDel(DRIVE_FILE_ID_KEY);
                 }
             } catch (error: any) {
-                 console.error("Failed to load file from stored ID, it might have been deleted. Clearing ID.", error);
+                 if (error.status === 404) {
+                    console.error("Failed to load file from stored ID, it was not found. Clearing ID.", error);
+                 } else {
+                    console.error("An error occurred loading from stored ID. Clearing ID.", error);
+                 }
                  await idbDel(DRIVE_FILE_ID_KEY);
             }
         }
 
-        // If loading by ID fails, fall back to searching by name.
-        console.log("Searching for project file by name on Google Drive...");
+        console.log("Searching for the most recent project file by name on Google Drive...");
         const listResponse = await gapi.client.request({
             path: 'https://www.googleapis.com/drive/v3/files',
             params: {
                 q: `name='${DRIVE_PROJECT_FILENAME}' and trashed=false`,
-                fields: 'files(id, name)',
+                fields: 'files(id, name, modifiedTime)',
+                orderBy: 'modifiedTime desc',
+                pageSize: 1,
                 spaces: 'drive'
             }
         });
 
         if (listResponse.result.files && listResponse.result.files.length > 0) {
             const file = listResponse.result.files[0];
-            console.log(`Found project file by name with ID: ${file.id}`);
+            console.log(`Found most recent project file by name with ID: ${file.id}`);
             driveFileIdRef.current = file.id;
-            await idbSet(DRIVE_FILE_ID_KEY, file.id); // Store the found ID for next time
+            await idbSet(DRIVE_FILE_ID_KEY, file.id);
             
             const contentResponse = await gapi.client.request({
                 path: `https://www.googleapis.com/drive/v3/files/${file.id}`,
@@ -192,6 +166,7 @@ export function useProjectStorage() {
 
             return { name: file.name, data: contentResponse.result };
         }
+        
         console.log("No project file found on Google Drive.");
         return null;
     }, []);
@@ -204,7 +179,6 @@ export function useProjectStorage() {
                 scope: SCOPES,
                 callback: async (tokenResponse: TokenResponse) => {
                     if (tokenResponse && tokenResponse.access_token) {
-                        // Calculate expiration time and store it with the token.
                         const expires_at = Date.now() + (tokenResponse.expires_in * 1000);
                         const storedToken: StoredToken = { ...tokenResponse, expires_at };
                         await idbSet(GAPI_AUTH_TOKEN_KEY, storedToken);
@@ -224,7 +198,6 @@ export function useProjectStorage() {
                     reject(new Error(`Sign in failed: ${error.type || 'Unknown error'}`));
                 }
             });
-            // Remove `prompt: 'consent'` for better UX on subsequent sign-ins.
             tokenClient.requestAccessToken();
         } catch (error) {
             reject(error);
@@ -233,35 +206,33 @@ export function useProjectStorage() {
     }, []);
 
     const signOut = useCallback(async () => {
-        // We only clear the local session data on sign-out. We do not revoke the token,
-        // as that would force the user to go through the consent screen again on every sign-in,
-        // which is the inconvenient behavior the user reported.
         if (gapi.client) {
             gapi.client.setToken('');
         }
         await idbDel(GAPI_AUTH_TOKEN_KEY);
         await idbDel(DRIVE_FILE_ID_KEY);
         driveFileIdRef.current = null;
-        // Disables automatic sign-in for the next page load.
         google.accounts.id.disableAutoSelect();
         console.log('User signed out. Local session data cleared.');
     }, []);
     
     const initAndRestoreSession = useCallback(async (): Promise<UserProfile | null> => {
         console.log("Initializing GAPI client and attempting to restore session...");
-        await new Promise<void>((resolve, reject) => gapi.load('client', () => resolve()));
+        await new Promise<void>((resolve, reject) => {
+             // Add a timeout to prevent getting stuck if gapi fails to load
+            const timeout = setTimeout(() => reject(new Error("gapi.load timed out")), 5000);
+            gapi.load('client', () => { clearTimeout(timeout); resolve(); });
+        });
         await gapi.client.init({ apiKey: API_KEY }).catch((err: any) => {
             console.error("GAPI client init failed:", err);
             throw new Error(`Initialization failed:\n${err.details || 'Unknown error.'}`);
         });
 
         const token = await idbGet<StoredToken>(GAPI_AUTH_TOKEN_KEY);
-        // Check if token exists and has not expired.
         if (token && token.access_token && Date.now() < token.expires_at) {
             console.log("Found valid, non-expired auth token, verifying...");
             gapi.client.setToken(token);
             try {
-                // Verify the token is still valid by making a lightweight API call
                 const userInfo = await gapi.client.request({
                     path: 'https://www.googleapis.com/oauth2/v3/userinfo'
                 });
@@ -312,7 +283,7 @@ export function useProjectStorage() {
         if (handle && await verifyPermission(handle)) {
             projectFileHandleRef.current = handle;
             const writable = await handle.createWritable();
-            await writable.write(JSON.stringify(data)); // Use compact JSON
+            await writable.write(JSON.stringify(data));
             await writable.close();
         } else {
              console.error("No file handle available or permission denied.");

@@ -119,7 +119,8 @@ const NovelDetailPage: React.FC = () => {
             "p[style-name='Heading 3'] => h3:fresh",
         ];
 
-        for (const file of sortedFiles) {
+        // FIX: Explicitly typed 'file' as File to resolve errors when accessing properties like 'arrayBuffer' and 'name'.
+        for (const file: File of sortedFiles) {
             try {
                 const arrayBuffer = await file.arrayBuffer();
                 const { value: html } = await mammoth.convertToHtml({ arrayBuffer }, { styleMap });
@@ -527,7 +528,8 @@ const NovelDetailPage: React.FC = () => {
                 isOpen={isDocxConfirmOpen}
                 onClose={() => { setIsDocxConfirmOpen(false); setPendingFiles(null); }}
                 onConfirm={handleDocxImport}
-                title={`Import from ${pendingFiles?.length === 1 && pendingFiles.item(0) ? `"${pendingFiles.item(0)!.name}"` : `${pendingFiles?.length || 0} files`}?`}
+                // FIX: Added type assertion to resolve error when accessing 'name' property on an 'unknown' type.
+                title={`Import from ${pendingFiles?.length === 1 && pendingFiles.item(0) ? `"${(pendingFiles.item(0) as File).name}"` : `${pendingFiles?.length || 0} files`}?`}
                 message="This will replace all existing chapters in this novel with the content from the selected DOCX file(s). This action cannot be undone."
                 confirmButtonClass={`px-6 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}
             />
