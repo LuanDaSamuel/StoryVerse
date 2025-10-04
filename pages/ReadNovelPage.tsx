@@ -1,24 +1,21 @@
-import React, { useState, useMemo, useContext, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
-import { ProjectContext } from '../contexts/ProjectContext';
+import { useProjectStore, useThemeClasses } from '../store/projectStore';
 import { enhanceHtml, enhancePlainText } from '../constants';
 import { BackIcon, Bars3Icon, ChevronLeftIcon, ChevronRightIcon, CloseIcon } from '../components/Icons';
 
 const ChapterListModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
-    novelId: string;
-    novel: { title: string; chapters: { id: string; title: string }[] };
-    themeClasses: any;
-}> = ({ isOpen, onClose, novelId, novel, themeClasses }) => {
+    novel: { id: string; title: string; chapters: { id: string; title: string }[] };
+}> = ({ isOpen, onClose, novel }) => {
+    const themeClasses = useThemeClasses();
     if (!isOpen) return null;
 
     return (
         <div 
             className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 font-sans"
-            onClick={onClose}
-            role="dialog"
-            aria-modal="true"
+            onClick={onClose} role="dialog" aria-modal="true"
         >
             <div 
                 className={`w-full max-w-md p-6 rounded-lg shadow-2xl ${themeClasses.bgSecondary} ${themeClasses.accentText} border ${themeClasses.border}`}
@@ -35,7 +32,7 @@ const ChapterListModal: React.FC<{
                         {novel.chapters.map(chapter => (
                             <li key={chapter.id}>
                                 <Link
-                                    to={`/novel/${novelId}/read/${chapter.id}`}
+                                    to={`/novel/${novel.id}/read/${chapter.id}`}
                                     onClick={onClose}
                                     className={`block w-full text-left px-3 py-2 rounded-md transition-colors ${themeClasses.accentText} hover:${themeClasses.bgTertiary}`}
                                 >
@@ -54,72 +51,30 @@ const ChapterListModal: React.FC<{
 const ReadNovelPage: React.FC = () => {
     const { novelId, chapterId } = useParams<{ novelId: string; chapterId?: string }>();
     const navigate = useNavigate();
-    const { projectData, themeClasses } = useContext(ProjectContext);
+    const { projectData } = useProjectStore();
+    const themeClasses = useThemeClasses();
 
     const [isChapterListOpen, setIsChapterListOpen] = useState(false);
     const mainRef = useRef<HTMLElement>(null);
 
     const { novel, currentChapter, chapterIndex } = useMemo(() => {
         if (!projectData?.novels || !novelId) return { novel: null, currentChapter: null, chapterIndex: -1 };
-        
         const n = projectData.novels.find(n => n.id === novelId) || null;
         if (!n) return { novel: null, currentChapter: null, chapterIndex: -1 };
-
-        const cIndex = chapterId ? n.chapters.findIndex(c => c.id === chapterId) : -1;
+        const cIndex = chapterId ? n.chapters.findIndex(c => c.id === chapterId) : (n.chapters.length > 0 ? 0 : -1);
         const c = cIndex !== -1 ? n.chapters[cIndex] : null;
-
         return { novel: n, currentChapter: c, chapterIndex: cIndex };
     }, [projectData, novelId, chapterId]);
 
-    const baseFontSize = projectData?.settings?.baseFontSize || 18;
-
     useEffect(() => {
-        // If novel is loaded but chapter isn't (or no ID is in URL), redirect to first chapter.
-        if (novel && !currentChapter && novel.chapters.length > 0) {
+        if (novel && !chapterId && novel.chapters.length > 0) {
             navigate(`/novel/${novelId}/read/${novel.chapters[0].id}`, { replace: true });
         }
-    }, [novel, currentChapter, novelId, navigate]);
+    }, [novel, chapterId, novelId, navigate]);
     
-    // Effect to handle scroll position restoration and scrolling to top
     useEffect(() => {
-        const mainEl = mainRef.current;
-        if (!mainEl || !novelId || !chapterId) return;
-
-        const savedPosition = sessionStorage.getItem(`storyverse-scroll-pos-${novelId}-${chapterId}`);
-        if (savedPosition) {
-            mainEl.scrollTo(0, parseInt(savedPosition, 10));
-        } else {
-            mainEl.scrollTo(0, 0);
-        }
-    }, [chapterId, novelId]);
-
-    // Effect to save scroll position
-    useEffect(() => {
-        const mainEl = mainRef.current;
-        if (!mainEl || !novelId || !chapterId) return () => {};
-
-        const throttleTimeout = { current: null as number | null };
-
-        const handleScroll = () => {
-            if (throttleTimeout.current) return;
-            throttleTimeout.current = window.setTimeout(() => {
-                if (mainRef.current) {
-                    sessionStorage.setItem(`storyverse-scroll-pos-${novelId}-${chapterId}`, String(mainRef.current.scrollTop));
-                }
-                throttleTimeout.current = null;
-            }, 250);
-        };
-
-        mainEl.addEventListener('scroll', handleScroll);
-
-        return () => {
-            mainEl.removeEventListener('scroll', handleScroll);
-            if (throttleTimeout.current) {
-                clearTimeout(throttleTimeout.current);
-            }
-        };
-    }, [chapterId, novelId]);
-
+        mainRef.current?.scrollTo(0, 0);
+    }, [chapterId]);
 
     if (!novel || !currentChapter) {
         return (
@@ -137,9 +92,7 @@ const ReadNovelPage: React.FC = () => {
              <ChapterListModal 
                 isOpen={isChapterListOpen} 
                 onClose={() => setIsChapterListOpen(false)} 
-                novelId={novel.id}
-                novel={novel} 
-                themeClasses={themeClasses}
+                novel={novel}
             />
 
             <main ref={mainRef} className="h-full overflow-y-auto relative">
@@ -158,7 +111,7 @@ const ReadNovelPage: React.FC = () => {
                 
                 <article
                     className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12"
-                    style={{ fontSize: `${baseFontSize}px` }}
+                    style={{ fontSize: `${projectData?.settings.baseFontSize || 18}px` }}
                 >
                      <section
                         key={currentChapter.id}
@@ -183,7 +136,7 @@ const ReadNovelPage: React.FC = () => {
                                     <ChevronLeftIcon className="w-5 h-5" />
                                     Previous Chapter
                                 </Link>
-                            ) : (<div />) /* Placeholder to keep "Next" button on the right */}
+                            ) : (<div />)}
 
                              {nextChapter ? (
                                 <Link

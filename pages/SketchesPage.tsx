@@ -1,6 +1,6 @@
-import React, { useState, useContext, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ProjectContext } from '../contexts/ProjectContext';
+import { useProjectStore, useThemeClasses } from '../store/projectStore';
 import { NovelSketch, AggregatedSketch } from '../types';
 import { enhancePlainText } from '../constants';
 import { PlusIcon } from '../components/Icons';
@@ -8,7 +8,8 @@ import ConfirmModal from '../components/ConfirmModal';
 import SelectNovelModal from '../components/SelectNovelModal';
 
 const SketchesPage: React.FC = () => {
-    const { projectData, setProjectData, themeClasses } = useContext(ProjectContext);
+    const { projectData, setProjectData } = useProjectStore();
+    const themeClasses = useThemeClasses();
     const navigate = useNavigate();
     
     const [isCreatingSketch, setIsCreatingSketch] = useState(false);
@@ -33,26 +34,21 @@ const SketchesPage: React.FC = () => {
     
         const now = new Date().toISOString();
         const newSketch: NovelSketch = {
-            id: crypto.randomUUID(),
-            title: 'Untitled Sketch',
-            content: '<p><br></p>',
-            tags: [],
-            createdAt: now,
-            updatedAt: now,
+            id: crypto.randomUUID(), title: 'Untitled Sketch', content: '<p><br></p>',
+            tags: [], createdAt: now, updatedAt: now,
         };
     
-        setProjectData(currentData => {
-            if (!currentData) return null;
-            const novelIndex = currentData.novels.findIndex(n => n.id === selectedNovelId);
-            if (novelIndex === -1) return currentData;
-    
-            const updatedNovels = [...currentData.novels];
-            const novelToUpdate = { ...updatedNovels[novelIndex] };
+        setProjectData(data => {
+            if (!data) return null;
+            const novelIndex = data.novels.findIndex(n => n.id === selectedNovelId);
+            if (novelIndex === -1) return data;
             
+            const updatedNovels = [...data.novels];
+            const novelToUpdate = { ...updatedNovels[novelIndex] };
             novelToUpdate.sketches = [newSketch, ...novelToUpdate.sketches];
             updatedNovels[novelIndex] = novelToUpdate;
             
-            return { ...currentData, novels: updatedNovels };
+            return { ...data, novels: updatedNovels };
         });
     
         setIsCreatingSketch(false);
@@ -61,16 +57,16 @@ const SketchesPage: React.FC = () => {
 
     const handleDeleteSketch = () => {
         if (!sketchToDelete) return;
-        setProjectData(currentData => {
-            if (!currentData) return null;
-            const novelIndex = currentData.novels.findIndex(n => n.id === sketchToDelete.novelId);
-            if (novelIndex === -1) return currentData;
+        setProjectData(data => {
+            if (!data) return null;
+            const novelIndex = data.novels.findIndex(n => n.id === sketchToDelete.novelId);
+            if (novelIndex === -1) return data;
 
-            const updatedNovels = [...currentData.novels];
+            const updatedNovels = [...data.novels];
             const currentNovel = { ...updatedNovels[novelIndex] };
             currentNovel.sketches = currentNovel.sketches.filter(s => s.id !== sketchToDelete.id);
             updatedNovels[novelIndex] = currentNovel;
-            return { ...currentData, novels: updatedNovels };
+            return { ...data, novels: updatedNovels };
         });
         setSketchToDelete(null);
     };

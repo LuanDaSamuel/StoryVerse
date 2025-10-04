@@ -1,6 +1,6 @@
-import React, { useContext, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { AggregatedSketch } from '../types';
-import { ProjectContext } from '../contexts/ProjectContext';
+import { useProjectStore, useThemeClasses } from '../store/projectStore';
 import { CloseIcon } from './Icons';
 import { enhancePlainText, enhanceHtml } from '../constants';
 
@@ -10,8 +10,8 @@ interface SketchViewerModalProps {
 }
 
 const SketchViewerModal: React.FC<SketchViewerModalProps> = ({ sketch, onClose }) => {
-    const { themeClasses, projectData } = useContext(ProjectContext);
-    const baseFontSize = projectData?.settings?.baseFontSize || 18;
+    const themeClasses = useThemeClasses();
+    const baseFontSize = useProjectStore(state => state.projectData?.settings.baseFontSize || 18);
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
@@ -27,12 +27,10 @@ const SketchViewerModal: React.FC<SketchViewerModalProps> = ({ sketch, onClose }
 
     if (!sketch) return null;
     
-    const textColor = themeClasses.accentText;
-
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-start justify-center p-4 overflow-y-auto" role="dialog" aria-modal="true" onClick={onClose}>
             <div 
-                className={`flex flex-col shadow-xl w-full max-w-3xl rounded-lg my-8 ${themeClasses.bgSecondary} ${textColor} border ${themeClasses.border}`}
+                className={`flex flex-col shadow-xl w-full max-w-3xl rounded-lg my-8 ${themeClasses.bgSecondary} ${themeClasses.accentText} border ${themeClasses.border}`}
                 onClick={e => e.stopPropagation()}
             >
                 <header className="flex justify-between items-start p-6 border-b border-inherit flex-shrink-0">
@@ -45,7 +43,7 @@ const SketchViewerModal: React.FC<SketchViewerModalProps> = ({ sketch, onClose }
                             ))}
                         </div>
                     </div>
-                    <button onClick={onClose} className={`p-2 -m-2 rounded-full hover:${themeClasses.bgTertiary} transition-colors ${textColor}`}>
+                    <button onClick={onClose} className={`p-2 -m-2 rounded-full hover:${themeClasses.bgTertiary} transition-colors ${themeClasses.accentText}`}>
                         <CloseIcon className="w-6 h-6" />
                     </button>
                 </header>

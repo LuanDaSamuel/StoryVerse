@@ -1,6 +1,6 @@
-import React, { useMemo, useContext } from 'react';
+import React, { useMemo } from 'react';
 import { Novel } from '../types';
-import { ProjectContext } from '../contexts/ProjectContext';
+import { useThemeClasses } from '../store/projectStore';
 import { enhancePlainText } from '../constants';
 
 interface NovelHistoryPageProps {
@@ -8,7 +8,7 @@ interface NovelHistoryPageProps {
 }
 
 const NovelHistoryPage: React.FC<NovelHistoryPageProps> = ({ novel }) => {
-    const { themeClasses } = useContext(ProjectContext);
+    const themeClasses = useThemeClasses();
 
     const historyLog = useMemo(() => {
         if (!novel || !novel.chapters) return [];

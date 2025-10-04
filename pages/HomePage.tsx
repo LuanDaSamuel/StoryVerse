@@ -1,12 +1,11 @@
-import React, { useContext } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
-import { ProjectContext } from '../contexts/ProjectContext';
+import { useProjectStore, useThemeClasses } from '../store/projectStore';
 import { enhancePlainText } from '../constants';
-import { Novel } from '../types';
 
 const HomePage = () => {
-    const { projectData, themeClasses } = useContext(ProjectContext);
-    const novels = projectData?.novels || [];
+    const novels = useProjectStore(state => state.projectData?.novels || []);
+    const themeClasses = useThemeClasses();
 
     if (novels.length === 0) {
         return (
@@ -30,14 +29,10 @@ const HomePage = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {novels.map((novel) => {
                     const latestChapter = novel.chapters.length > 0
-                        ? novel.chapters.reduce((latest, current) => {
-                            return new Date(current.updatedAt) > new Date(latest.updatedAt) ? current : latest;
-                        })
+                        ? novel.chapters.reduce((latest, current) => new Date(current.updatedAt) > new Date(latest.updatedAt) ? current : latest)
                         : null;
                     
-                    const linkTo = latestChapter
-                        ? `/novel/${novel.id}/edit/${latestChapter.id}`
-                        : `/novel/${novel.id}`;
+                    const linkTo = latestChapter ? `/novel/${novel.id}/edit/${latestChapter.id}` : `/novel/${novel.id}`;
 
                     return (
                         <Link
@@ -45,7 +40,6 @@ const HomePage = () => {
                             key={novel.id}
                             className={`group relative flex flex-col rounded-lg overflow-hidden transition-all duration-300 ease-in-out transform hover:-translate-y-1 hover:shadow-2xl ${themeClasses.bgSecondary}`}
                         >
-                            {/* Cover Image */}
                             <div className={`relative w-full aspect-[3/4] flex-shrink-0 ${themeClasses.bgTertiary}`}>
                                 {novel.coverImage ? (
                                     <img src={novel.coverImage} alt={novel.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
@@ -55,7 +49,6 @@ const HomePage = () => {
                                     </div>
                                 )}
                             </div>
-                            {/* Novel Details */}
                             <div className="p-4 flex flex-col flex-grow">
                                 <h3 className={`font-bold text-xl ${themeClasses.accentText} min-h-[3.5rem]`} title={novel.title}>
                                     {enhancePlainText(novel.title)}
@@ -69,7 +62,6 @@ const HomePage = () => {
                                 </div>
                             </div>
 
-                            {/* Centered, truncated description overlay on hover */}
                             {novel.description && (
                                 <div className="absolute inset-0 p-6 bg-black/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center text-center">
                                     <p className="text-white text-base line-clamp-[12]">

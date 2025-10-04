@@ -103,7 +103,7 @@ export function useProject() {
 
   const storage = useProjectStorage();
   const saveProjectRef = useRef<() => Promise<void>>(async () => {});
-// FIX: The type for window.setTimeout is `number` in browsers, not `React.Timeout`, which was causing the "Cannot find namespace 'React'" error.
+  // FIX: Changed the type for window.setTimeout from `React.Timeout` to `number`. `setTimeout` in browsers returns a `number`. The namespace `React` does not contain a `Timeout` type.
   const saveTimeoutRef = useRef<number | null>(null);
 
   const saveProject = useCallback(async () => {
@@ -196,7 +196,7 @@ export function useProject() {
 
             saveTimeoutRef.current = window.setTimeout(() => {
                 saveProjectRef.current?.();
-            }, 1000); // 1-second delay
+            }, 500); // Reduced delay to 500ms for faster saves
         }
         return newData;
     });
