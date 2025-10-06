@@ -1,5 +1,5 @@
-import React from 'react';
-import { useThemeClasses } from '../store/projectStore';
+import * as React from 'react';
+import { ProjectContext } from '../contexts/ProjectContext';
 import { CloseIcon } from './Icons';
 import { enhancePlainText } from '../constants';
 
@@ -12,8 +12,8 @@ interface ConfirmModalProps {
   confirmButtonClass?: string;
 }
 
-const ConfirmModal: React.FC<ConfirmModalProps> = ({ isOpen, onClose, onConfirm, title, message, confirmButtonClass }) => {
-    const themeClasses = useThemeClasses();
+const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message, confirmButtonClass }: ConfirmModalProps) => {
+    const { themeClasses } = React.useContext(ProjectContext);
 
     if (!isOpen) return null;
 

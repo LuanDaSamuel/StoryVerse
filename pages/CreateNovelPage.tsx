@@ -1,26 +1,26 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useProjectStore, useThemeClasses } from '../store/projectStore';
+import { ProjectContext } from '../contexts/ProjectContext';
 import { TAG_OPTIONS } from '../constants';
 import { Novel } from '../types';
 import { UploadIcon, BackIcon } from '../components/Icons';
 
 const DRAFT_KEY = 'storyverse-novel-draft';
 
-const CreateNovelPage: React.FC = () => {
-    const { setProjectData } = useProjectStore();
-    const themeClasses = useThemeClasses();
+const CreateNovelPage = () => {
+    const { setProjectData, themeClasses } = React.useContext(ProjectContext);
     const navigate = useNavigate();
-    const [title, setTitle] = useState('');
-    const [description, setDescription] = useState('');
-    const [coverImage, setCoverImage] = useState<string | null>(null);
-    const [selectedTags, setSelectedTags] = useState<string[]>([]);
-    const [tagFilter, setTagFilter] = useState('');
-    const [tagSort, setTagSort] = useState<'default' | 'alpha'>('default');
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const descriptionTextareaRef = useRef<HTMLTextAreaElement>(null);
+    const [title, setTitle] = React.useState('');
+    const [description, setDescription] = React.useState('');
+    const [coverImage, setCoverImage] = React.useState<string | null>(null);
+    const [selectedTags, setSelectedTags] = React.useState<string[]>([]);
+    const [tagFilter, setTagFilter] = React.useState('');
+    const [tagSort, setTagSort] = React.useState<'default' | 'alpha'>('default');
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
+    const descriptionTextareaRef = React.useRef<HTMLTextAreaElement>(null);
 
-    useEffect(() => {
+    // Load draft from session storage on component mount
+    React.useEffect(() => {
         try {
             const savedDraft = sessionStorage.getItem(DRAFT_KEY);
             if (savedDraft) {
@@ -31,36 +31,64 @@ const CreateNovelPage: React.FC = () => {
                 setSelectedTags(draft.selectedTags || []);
             }
         } catch (error) {
-            console.error("Failed to load novel draft:", error);
+            console.error("Failed to load novel draft from session storage:", error);
+            sessionStorage.removeItem(DRAFT_KEY); // Clear potentially corrupted data
         }
-    }, []);
+    }, []); // Empty dependency array ensures this runs only once on mount
 
-    useEffect(() => {
+    // Save draft to session storage whenever form data changes
+    React.useEffect(() => {
         const draft = { title, description, coverImage, selectedTags };
-        sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+        try {
+            sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+        } catch (error) {
+            console.error("Failed to save novel draft to session storage:", error);
+        }
     }, [title, description, coverImage, selectedTags]);
 
-    useEffect(() => {
+    // Autosize the description textarea to fit its content.
+    React.useEffect(() => {
         if (descriptionTextareaRef.current) {
-            descriptionTextareaRef.current.style.height = 'auto';
-            descriptionTextareaRef.current.style.height = `${descriptionTextareaRef.current.scrollHeight}px`;
+            const textarea = descriptionTextareaRef.current;
+            textarea.style.height = 'auto'; // Reset height to allow shrinking
+            textarea.style.height = `${textarea.scrollHeight}px`;
         }
     }, [description]);
+
+
+    const placeholderClass = themeClasses.input.split(' ').find(c => c.startsWith('placeholder-')) || 'placeholder-gray-400';
     
-    const filteredAndSortedTags = useMemo(() => {
-        const filtered = TAG_OPTIONS.filter(tag => tag.toLowerCase().includes(tagFilter.toLowerCase()));
-        return tagSort === 'alpha' ? filtered.sort((a, b) => a.localeCompare(b)) : filtered;
+    const filteredAndSortedTags = React.useMemo(() => {
+        const filtered = TAG_OPTIONS.filter(tag =>
+            tag.toLowerCase().includes(tagFilter.toLowerCase())
+        );
+
+        if (tagSort === 'alpha') {
+            return filtered.sort((a, b) => a.localeCompare(b));
+        }
+
+        return filtered;
     }, [tagFilter, tagSort]);
 
     const handleTagClick = (tag: string) => {
-        setSelectedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : (prev.length < 6 ? [...prev, tag] : prev));
+        setSelectedTags(prev => {
+            if (prev.includes(tag)) {
+                return prev.filter(t => t !== tag);
+            }
+            if (prev.length < 6) {
+                return [...prev, tag];
+            }
+            return prev;
+        });
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
             const reader = new FileReader();
-            reader.onloadend = () => setCoverImage(reader.result as string);
+            reader.onloadend = () => {
+                setCoverImage(reader.result as string);
+            };
             reader.readAsDataURL(file);
         }
     };
@@ -70,18 +98,38 @@ const CreateNovelPage: React.FC = () => {
         const newChapterId = crypto.randomUUID();
         const now = new Date().toISOString();
         const newNovel: Novel = {
-            id: crypto.randomUUID(), title, description, tags: selectedTags,
-            chapters: [{ id: newChapterId, title: 'Chapter 1', content: '', wordCount: 0, createdAt: now, updatedAt: now, history: [] }],
-            sketches: [], createdAt: now, ...(coverImage && { coverImage }),
+            id: crypto.randomUUID(),
+            title,
+            description,
+            tags: selectedTags,
+            chapters: [{
+                id: newChapterId,
+                title: 'Chapter 1',
+                content: '',
+                wordCount: 0,
+                createdAt: now,
+                updatedAt: now,
+                history: [],
+            }],
+            // FIX: Initialize sketches as an empty array for new novels.
+            sketches: [],
+            createdAt: now,
+            ...(coverImage && { coverImage }),
         };
 
-        setProjectData(data => data ? { ...data, novels: [...data.novels, newNovel] } : null);
+        setProjectData(currentData => {
+            if (!currentData) return null; // Should not happen if we are on this page
+            return {
+                ...currentData,
+                novels: [...currentData.novels, newNovel],
+            };
+        });
         
+        // Clear the draft from session storage after successful submission
         sessionStorage.removeItem(DRAFT_KEY);
+
         navigate(`/novel/${newNovel.id}/edit/${newChapterId}`);
     };
-
-    const placeholderClass = themeClasses.input.split(' ').find(c => c.startsWith('placeholder-')) || 'placeholder-gray-400';
 
     return (
         <div className={`p-4 sm:p-8 md:p-12 ${themeClasses.bg} min-h-screen`}>

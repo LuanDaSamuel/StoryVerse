@@ -1,137 +1,401 @@
-import React, { useMemo, useRef, useState, useCallback, useEffect } from 'react';
+import * as React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useProjectStore, useThemeClasses } from '../store/projectStore';
-import { BackIcon, ChevronLeftIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, TrashIcon, H1Icon, H2Icon, H3Icon, LoadingIcon, CheckIcon, ExclamationTriangleIcon } from '../components/Icons';
+import { ProjectContext } from '../contexts/ProjectContext';
+import { BackIcon, ChevronLeftIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, TrashIcon, H1Icon, H2Icon, H3Icon, SearchIcon, LoadingIcon, CheckIcon, ExclamationTriangleIcon, CloseIcon } from '../components/Icons';
 import { enhanceHtml, enhancePlainText, SKETCH_TAG_OPTIONS } from '../constants';
 import { StoryIdea, StoryIdeaStatus } from '../types';
 import ConfirmModal from '../components/ConfirmModal';
 
-// FIX: Moved SaveStatusIndicator outside the main component to prevent re-declaration on every render.
-const SaveStatusIndicator: React.FC = () => {
-    const saveStatus = useProjectStore(state => state.saveStatus);
-    const themeClasses = useThemeClasses();
+const SaveStatusIndicator = () => {
+    const { theme, saveStatus } = React.useContext(ProjectContext);
     const baseClasses = 'flex items-center space-x-2 text-sm font-sans font-semibold';
     switch (saveStatus) {
-        case 'unsaved': return <div className={`${baseClasses} ${themeClasses.textSecondary}`}>Unsaved</div>;
-        case 'saving': return <div className={`${baseClasses} text-blue-400`}><LoadingIcon className="w-4 h-4 animate-spin" /> Saving...</div>;
-        case 'saved': return <div className={`${baseClasses} text-green-400`}><CheckIcon className="w-4 h-4" /> Saved!</div>;
-        case 'error': return <div className={`${baseClasses} text-red-400`}><ExclamationTriangleIcon className="w-4 h-4" /> Error</div>;
+        case 'unsaved': return <div className={`${baseClasses} ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`}><span>Unsaved changes</span></div>;
+        case 'saving': return <div className={`${baseClasses} ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}><LoadingIcon className="w-4 h-4 animate-spin" /><span>Saving...</span></div>;
+        case 'saved': return <div className={`${baseClasses} ${theme === 'dark' ? 'text-green-400' : 'text-green-600'}`}><CheckIcon className="w-4 h-4" /><span>Saved!</span></div>;
+        case 'error': return <div className={`${baseClasses} ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}><ExclamationTriangleIcon className="w-4 h-4" /><span>Error saving</span></div>;
         default: return null;
     }
 };
 
-const StoryIdeaEditorPage: React.FC = () => {
+const FindReplaceModal = ({ isOpen, onClose, editorRef }: { isOpen: boolean, onClose: () => void, editorRef: React.RefObject<HTMLDivElement> }) => {
+    const { themeClasses } = React.useContext(ProjectContext);
+    const [findText, setFindText] = React.useState('');
+    const [replaceText, setReplaceText] = React.useState('');
+    const [matches, setMatches] = React.useState<HTMLElement[]>([]);
+    const [currentIndex, setCurrentIndex] = React.useState(-1);
+    const [caseSensitive, setCaseSensitive] = React.useState(false);
+    const [wholeWord, setWholeWord] = React.useState(false);
+    const debounceTimeout = React.useRef<number | null>(null);
+
+    const clearHighlights = React.useCallback(() => {
+        if (!editorRef.current) return;
+        editorRef.current.querySelectorAll('.search-highlight, .current-match').forEach(node => {
+            const parent = node.parentNode;
+            if (parent) {
+                while (node.firstChild) parent.insertBefore(node.firstChild, node);
+                parent.removeChild(node);
+            }
+        });
+        editorRef.current.normalize();
+    }, [editorRef]);
+
+    const handleClose = React.useCallback(() => {
+        clearHighlights();
+        setFindText('');
+        setReplaceText('');
+        setMatches([]);
+        setCurrentIndex(-1);
+        onClose();
+    }, [clearHighlights, onClose]);
+
+    const highlightMatches = React.useCallback(() => {
+        clearHighlights();
+        if (!findText || !editorRef.current) {
+            setMatches([]);
+            setCurrentIndex(-1);
+            return;
+        }
+        const newMatches: HTMLElement[] = [];
+        const walker = document.createTreeWalker(editorRef.current, NodeFilter.SHOW_TEXT);
+        const textNodes: Text[] = [];
+        while (walker.nextNode()) textNodes.push(walker.currentNode as Text);
+        let flags = 'g';
+        if (!caseSensitive) flags += 'i';
+        let pattern = findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        if (wholeWord) {
+            pattern = `\\b${pattern}\\b`;
+        }
+        const regex = new RegExp(pattern, flags);
+        textNodes.forEach(node => {
+            if (!node.textContent || node.parentElement?.closest('.search-highlight')) return;
+            const matchesInNode = [...node.textContent.matchAll(regex)];
+            if (matchesInNode.length > 0) {
+                let lastIndex = 0;
+                const fragment = document.createDocumentFragment();
+                matchesInNode.forEach(match => {
+                    const index = match.index!;
+                    if (index > lastIndex) fragment.appendChild(document.createTextNode(node.textContent!.slice(lastIndex, index)));
+                    const span = document.createElement('span');
+                    span.className = 'search-highlight';
+                    span.textContent = match[0];
+                    fragment.appendChild(span);
+                    newMatches.push(span);
+                    lastIndex = index + match[0].length;
+                });
+                if (lastIndex < node.textContent.length) fragment.appendChild(document.createTextNode(node.textContent.slice(lastIndex)));
+                node.parentNode?.replaceChild(fragment, node);
+            }
+        });
+        setMatches(newMatches);
+        setCurrentIndex(newMatches.length > 0 ? 0 : -1);
+    }, [findText, editorRef, clearHighlights, caseSensitive, wholeWord]);
+
+    React.useEffect(() => {
+        if (isOpen) {
+            if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
+            debounceTimeout.current = window.setTimeout(highlightMatches, 300);
+        }
+        return () => {
+            if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
+        };
+    }, [findText, isOpen, highlightMatches, caseSensitive, wholeWord]);
+
+    React.useEffect(() => {
+        matches.forEach((match, index) => {
+            if (index === currentIndex) {
+                match.classList.add('current-match');
+                match.scrollIntoView({
+                    block: 'center',
+                    behavior: 'smooth'
+                });
+            } else {
+                match.classList.remove('current-match');
+            }
+        });
+    }, [currentIndex, matches]);
+    
+    const handleNavigate = (direction: 'next' | 'prev') => {
+        if (matches.length === 0) return;
+        setCurrentIndex(prev => (direction === 'next' ? prev + 1 : prev - 1 + matches.length) % matches.length);
+    };
+
+    const handleReplace = () => {
+        if (currentIndex === -1 || matches.length === 0) return;
+        const match = matches[currentIndex];
+        match.textContent = replaceText;
+        match.classList.remove('search-highlight', 'current-match');
+        setTimeout(() => {
+            const newMatches = matches.filter(m => m !== match);
+            setMatches(newMatches);
+            if (newMatches.length > 0) {
+                setCurrentIndex(currentIndex % newMatches.length);
+            } else {
+                setCurrentIndex(-1);
+            }
+            editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+        }, 0);
+    };
+
+    const handleReplaceAll = () => {
+        if (!editorRef.current || matches.length === 0) return;
+        matches.forEach(match => {
+            match.textContent = replaceText;
+        });
+        editorRef.current.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+        handleClose();
+    };
+
+    if (!isOpen) return null;
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 transition-opacity font-sans">
+            <div className={`p-6 rounded-lg shadow-2xl w-full max-w-md m-4 ${themeClasses.bgSecondary} ${themeClasses.accentText} border ${themeClasses.border}`}>
+                <div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold">Find & Replace</h2><button onClick={handleClose} className={`p-1 rounded-full hover:${themeClasses.bgTertiary}`} aria-label="Close"><CloseIcon className="w-6 h-6" /></button></div>
+                <div className="space-y-4">
+                    <div className="relative">
+                        <input type="text" placeholder="Find..." value={findText} onChange={(e) => setFindText(e.target.value)} className={`w-full px-3 py-2 rounded-md ${themeClasses.input} border ${themeClasses.border}`} />
+                        {findText && <div className={`absolute right-3 top-1/2 -translate-y-1/2 text-xs ${themeClasses.textSecondary}`}>{matches.length > 0 ? `${currentIndex + 1} / ${matches.length}` : '0 matches'}</div>}
+                    </div>
+                    <input type="text" placeholder="Replace with..." value={replaceText} onChange={(e) => setReplaceText(e.target.value)} className={`w-full px-3 py-2 rounded-md ${themeClasses.input} border ${themeClasses.border}`} />
+                </div>
+                <div className="flex items-center space-x-4 mt-3">
+                    <button onClick={() => setCaseSensitive(p => !p)} className={`px-3 py-1 text-xs rounded-md font-semibold ${caseSensitive ? `${themeClasses.accent} ${themeClasses.accentText}` : themeClasses.bgTertiary}`}>Aa</button>
+                    <button onClick={() => setWholeWord(p => !p)} className={`px-3 py-1 text-xs rounded-md font-semibold ${wholeWord ? `${themeClasses.accent} ${themeClasses.accentText}` : themeClasses.bgTertiary}`}>Whole Word</button>
+                </div>
+                <div className="flex justify-between items-center mt-4">
+                    <div className="flex items-center space-x-2"><button onClick={() => handleNavigate('prev')} disabled={matches.length === 0} className={`px-3 py-1 rounded-md text-sm font-semibold ${themeClasses.bgTertiary} disabled:opacity-50`}>Previous</button><button onClick={() => handleNavigate('next')} disabled={matches.length === 0} className={`px-3 py-1 rounded-md text-sm font-semibold ${themeClasses.bgTertiary} disabled:opacity-50`}>Next</button></div>
+                    <div className="flex items-center space-x-2"><button onClick={handleReplace} disabled={currentIndex === -1} className={`px-4 py-2 font-semibold rounded-lg ${themeClasses.bgTertiary} disabled:opacity-50`}>Replace</button><button onClick={handleReplaceAll} disabled={!findText} className={`px-4 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} disabled:opacity-50`}>Replace All</button></div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const StoryIdeaEditorPage = () => {
     const { ideaId } = useParams<{ ideaId: string }>();
     const navigate = useNavigate();
-    const { projectData, setProjectData } = useProjectStore();
-    const themeClasses = useThemeClasses();
-    const editorRef = useRef<HTMLDivElement>(null);
-    const editorContentRef = useRef<string>("");
-
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+    const { projectData, setProjectData, themeClasses } = React.useContext(ProjectContext);
     
-    const { idea, ideaIndex } = useMemo(() => {
+    const editorRef = React.useRef<HTMLDivElement>(null);
+    const editorContentRef = React.useRef<string>("");
+
+    const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+    const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = React.useState(false);
+    const [isFindReplaceOpen, setIsFindReplaceOpen] = React.useState(false);
+    const [activeFormats, setActiveFormats] = React.useState({ isBold: false, isItalic: false, isUL: false, isOL: false, currentBlock: 'p' });
+
+    const { idea, ideaIndex } = React.useMemo(() => {
         if (!projectData?.storyIdeas || !ideaId) return { idea: null, ideaIndex: -1 };
+        
         const index = projectData.storyIdeas.findIndex(i => i.id === ideaId);
-        return { idea: index > -1 ? projectData.storyIdeas[index] : null, ideaIndex: index };
+        if (index === -1) return { idea: null, ideaIndex: -1 };
+
+        return {
+            idea: projectData.storyIdeas[index],
+            ideaIndex: index,
+        };
     }, [projectData, ideaId]);
 
-    const updateIdea = useCallback((updates: Partial<Omit<StoryIdea, 'id' | 'createdAt'>>) => {
+    const updateStoryIdea = React.useCallback((updates: Partial<Omit<StoryIdea, 'id' | 'createdAt'>>) => {
         if (ideaIndex === -1) return;
-        setProjectData(data => {
-            if (!data) return null;
-            const ideas = [...data.storyIdeas];
-            const currentIdea = ideas[ideaIndex];
-            const newSynopsis = updates.synopsis !== undefined ? updates.synopsis : currentIdea.synopsis;
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = newSynopsis;
-            const wordCount = (tempDiv.textContent || "").trim().split(/\s+/).filter(Boolean).length;
 
-            ideas[ideaIndex] = { ...currentIdea, ...updates, wordCount, updatedAt: new Date().toISOString() };
-            return { ...data, storyIdeas: ideas };
+        setProjectData(currentData => {
+            if (!currentData || !currentData.storyIdeas[ideaIndex]) return currentData;
+            
+            const updatedIdeas = [...currentData.storyIdeas];
+            
+            let updatedIdea = {
+                ...updatedIdeas[ideaIndex],
+                ...updates,
+                updatedAt: new Date().toISOString(),
+            };
+
+            // Update word count if synopsis changes
+            if ('synopsis' in updates) {
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = updates.synopsis || '';
+                const text = tempDiv.textContent || "";
+                updatedIdea.wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+            }
+            
+            updatedIdeas[ideaIndex] = updatedIdea;
+            
+            return { ...currentData, storyIdeas: updatedIdeas };
         });
     }, [ideaIndex, setProjectData]);
 
     const handleEditorInput = (e: React.FormEvent<HTMLDivElement>) => {
         const newHTML = e.currentTarget.innerHTML;
         editorContentRef.current = newHTML;
-        updateIdea({ synopsis: newHTML });
+        updateStoryIdea({ synopsis: newHTML });
+    };
+    
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            document.execCommand('insertText', false, '    ');
+        }
     };
 
-    useEffect(() => {
+    const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        const text = e.clipboardData.getData('text/plain');
+        if (!text) return;
+
+        const htmlToInsert = text
+            .split(/\r?\n/)
+            .map(line => `<p>${line.trim() === '' ? '<br>' : enhancePlainText(line)}</p>`)
+            .join('');
+
+        document.execCommand('insertHTML', false, htmlToInsert);
+    };
+
+    React.useEffect(() => {
         if (editorRef.current && idea && idea.synopsis !== editorContentRef.current) {
-            editorRef.current.innerHTML = enhanceHtml(idea.synopsis || '<p><br></p>');
-            editorContentRef.current = idea.synopsis;
+            const initialContent = idea.synopsis || '<p><br></p>';
+            editorRef.current.innerHTML = enhanceHtml(initialContent);
+            editorContentRef.current = initialContent;
         }
     }, [idea]);
+    
+    const updateActiveFormats = React.useCallback(() => {
+        const selection = window.getSelection();
+        if (!selection?.rangeCount) return;
+        let element = selection.anchorNode;
+        if (element?.nodeType === 3) element = element.parentNode;
+        let blockType = 'p';
+        let parent = element as HTMLElement | null;
+        while(parent && parent !== editorRef.current) {
+            const tag = parent.tagName.toLowerCase();
+            if(['h1','h2','h3','blockquote'].includes(tag)) {
+                blockType = tag;
+                break;
+            }
+            parent = parent.parentElement;
+        }
+        setActiveFormats({
+            isBold: document.queryCommandState('bold'),
+            isItalic: document.queryCommandState('italic'),
+            isUL: document.queryCommandState('insertUnorderedList'),
+            isOL: document.queryCommandState('insertOrderedList'),
+            currentBlock: blockType,
+        });
+    }, []);
 
-    const applyCommand = (command: string) => {
-        document.execCommand(command, false);
+    React.useEffect(() => {
+        const editorEl = editorRef.current;
+        document.addEventListener('selectionchange', updateActiveFormats);
+        editorEl?.addEventListener('keyup', updateActiveFormats);
+        editorEl?.addEventListener('mouseup', updateActiveFormats);
+        editorEl?.addEventListener('focus', updateActiveFormats);
+        return () => {
+            document.removeEventListener('selectionchange', updateActiveFormats);
+            editorEl?.removeEventListener('keyup', updateActiveFormats);
+            editorEl?.removeEventListener('mouseup', updateActiveFormats);
+            editorEl?.removeEventListener('focus', updateActiveFormats);
+        };
+    }, [updateActiveFormats]);
+
+    const applyCommand = (e: React.MouseEvent<HTMLButtonElement>, command: string, value?: string) => {
+        e.preventDefault();
+        document.execCommand(command, false, value);
         editorRef.current?.focus();
-        handleEditorInput({ currentTarget: editorRef.current } as React.FormEvent<HTMLDivElement>);
+        updateActiveFormats();
+    };
+
+    const applyBlockFormat = (e: React.MouseEvent<HTMLButtonElement>, format: string) => {
+        e.preventDefault();
+        const currentBlock = activeFormats.currentBlock;
+        const formatToApply = currentBlock === format ? 'p' : format;
+        document.execCommand('formatBlock', false, formatToApply);
+        editorRef.current?.focus();
+        updateActiveFormats();
+    };
+    
+    const handleTagClick = (tag: string) => {
+        if (!idea) return;
+        const currentTags = idea.tags || [];
+        const newTags = currentTags.includes(tag)
+            ? currentTags.filter(t => t !== tag)
+            : [...currentTags, tag].slice(0, 6);
+        updateStoryIdea({ tags: newTags });
     };
 
     const handleDelete = () => {
         if (!idea) return;
-        setProjectData(data => data ? { ...data, storyIdeas: data.storyIdeas.filter(i => i.id !== idea.id) } : null);
+        setProjectData(currentData => {
+            if (!currentData) return null;
+            const updatedIdeas = currentData.storyIdeas.filter(s => s.id !== idea.id);
+            return { ...currentData, storyIdeas: updatedIdeas };
+        });
         navigate('/demos');
     };
 
-    if (!idea) return <div className={`flex h-screen items-center justify-center ${themeClasses.bg}`}><p>Loading idea...</p></div>;
+    if (!idea) {
+        return (
+            <div className={`flex h-screen items-center justify-center ${themeClasses.bg}`}>
+                <p>Loading idea...</p>
+            </div>
+        );
+    }
+    const statusOptions: StoryIdeaStatus[] = ['Seedling', 'Developing', 'Archived'];
 
     return (
         <>
             <div className={`flex h-screen font-serif ${themeClasses.bg} ${themeClasses.text}`}>
                 {isSidebarOpen && <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-black/50 z-30" />}
                 <div className="flex-1 overflow-y-auto relative">
-                    <div className={`sticky top-0 z-10 px-8 pt-6 pb-4 ${themeClasses.bg} bg-opacity-80 backdrop-blur-sm border-b ${themeClasses.border} flex justify-between`}>
-                        <button onClick={() => navigate('/demos')} className={`flex items-center space-x-2 ${themeClasses.text} opacity-70 hover:opacity-100`}>
-                            <BackIcon className="w-5 h-5" /><span className="font-sans">To Idea Box</span>
-                        </button>
+                    <div className={`sticky top-0 z-10 px-8 md:px-16 lg:px-24 pt-6 pb-4 ${themeClasses.bg} bg-opacity-80 backdrop-blur-sm border-b ${themeClasses.border} flex justify-between items-center`}>
+                        <button onClick={() => navigate('/demos')} className={`flex items-center space-x-2 ${themeClasses.text} opacity-70 hover:opacity-100`}><BackIcon className="w-5 h-5" /><span className="font-sans">Return to Idea Box</span></button>
                         <SaveStatusIndicator />
                     </div>
-                    <div className="px-8 pt-8 pb-48">
-                        <input type="text" value={idea.title} onChange={e => updateIdea({ title: e.target.value })} onBlur={e => updateIdea({ title: enhancePlainText(e.target.value) })} className="text-4xl font-bold bg-transparent outline-none w-full mb-8" />
-                        <div ref={editorRef} contentEditable onInput={handleEditorInput} className="w-full outline-none story-content" style={{fontSize: `${projectData?.settings.baseFontSize}px`}} />
+                    <div className="px-8 md:px-16 lg:px-24 pt-8 pb-48">
+                        <input type="text" value={idea.title} onChange={e => updateStoryIdea({ title: e.target.value })} onBlur={(e) => updateStoryIdea({ title: enhancePlainText(e.target.value) })} placeholder="Idea Title" className="text-4xl font-bold bg-transparent outline-none w-full mb-8" />
+                        <div ref={editorRef} contentEditable spellCheck={true} suppressContentEditableWarning onInput={handleEditorInput} onKeyDown={handleKeyDown} onPaste={handlePaste} className="w-full leading-relaxed outline-none story-content" style={{ fontSize: `${projectData?.settings?.baseFontSize || 18}px` }}/>
                     </div>
                 </div>
-                <div className={`fixed top-0 right-0 h-full z-40 transition-transform ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+                <div className={`fixed top-0 right-0 h-full z-40 transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
                     <div className={`w-80 h-full ${themeClasses.bgSecondary} ${themeClasses.accentText} text-sm font-sans border-l ${themeClasses.border} flex flex-col`}>
-                         <div className={`px-4 py-3 flex justify-between items-center border-b ${themeClasses.border}`}>
-                            <span className="font-bold">IDEA DETAILS</span>
-                            <button onClick={() => setIsSidebarOpen(false)}><ChevronLeftIcon className="w-5 h-5"/></button>
-                         </div>
-                         <div className="p-4 space-y-4">
-                             <div>
-                                <h3 className={`font-bold mb-2 ${themeClasses.textSecondary}`}>STATUS</h3>
-                                <div className="flex rounded-md overflow-hidden border ${themeClasses.border}`}>
-                                    {(['Seedling', 'Developing', 'Archived'] as StoryIdeaStatus[]).map(s => (
-                                        <button key={s} onClick={() => updateIdea({ status: s })} className={`flex-1 py-2 text-sm font-semibold ${idea.status === s ? `${themeClasses.accent} ${themeClasses.accentText}` : `hover:${themeClasses.bgTertiary}`}`}>{s}</button>
+                        <div className={`px-4 py-3 flex justify-between items-center border-b ${themeClasses.border}`}><span className="font-bold text-base">IDEA DETAILS</span><button onClick={() => setIsSidebarOpen(false)}><ChevronLeftIcon className="w-5 h-5"/></button></div>
+                        <div className="flex-1 p-4 space-y-6 overflow-y-auto">
+                           <div>
+                                <h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Status</h3>
+                                <div className={`flex rounded-md overflow-hidden border ${themeClasses.border}`}>
+                                    {statusOptions.map(option => (
+                                        <button key={option} onClick={() => updateStoryIdea({ status: option })} className={`flex-1 py-2 text-sm font-semibold transition-colors ${idea.status === option ? `${themeClasses.accent} ${themeClasses.accentText}` : `hover:${themeClasses.bgTertiary}`}`}>{option}</button>
                                     ))}
                                 </div>
-                             </div>
-                             <div>
-                                <h3 className={`font-bold mb-2 ${themeClasses.textSecondary}`}>TAGS</h3>
-                                <div className="flex flex-wrap gap-1.5">{SKETCH_TAG_OPTIONS.map(t => <button key={t} onClick={() => updateIdea({ tags: idea.tags.includes(t) ? idea.tags.filter(tag => tag !== t) : [...idea.tags, t] })} className={`px-2 py-1 text-xs rounded-full ${idea.tags.includes(t) ? `${themeClasses.accent} ${themeClasses.accentText}` : `${themeClasses.bgTertiary}`}`}>{t}</button>)}</div>
-                             </div>
-                             <div>
-                                <h3 className={`font-bold mb-2 ${themeClasses.textSecondary}`}>ACTIONS</h3>
-                                <button onClick={() => setIsDeleteConfirmOpen(true)} className="w-full flex items-center space-x-2 px-3 py-2 rounded-md bg-red-700 text-red-100"><TrashIcon className="w-5 h-5"/><span>Delete Idea</span></button>
-                             </div>
-                         </div>
+                           </div>
+                           <div><h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Tags</h3><div className="flex flex-wrap gap-1.5">{SKETCH_TAG_OPTIONS.map(t => <button key={t} onClick={() => handleTagClick(t)} className={`px-2 py-1 text-xs rounded-full font-semibold ${idea.tags.includes(t) ? `${themeClasses.accent} ${themeClasses.accentText}` : `${themeClasses.bgTertiary} hover:opacity-80`}`}>{t}</button>)}</div></div>
+                           <div><h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Actions</h3><button onClick={() => setIsDeleteConfirmOpen(true)} className="w-full flex items-center space-x-3 text-left px-4 py-3 rounded-lg font-semibold bg-red-700 text-red-100 hover:bg-red-800"><TrashIcon className="w-5 h-5"/><span>Delete Idea</span></button></div>
+                        </div>
                     </div>
                 </div>
                 <div className="absolute bottom-0 left-0 w-full flex justify-center pb-4 z-20 pointer-events-none">
-                    <div className="flex items-center space-x-1 p-1 rounded-full shadow-lg bg-stone-900/70 border border-white/10 backdrop-blur-sm pointer-events-auto">
-                        <button onClick={() => applyCommand('bold')} className="p-2 rounded-full text-white/70 hover:text-white"><BoldIcon className="w-5 h-5"/></button>
-                        {/* FIX: Fixed a likely JSX parsing error by properly formatting the closing div tag. This was causing cascading compile errors. */}
-                        <button onClick={() => applyCommand('italic')} className="p-2 rounded-full text-white/70 hover:text-white"><ItalicIcon className="w-5 h-5"/></button>
+                    <div className="relative pointer-events-auto">
+                        <div className="flex items-center space-x-1 p-1 rounded-full shadow-lg bg-stone-900/70 border border-white/10 backdrop-blur-sm" onMouseDown={e => e.preventDefault()}>
+                            <button onClick={(e) => applyCommand(e, 'bold')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors ${activeFormats.isBold ? 'text-white bg-white/10' : ''}`}><BoldIcon className="w-5 h-5"/></button>
+                            <button onClick={(e) => applyCommand(e, 'italic')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors ${activeFormats.isItalic ? 'text-white bg-white/10' : ''}`}><ItalicIcon className="w-5 h-5"/></button>
+                            <div className="w-px h-5 bg-white/20 mx-1" />
+                            <button onClick={(e) => applyBlockFormat(e, 'h1')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors ${activeFormats.currentBlock === 'h1' ? 'text-white bg-white/10' : ''}`}><H1Icon className="w-5 h-5"/></button>
+                            <button onClick={(e) => applyBlockFormat(e, 'h2')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors ${activeFormats.currentBlock === 'h2' ? 'text-white bg-white/10' : ''}`}><H2Icon className="w-5 h-5"/></button>
+                            <button onClick={(e) => applyBlockFormat(e, 'h3')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors ${activeFormats.currentBlock === 'h3' ? 'text-white bg-white/10' : ''}`}><H3Icon className="w-5 h-5"/></button>
+                            <div className="w-px h-5 bg-white/20 mx-1" />
+                            <button onClick={(e) => applyCommand(e, 'insertUnorderedList')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors ${activeFormats.isUL ? 'text-white bg-white/10' : ''}`}><ListBulletIcon className="w-5 h-5"/></button>
+                            <button onClick={(e) => applyCommand(e, 'insertOrderedList')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors ${activeFormats.isOL ? 'text-white bg-white/10' : ''}`}><OrderedListIcon className="w-5 h-5"/></button>
+                            <button onClick={(e) => applyBlockFormat(e, 'blockquote')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors ${activeFormats.currentBlock === 'blockquote' ? 'text-white bg-white/10' : ''}`}><BlockquoteIcon className="w-5 h-5"/></button>
+                            <div className="w-px h-5 bg-white/20 mx-1" />
+                            <button onClick={() => setIsFindReplaceOpen(true)} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors`}><SearchIcon className="w-5 h-5"/></button>
+                            <div className="w-px h-5 bg-white/20 mx-1" />
+                            <button onClick={(e) => applyCommand(e, 'undo')} className="p-2 rounded-full text-white/70 hover:text-white transition-colors"><UndoIcon className="w-5 h-5"/></button>
+                            <button onClick={(e) => applyCommand(e, 'redo')} className="p-2 rounded-full text-white/70 hover:text-white transition-colors"><RedoIcon className="w-5 h-5"/></button>
+                        </div>
                     </div>
                 </div>
             </div>
-            {!isSidebarOpen && <button onClick={() => setIsSidebarOpen(true)} className={`fixed top-4 right-4 z-30 p-2 rounded-md ${themeClasses.bgSecondary} ${themeClasses.accentText} shadow-lg border ${themeClasses.border}`}><ChevronLeftIcon className="w-5 h-5" /></button>}
-            <ConfirmModal isOpen={isDeleteConfirmOpen} onClose={() => setIsDeleteConfirmOpen(false)} onConfirm={handleDelete} title={`Delete "${idea.title}"?`} message="This action is permanent." />
+            {!isSidebarOpen && <button onClick={() => setIsSidebarOpen(true)} className={`fixed top-4 right-4 z-30 p-2 rounded-md ${themeClasses.bgSecondary} ${themeClasses.accentText} hover:opacity-80 shadow-lg border ${themeClasses.border}`}><ChevronLeftIcon className="w-5 h-5" /></button>}
+            <FindReplaceModal isOpen={isFindReplaceOpen} onClose={() => setIsFindReplaceOpen(false)} editorRef={editorRef} />
+            <ConfirmModal isOpen={isDeleteConfirmOpen} onClose={() => setIsDeleteConfirmOpen(false)} onConfirm={handleDelete} title={`Delete "${idea.title}"?`} message="Are you sure you want to delete this idea? This action is permanent." />
         </>
     );
 };

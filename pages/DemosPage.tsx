@@ -1,6 +1,6 @@
-import React, { useMemo, useRef, useState } from 'react';
+import * as React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useProjectStore, useThemeClasses } from '../store/projectStore';
+import { ProjectContext } from '../contexts/ProjectContext';
 import { StoryIdea } from '../types';
 import { PlusIcon, UploadIcon, BackIcon, TrashIcon } from '../components/Icons';
 import ConfirmModal from '../components/ConfirmModal';
@@ -8,26 +8,37 @@ import { enhancePlainText } from '../constants';
 import * as mammoth from 'mammoth';
 
 const DemosPage = () => {
-    const { projectData, setProjectData } = useProjectStore();
-    const themeClasses = useThemeClasses();
+    const { projectData, setProjectData, themeClasses } = React.useContext(ProjectContext);
     const navigate = useNavigate();
-    const [isDocxConfirmOpen, setIsDocxConfirmOpen] = useState(false);
-    const [pendingImportData, setPendingImportData] = useState<{ title: string; synopsisHtml: string; originalFilename: string } | null>(null);
-    const docxInputRef = useRef<HTMLInputElement>(null);
-    const [ideaToDelete, setIdeaToDelete] = useState<StoryIdea | null>(null);
+    const [isDocxConfirmOpen, setIsDocxConfirmOpen] = React.useState(false);
+    const [pendingImportData, setPendingImportData] = React.useState<{ title: string; synopsisHtml: string; originalFilename: string } | null>(null);
+    const docxInputRef = React.useRef<HTMLInputElement>(null);
+    const [ideaToDelete, setIdeaToDelete] = React.useState<StoryIdea | null>(null);
 
-    const storyIdeas = useMemo(() => {
+    const storyIdeas = React.useMemo(() => {
         return [...(projectData?.storyIdeas || [])].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
     }, [projectData?.storyIdeas]);
 
     const handleNewIdea = () => {
         const now = new Date().toISOString();
         const newIdea: StoryIdea = {
-            id: crypto.randomUUID(), title: 'Untitled Idea', synopsis: '<p><br></p>',
-            wordCount: 0, tags: [], status: 'Seedling', createdAt: now, updatedAt: now,
+            id: crypto.randomUUID(),
+            title: 'Untitled Idea',
+            synopsis: '<p><br></p>',
+            wordCount: 0,
+            tags: [],
+            status: 'Seedling',
+            createdAt: now,
+            updatedAt: now,
         };
 
-        setProjectData(data => data ? { ...data, storyIdeas: [newIdea, ...data.storyIdeas] } : null);
+        setProjectData(currentData => {
+            if (!currentData) return null;
+            return {
+                ...currentData,
+                storyIdeas: [newIdea, ...currentData.storyIdeas],
+            };
+        });
         navigate(`/idea/${newIdea.id}/edit`);
     };
     
@@ -37,18 +48,35 @@ const DemosPage = () => {
 
         try {
             const arrayBuffer = await file.arrayBuffer();
-            const { value: html } = await mammoth.convertToHtml({ arrayBuffer }, { styleMap: ["p[style-name='Title'] => h1:fresh", "p[style-name*='Heading 1'] => h2:fresh", "p[style-name*='Heading 2'] => h3:fresh"] });
+            const styleMap = [
+                "p[style-name='Title'] => h1:fresh",
+                "p[style-name='Heading 1'] => h2:fresh",
+                "p[style-name='Heading 2'] => h3:fresh",
+                "p[style-name='Heading 3'] => h3:fresh",
+            ];
+            const { value: html } = await mammoth.convertToHtml({ arrayBuffer }, { styleMap });
+            
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = html.replace(/<p>(\s|&nbsp;|<br\s*\/?>)*<\/p>/gi, '').trim();
             
             let ideaTitle = file.name.replace(/\.docx$/, '');
             const firstHeading = tempDiv.querySelector('h1, h2, h3');
-            if (firstHeading?.textContent) ideaTitle = firstHeading.textContent.trim();
             
-            setPendingImportData({ title: ideaTitle, synopsisHtml: tempDiv.innerHTML, originalFilename: file.name });
+            if (firstHeading && firstHeading.textContent) {
+                ideaTitle = firstHeading.textContent.trim();
+            }
+            
+            const synopsisHtml = tempDiv.innerHTML;
+            
+            setPendingImportData({
+                title: ideaTitle,
+                synopsisHtml: synopsisHtml,
+                originalFilename: file.name,
+            });
             setIsDocxConfirmOpen(true);
         } catch (error) {
-            alert(`Failed to process ${file.name}. It might be corrupted.`);
+            console.error(`Error processing file ${file.name}:`, error);
+            alert(`Failed to process ${file.name}. It might be corrupted or not a valid .docx file.`);
         } finally {
             e.target.value = '';
         }
@@ -58,18 +86,41 @@ const DemosPage = () => {
         if (!pendingImportData) return;
         setIsDocxConfirmOpen(false);
 
-        const now = new Date().toISOString();
-        const newIdea: StoryIdea = {
-            id: crypto.randomUUID(), title: pendingImportData.title, synopsis: pendingImportData.synopsisHtml,
-            wordCount: 0, tags: [], status: 'Seedling', createdAt: now, updatedAt: now,
-        };
-        setProjectData(data => data ? { ...data, storyIdeas: [newIdea, ...data.storyIdeas] } : null);
-        setPendingImportData(null);
+        try {
+            const now = new Date().toISOString();
+            const newIdea: StoryIdea = {
+                id: crypto.randomUUID(),
+                title: pendingImportData.title,
+                synopsis: pendingImportData.synopsisHtml,
+                wordCount: 0, 
+                tags: [],
+                status: 'Seedling',
+                createdAt: now,
+                updatedAt: now,
+            };
+
+            setProjectData(currentData => {
+                if (!currentData) return null;
+                return {
+                    ...currentData,
+                    storyIdeas: [newIdea, ...currentData.storyIdeas],
+                };
+            });
+        } catch (error) {
+            console.error(`Error importing file:`, error);
+            alert(`Failed to import the story idea.`);
+        } finally {
+            setPendingImportData(null);
+        }
     };
 
     const handleDeleteIdea = () => {
         if (!ideaToDelete) return;
-        setProjectData(data => data ? { ...data, storyIdeas: data.storyIdeas.filter(i => i.id !== ideaToDelete.id) } : null);
+        setProjectData(currentData => {
+            if (!currentData) return null;
+            const updatedIdeas = currentData.storyIdeas.filter(i => i.id !== ideaToDelete.id);
+            return { ...currentData, storyIdeas: updatedIdeas };
+        });
         setIdeaToDelete(null);
     };
 
@@ -93,7 +144,10 @@ const DemosPage = () => {
                 <h1 className={`text-3xl font-bold ${themeClasses.text}`}>Idea Box</h1>
                 <div className="flex items-center space-x-2">
                     <input
-                        type="file" ref={docxInputRef} onChange={handleFileSelectForDocx} className="hidden"
+                        type="file"
+                        ref={docxInputRef}
+                        onChange={handleFileSelectForDocx}
+                        className="hidden"
                         accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     />
                     <button
@@ -117,7 +171,13 @@ const DemosPage = () => {
                 <div className={`p-8 md:p-12 h-full flex flex-col items-center justify-center -mt-16`}>
                     <div className={`w-full max-w-3xl p-8 text-center rounded-lg ${themeClasses.bgSecondary}`}>
                         <h2 className={`text-2xl font-bold mb-2 ${themeClasses.accentText}`}>Your Idea Box is empty.</h2>
-                        <p className={`${themeClasses.accentText} opacity-80`}>Click 'New Idea' to capture your first story concept.</p>
+                        <p className={`${themeClasses.accentText} opacity-80 mb-6`}>
+                            Click 'New Idea' to capture your first story concept, or import an idea from a DOCX file.
+                        </p>
+                        <Link to="/" className={`inline-flex items-center space-x-2 px-4 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}>
+                            <BackIcon className="w-5 h-5" />
+                            <span>Go to Home page</span>
+                        </Link>
                     </div>
                 </div>
             ) : (
@@ -143,7 +203,10 @@ const DemosPage = () => {
                                 </p>
                             </div>
                             <button
-                                onClick={(e) => { e.stopPropagation(); setIdeaToDelete(idea); }}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setIdeaToDelete(idea);
+                                }}
                                 className={`absolute top-3 right-3 p-2 rounded-full text-red-500 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-opacity`}
                                 aria-label={`Delete idea: ${enhancePlainText(idea.title)}`}
                             >
@@ -156,17 +219,33 @@ const DemosPage = () => {
 
             <ConfirmModal
                 isOpen={isDocxConfirmOpen}
-                onClose={() => setIsDocxConfirmOpen(false)}
+                onClose={() => { setIsDocxConfirmOpen(false); setPendingImportData(null); }}
                 onConfirm={handleDocxImport}
                 title={`Import from "${pendingImportData?.originalFilename}"?`}
-                message={pendingImportData ? <div><p className="mb-4">This will create a new story idea with the following content:</p><div className={`p-3 rounded-lg border ${themeClasses.border} ${themeClasses.bgTertiary}`}><p className="font-semibold text-sm">TITLE</p><p className={`mb-2 ${themeClasses.accentText}`}>{enhancePlainText(pendingImportData.title)}</p><p className="font-semibold text-sm">PREVIEW</p><p className={`text-sm italic ${themeClasses.textSecondary}`}>{getSnippet(pendingImportData.synopsisHtml)}</p></div></div> : null}
+                message={
+                    pendingImportData ? (
+                        <div>
+                            <p className="mb-4">This will create a new story idea with the following detected content:</p>
+                            <div className={`p-3 rounded-lg border ${themeClasses.border} ${themeClasses.bgTertiary}`}>
+                                <p className="font-semibold text-sm">TITLE</p>
+                                <p className={`mb-2 ${themeClasses.accentText}`}>{enhancePlainText(pendingImportData.title)}</p>
+                                <p className="font-semibold text-sm">SYNOPSIS PREVIEW</p>
+                                <p className={`text-sm italic ${themeClasses.textSecondary}`}>
+                                    {getSnippet(pendingImportData.synopsisHtml)}
+                                </p>
+                            </div>
+                            <p className="mt-4">Do you want to proceed?</p>
+                        </div>
+                    ) : "Loading preview..."
+                }
+                confirmButtonClass={`px-6 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}
             />
              <ConfirmModal
                 isOpen={!!ideaToDelete}
                 onClose={() => setIdeaToDelete(null)}
                 onConfirm={handleDeleteIdea}
                 title={`Delete "${ideaToDelete?.title}"?`}
-                message="Are you sure? This action is permanent."
+                message="Are you sure you want to delete this story idea? This action is permanent and cannot be undone."
             />
         </div>
     );

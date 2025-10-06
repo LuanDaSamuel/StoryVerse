@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useThemeClasses } from '../store/projectStore';
+import * as React from 'react';
+import { ProjectContext } from '../contexts/ProjectContext';
 import { CloseIcon } from './Icons';
 import { enhancePlainText } from '../constants';
 
@@ -10,11 +10,11 @@ interface SelectNovelModalProps {
   novels: { id: string, title: string }[];
 }
 
-const SelectNovelModal: React.FC<SelectNovelModalProps> = ({ isOpen, onClose, onConfirm, novels }) => {
-    const themeClasses = useThemeClasses();
-    const [selectedNovelId, setSelectedNovelId] = useState('');
+const SelectNovelModal = ({ isOpen, onClose, onConfirm, novels }: SelectNovelModalProps) => {
+    const { themeClasses } = React.useContext(ProjectContext);
+    const [selectedNovelId, setSelectedNovelId] = React.useState('');
 
-    useEffect(() => {
+    React.useEffect(() => {
         if (novels.length > 0) {
             setSelectedNovelId(novels[0].id);
         }

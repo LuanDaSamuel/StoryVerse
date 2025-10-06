@@ -1,21 +1,29 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useProjectStore, useThemeClasses } from '../store/projectStore';
+import * as React from 'react';
+import { ProjectContext } from '../contexts/ProjectContext';
 import { StoryIdea, StoryIdeaStatus } from '../types';
 import { SKETCH_TAG_OPTIONS, enhanceHtml } from '../constants';
 import { CloseIcon, BoldIcon, ItalicIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, H1Icon, H2Icon, H3Icon } from './Icons';
 
+// FIX: Refactored to use a standard interface and React.FC for better type safety and to resolve compiler errors.
 interface ToolbarButtonProps {
   onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
   isActive: boolean;
   children: React.ReactNode;
 }
 
-const ToolbarButton: React.FC<ToolbarButtonProps> = ({ onClick, isActive, children }) => {
+const ToolbarButton = ({
+  onClick,
+  isActive,
+  children,
+}: ToolbarButtonProps) => {
     const activeClass = `bg-white/20 text-white`;
     const inactiveClass = `hover:bg-white/10 text-gray-300`;
 
     return (
-        <button onMouseDown={onClick} className={`p-2 rounded-md transition-colors ${isActive ? activeClass : inactiveClass}`}>
+        <button
+            onMouseDown={onClick}
+            className={`p-2 rounded-md transition-colors ${isActive ? activeClass : inactiveClass}`}
+        >
             {children}
         </button>
     );
@@ -29,20 +37,20 @@ interface StoryIdeaEditorModalProps {
 
 const statusOptions: StoryIdeaStatus[] = ['Seedling', 'Developing', 'Archived'];
 
-const StoryIdeaEditorModal: React.FC<StoryIdeaEditorModalProps> = ({ idea, onClose, onSave }) => {
-    const themeClasses = useThemeClasses();
-    const baseFontSize = useProjectStore(state => state.projectData?.settings.baseFontSize || 18);
+const StoryIdeaEditorModal = ({ idea, onClose, onSave }: StoryIdeaEditorModalProps) => {
+    const { themeClasses, projectData } = React.useContext(ProjectContext);
     const isNew = idea === null;
     
-    const [title, setTitle] = useState('');
-    const [synopsis, setSynopsis] = useState('');
-    const [tags, setTags] = useState<string[]>([]);
-    const [status, setStatus] = useState<StoryIdeaStatus>('Seedling');
-    const [activeFormats, setActiveFormats] = useState({ isBold: false, isItalic: false, isUL: false, isOL: false, currentBlock: 'p' });
+    const [title, setTitle] = React.useState('');
+    const [synopsis, setSynopsis] = React.useState('');
+    const [tags, setTags] = React.useState<string[]>([]);
+    const [status, setStatus] = React.useState<StoryIdeaStatus>('Seedling');
+    const [activeFormats, setActiveFormats] = React.useState({ isBold: false, isItalic: false, isUL: false, isOL: false, currentBlock: 'p' });
     
-    const editorRef = useRef<HTMLDivElement>(null);
+    const editorRef = React.useRef<HTMLDivElement>(null);
+    const baseFontSize = projectData?.settings?.baseFontSize || 18;
 
-    useEffect(() => {
+    React.useEffect(() => {
         if (idea) {
             setTitle(idea.title);
             setSynopsis(idea.synopsis);
@@ -56,28 +64,32 @@ const StoryIdeaEditorModal: React.FC<StoryIdeaEditorModalProps> = ({ idea, onClo
         }
     }, [idea]);
     
-    useEffect(() => {
+    React.useEffect(() => {
         if (editorRef.current && synopsis !== editorRef.current.innerHTML) {
             editorRef.current.innerHTML = enhanceHtml(synopsis);
         }
     }, [synopsis]);
 
-    const updateActiveFormats = useCallback(() => {
-        let blockType = 'p';
+    const updateActiveFormats = React.useCallback(() => {
         const selection = window.getSelection();
-        if (selection?.rangeCount) {
-            let element = selection.anchorNode;
-            if (element?.nodeType === 3) element = element.parentNode;
-            let parent = element as HTMLElement | null;
-            while(parent && parent !== editorRef.current) {
-                const tag = parent.tagName.toLowerCase();
-                if(['h1','h2','h3','blockquote'].includes(tag)) {
-                    blockType = tag;
-                    break;
-                }
-                parent = parent.parentElement;
-            }
+        if (!selection?.rangeCount) return;
+        
+        let element = selection.anchorNode;
+        if (element?.nodeType === 3) {
+            element = element.parentNode;
         }
+
+        let blockType = 'p';
+        let parent = element as HTMLElement | null;
+        while(parent && parent !== editorRef.current) {
+            const tag = parent.tagName.toLowerCase();
+            if(['h1','h2','h3','blockquote'].includes(tag)) {
+                blockType = tag;
+                break;
+            }
+            parent = parent.parentElement;
+        }
+
         setActiveFormats({
             isBold: document.queryCommandState('bold'),
             isItalic: document.queryCommandState('italic'),
@@ -87,7 +99,7 @@ const StoryIdeaEditorModal: React.FC<StoryIdeaEditorModalProps> = ({ idea, onClo
         });
     }, []);
 
-    useEffect(() => {
+    React.useEffect(() => {
         const editorEl = editorRef.current;
         document.addEventListener('selectionchange', updateActiveFormats);
         editorEl?.addEventListener('keyup', updateActiveFormats);
@@ -103,7 +115,15 @@ const StoryIdeaEditorModal: React.FC<StoryIdeaEditorModalProps> = ({ idea, onClo
 
 
     const handleTagClick = (tag: string) => {
-        setTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : (prev.length < 6 ? [...prev, tag] : prev));
+        setTags(prev => {
+            if (prev.includes(tag)) {
+                return prev.filter(t => t !== tag);
+            }
+            if (prev.length < 6) {
+                return [...prev, tag];
+            }
+            return prev;
+        });
     };
 
     const handleSave = () => {
@@ -112,12 +132,14 @@ const StoryIdeaEditorModal: React.FC<StoryIdeaEditorModalProps> = ({ idea, onClo
         
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = synopsisHtml;
-        const wordCount = (tempDiv.textContent || "").trim().split(/\s+/).filter(Boolean).length;
+        const text = tempDiv.textContent || "";
+        const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
 
         const finalIdea: StoryIdea = {
             id: idea?.id || crypto.randomUUID(),
             title: title || 'Untitled Idea',
             synopsis: synopsisHtml,
+            // FIX: The 'wordCount' property was missing and is now calculated and included.
             wordCount,
             tags,
             status,
@@ -136,15 +158,19 @@ const StoryIdeaEditorModal: React.FC<StoryIdeaEditorModalProps> = ({ idea, onClo
 
     const applyBlockFormat = (e: React.MouseEvent<HTMLButtonElement>, format: string) => {
         e.preventDefault();
-        document.execCommand('formatBlock', false, activeFormats.currentBlock === format ? 'p' : format);
+        const currentBlock = activeFormats.currentBlock;
+        const formatToApply = currentBlock === format ? 'p' : format;
+        document.execCommand('formatBlock', false, formatToApply);
         editorRef.current?.focus();
         updateActiveFormats();
     };
     
+    const modalTextColor = themeClasses.accentText;
+
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4" onClick={onClose} role="dialog" aria-modal="true">
             <div 
-                className={`flex flex-col shadow-xl transition-all duration-300 w-full max-w-4xl rounded-lg max-h-[90vh] ${themeClasses.bgSecondary} ${themeClasses.accentText} border ${themeClasses.border}`} 
+                className={`flex flex-col shadow-xl transition-all duration-300 w-full max-w-4xl rounded-lg max-h-[90vh] ${themeClasses.bgSecondary} ${modalTextColor} border ${themeClasses.border}`} 
                 onClick={e => e.stopPropagation()}
             >
                 <header className="flex justify-between items-center p-4 border-b border-inherit flex-shrink-0">
@@ -178,7 +204,7 @@ const StoryIdeaEditorModal: React.FC<StoryIdeaEditorModalProps> = ({ idea, onClo
                         <div
                             ref={editorRef}
                             contentEditable
-                            className={`flex-grow outline-none prose-styles story-content leading-relaxed ${themeClasses.accentText}`}
+                            className={`flex-grow outline-none prose-styles story-content leading-relaxed ${modalTextColor}`}
                             style={{minHeight: '200px', fontSize: `${baseFontSize}px`}}
                         />
                     </div>

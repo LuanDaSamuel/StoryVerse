@@ -1,5 +1,5 @@
-import React from 'react';
-import { useThemeClasses } from '../store/projectStore';
+import * as React from 'react';
+import { ProjectContext } from '../contexts/ProjectContext';
 import { Novel } from '../types';
 import { CloseIcon } from './Icons';
 import { enhancePlainText, enhanceHtml } from '../constants';
@@ -10,8 +10,8 @@ interface ExportModalProps {
   novel: Novel;
 }
 
-const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, novel }) => {
-    const themeClasses = useThemeClasses();
+const ExportModal = ({ isOpen, onClose, novel }: ExportModalProps) => {
+    const { themeClasses } = React.useContext(ProjectContext);
 
     if (!isOpen) return null;
 

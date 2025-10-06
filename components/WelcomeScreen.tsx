@@ -1,17 +1,20 @@
-import React from 'react';
+import * as React from 'react';
 import { AppLogoIcon, GoogleIcon, DocumentPlusIcon, FolderIcon } from './Icons';
-import { useProjectStore } from '../store/projectStore';
 
-const WelcomeScreen: React.FC = () => {
-  const { signInWithGoogle, createLocalProject, openLocalProject } = useProjectStore();
+interface WelcomeScreenProps {
+  onGoogleSignIn: () => void;
+  onCreateLocalProject: () => void;
+  onOpenLocalProject: () => void;
+}
 
+const WelcomeScreen = ({ onGoogleSignIn, onCreateLocalProject, onOpenLocalProject }: WelcomeScreenProps) => {
   return (
     <div className="flex flex-col items-center justify-center h-screen w-full p-4 bg-gradient-to-br from-slate-900 to-[#0F172A] text-slate-200">
       <div className="flex flex-col items-center text-center">
         <AppLogoIcon className="w-20 h-20 mb-4 text-indigo-400" />
         <h1 className="text-6xl font-bold text-white">StoryVerse</h1>
         <p className="mt-2 text-lg text-slate-400">
-          Where your passion starts with words
+          Where your passion starts by words
         </p>
       </div>
 
@@ -25,7 +28,7 @@ const WelcomeScreen: React.FC = () => {
 
         <div className="mt-8 flex flex-col space-y-4">
             <button
-              onClick={signInWithGoogle}
+              onClick={onGoogleSignIn}
               className="flex items-center justify-center w-full px-6 py-4 text-lg font-semibold rounded-lg bg-white text-gray-800 hover:bg-gray-200 transition-colors shadow-lg"
             >
               <GoogleIcon className="w-6 h-6 mr-3" />
@@ -40,14 +43,14 @@ const WelcomeScreen: React.FC = () => {
 
             <div className="flex flex-col sm:flex-row gap-4">
                 <button
-                  onClick={createLocalProject}
+                  onClick={onCreateLocalProject}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-3 font-semibold rounded-lg bg-slate-700 text-slate-200 hover:bg-slate-600 transition-colors shadow"
                 >
                   <DocumentPlusIcon className="w-5 h-5" />
                   Create New
                 </button>
                 <button
-                  onClick={openLocalProject}
+                  onClick={onOpenLocalProject}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-3 font-semibold rounded-lg bg-slate-700 text-slate-200 hover:bg-slate-600 transition-colors shadow"
                 >
                   <FolderIcon className="w-5 h-5" />

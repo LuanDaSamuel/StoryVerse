@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useProjectStore, useTheme, useThemeClasses } from '../store/projectStore';
+import * as React from 'react';
+import { ProjectContext } from '../contexts/ProjectContext';
 import { Theme } from '../types';
 import { THEME_CONFIG } from '../constants';
 import { CloseIcon, DownloadIcon, TrashIcon, GoogleIcon } from './Icons';
@@ -15,21 +15,34 @@ const themeOptions: { name: Theme; label: string; colors: string[] }[] = [
   { name: 'book', label: 'Book', colors: ['#A0522D', '#FDF6E3'] },
 ];
 
-const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
-  const { projectData, setProjectData, downloadProject, closeProject, projectName, storageMode, signOut, signInWithGoogle } = useProjectStore();
-  const theme = useTheme();
-  const themeClasses = useThemeClasses();
-  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
+  const { 
+      projectData, theme, setProjectData, downloadProject, closeProject, 
+      themeClasses, projectName, storageMode, signOut, connectLocalToDrive
+  } = React.useContext(ProjectContext);
+  const [isConfirmOpen, setIsConfirmOpen] = React.useState(false);
 
   if (!isOpen || !projectData) return null;
 
   const handleThemeChange = (newTheme: Theme) => {
-    setProjectData(data => data ? { ...data, settings: { ...data.settings, theme: newTheme } } : null);
+    setProjectData(currentData => {
+        if (!currentData) return null;
+        return {
+            ...currentData,
+            settings: { ...currentData.settings, theme: newTheme },
+        };
+    });
   };
 
   const handleBaseFontSizeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newSize = parseInt(e.target.value, 10);
-    setProjectData(data => data ? { ...data, settings: { ...data.settings, baseFontSize: newSize } } : null);
+    setProjectData(currentData => {
+        if (!currentData) return null;
+        return {
+            ...currentData,
+            settings: { ...currentData.settings, baseFontSize: newSize },
+        };
+    });
   };
 
   const handleCloseOrSignOut = async () => {
@@ -57,6 +70,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const confirmMessage = storageMode === 'drive'
     ? "Are you sure you want to sign out? Your project is saved on Google Drive. You can sign back in to access it again."
     : "Are you sure you want to close this project? Any unsaved changes will be saved before closing. You can reopen it later from your files.";
+
 
   return (
     <>
@@ -116,7 +130,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                 <p className={`${descriptionColor} text-sm`}>Your project is saved in {storageLocation}.</p>
                 <div className="mt-4 grid grid-cols-1 gap-3">
                   {storageMode === 'local' && (
-                    <button onClick={signInWithGoogle} className="w-full flex items-center justify-center space-x-2 px-4 py-2 text-sm font-semibold rounded-lg transition-colors bg-white text-gray-800 hover:bg-gray-200">
+                    <button onClick={connectLocalToDrive} className="w-full flex items-center justify-center space-x-2 px-4 py-2 text-sm font-semibold rounded-lg transition-colors bg-white text-gray-800 hover:bg-gray-200">
                       <GoogleIcon className="w-4 h-4" />
                       <span>Connect to Google Drive</span>
                     </button>

@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import * as React from 'react';
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
 import { ProjectData, UserProfile } from '../types';
 
@@ -30,10 +30,10 @@ async function verifyPermission(handle: FileSystemHandle) {
 }
 
 export function useProjectStorage() {
-    const driveFileIdRef = useRef<string | null>(null);
-    const projectFileHandleRef = useRef<FileSystemFileHandle | null>(null);
+    const driveFileIdRef = React.useRef<string | null>(null);
+    const projectFileHandleRef = React.useRef<FileSystemFileHandle | null>(null);
 
-    const createOnDrive = useCallback(async (data: ProjectData): Promise<{ fileId: string, name: string }> => {
+    const createOnDrive = React.useCallback(async (data: ProjectData): Promise<{ fileId: string, name: string }> => {
         console.log("Creating new file on Google Drive via gapi.client.request...");
         
         // Step 1: Create the file with metadata only.
@@ -67,7 +67,7 @@ export function useProjectStorage() {
         return { fileId: fileId, name: createResponse.result.name };
     }, []);
 
-    const saveToDrive = useCallback(async (data: ProjectData) => {
+    const saveToDrive = React.useCallback(async (data: ProjectData) => {
         let fileId = driveFileIdRef.current || await idbGet<string>(DRIVE_FILE_ID_KEY);
     
         if (!fileId) {
@@ -109,7 +109,7 @@ export function useProjectStorage() {
         }
     }, [createOnDrive]);
 
-    const loadFromDrive = useCallback(async (): Promise<{ name: string, data: ProjectData } | null> => {
+    const loadFromDrive = React.useCallback(async (): Promise<{ name: string, data: ProjectData } | null> => {
         const storedFileId = await idbGet<string>(DRIVE_FILE_ID_KEY);
         if (storedFileId) {
             console.log(`Attempting to load project file from stored ID: ${storedFileId}`);
@@ -171,7 +171,7 @@ export function useProjectStorage() {
         return null;
     }, []);
 
-    const signIn = useCallback(async (): Promise<UserProfile> => {
+    const signIn = React.useCallback(async (): Promise<UserProfile> => {
       return new Promise((resolve, reject) => {
         try {
             const tokenClient = google.accounts.oauth2.initTokenClient({
@@ -205,7 +205,7 @@ export function useProjectStorage() {
       });
     }, []);
 
-    const signOut = useCallback(async () => {
+    const signOut = React.useCallback(async () => {
         if (gapi.client) {
             gapi.client.setToken('');
         }
@@ -216,7 +216,7 @@ export function useProjectStorage() {
         console.log('User signed out. Local session data cleared.');
     }, []);
     
-    const initAndRestoreSession = useCallback(async (): Promise<UserProfile | null> => {
+    const initAndRestoreSession = React.useCallback(async (): Promise<UserProfile | null> => {
         console.log("Initializing GAPI client and attempting to restore session...");
         await new Promise<void>((resolve, reject) => {
              // Add a timeout to prevent getting stuck if gapi fails to load

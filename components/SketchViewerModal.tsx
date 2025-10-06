@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
+import * as React from 'react';
 import { AggregatedSketch } from '../types';
-import { useProjectStore, useThemeClasses } from '../store/projectStore';
+import { ProjectContext } from '../contexts/ProjectContext';
 import { CloseIcon } from './Icons';
 import { enhancePlainText, enhanceHtml } from '../constants';
 
@@ -9,11 +9,11 @@ interface SketchViewerModalProps {
   onClose: () => void;
 }
 
-const SketchViewerModal: React.FC<SketchViewerModalProps> = ({ sketch, onClose }) => {
-    const themeClasses = useThemeClasses();
-    const baseFontSize = useProjectStore(state => state.projectData?.settings.baseFontSize || 18);
+const SketchViewerModal = ({ sketch, onClose }: SketchViewerModalProps) => {
+    const { themeClasses, projectData } = React.useContext(ProjectContext);
+    const baseFontSize = projectData?.settings?.baseFontSize || 18;
 
-    useEffect(() => {
+    React.useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
             if (event.key === 'Escape') {
                 onClose();
@@ -27,10 +27,12 @@ const SketchViewerModal: React.FC<SketchViewerModalProps> = ({ sketch, onClose }
 
     if (!sketch) return null;
     
+    const textColor = themeClasses.accentText;
+
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-start justify-center p-4 overflow-y-auto" role="dialog" aria-modal="true" onClick={onClose}>
             <div 
-                className={`flex flex-col shadow-xl w-full max-w-3xl rounded-lg my-8 ${themeClasses.bgSecondary} ${themeClasses.accentText} border ${themeClasses.border}`}
+                className={`flex flex-col shadow-xl w-full max-w-3xl rounded-lg my-8 ${themeClasses.bgSecondary} ${textColor} border ${themeClasses.border}`}
                 onClick={e => e.stopPropagation()}
             >
                 <header className="flex justify-between items-start p-6 border-b border-inherit flex-shrink-0">
@@ -43,7 +45,7 @@ const SketchViewerModal: React.FC<SketchViewerModalProps> = ({ sketch, onClose }
                             ))}
                         </div>
                     </div>
-                    <button onClick={onClose} className={`p-2 -m-2 rounded-full hover:${themeClasses.bgTertiary} transition-colors ${themeClasses.accentText}`}>
+                    <button onClick={onClose} className={`p-2 -m-2 rounded-full hover:${themeClasses.bgTertiary} transition-colors ${textColor}`}>
                         <CloseIcon className="w-6 h-6" />
                     </button>
                 </header>

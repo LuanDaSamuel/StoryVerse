@@ -1,4 +1,4 @@
-import React from 'react';
+import * as React from 'react';
 
 // Using a consistent "solid" icon style as a reversion from the outline style.
 

@@ -1,4 +1,4 @@
-import React, { createContext } from 'react';
+import * as React from 'react';
 import { ProjectData, Theme, ThemeConfig, UserProfile, SaveStatus } from '../types';
 
 interface ProjectContextType {
@@ -23,7 +23,7 @@ interface ProjectContextType {
   loadDriveProjectAndDiscardLocal: () => void;
 }
 
-export const ProjectContext = createContext<ProjectContextType>({
+export const ProjectContext = React.createContext<ProjectContextType>({
   projectData: null,
   setProjectData: () => {},
   downloadProject: async () => {},

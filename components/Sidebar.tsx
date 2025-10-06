@@ -1,16 +1,15 @@
-import React, { useState } from 'react';
+import * as React from 'react';
 import { NavLink } from 'react-router-dom';
 import { AppLogoIcon, HomeIcon, PlusIcon, SettingsIcon, LightbulbIcon, QuillPenIcon, LoadingIcon, CheckIcon, ExclamationTriangleIcon } from './Icons';
 import SettingsModal from './SettingsModal';
-import { useProjectStore, useTheme, useThemeClasses } from '../store/projectStore';
+import { ProjectContext } from '../contexts/ProjectContext';
 
 interface SidebarProps {
     onLinkClick?: () => void;
 }
 
-const SaveStatusIndicator: React.FC = () => {
-    const theme = useTheme();
-    const saveStatus = useProjectStore(state => state.saveStatus);
+const SaveStatusIndicator = () => {
+    const { theme, saveStatus } = React.useContext(ProjectContext);
 
     const baseClasses = 'flex items-center space-x-2 text-xs font-semibold';
 
@@ -32,17 +31,16 @@ const SaveStatusIndicator: React.FC = () => {
     }
 };
 
-const Sidebar: React.FC<SidebarProps> = ({ onLinkClick = () => {} }) => {
-    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-    const theme = useTheme();
-    const themeClasses = useThemeClasses();
-    const { userProfile, signOut } = useProjectStore();
+const Sidebar = ({ onLinkClick = () => {} }: SidebarProps) => {
+    const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
+    const { theme, themeClasses, userProfile, signOut } = React.useContext(ProjectContext);
 
     const navLinkClasses = ({ isActive }: { isActive: boolean }): string => {
         const baseClasses = `flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors`;
         const defaultText = theme === 'book' ? themeClasses.accentText : themeClasses.text;
 
         if (isActive) {
+            // Special case for the 'book' theme to match the screenshot's active style
             if (theme === 'book') {
                 return `${baseClasses} ${themeClasses.bg} ${themeClasses.text}`;
             }
@@ -51,6 +49,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onLinkClick = () => {} }) => {
         return `${baseClasses} ${defaultText} hover:${themeClasses.bgTertiary}`;
     };
     
+    // For the book theme, the text on the light sidebar should be dark.
     const sidebarTextColor = theme === 'book' ? themeClasses.accentText : themeClasses.text;
 
     return (

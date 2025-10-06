@@ -1,23 +1,22 @@
-import React, { useState, useMemo } from 'react';
+import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useProjectStore, useThemeClasses } from '../store/projectStore';
+import { ProjectContext } from '../contexts/ProjectContext';
 import { NovelSketch, AggregatedSketch } from '../types';
 import { enhancePlainText } from '../constants';
 import { PlusIcon } from '../components/Icons';
 import ConfirmModal from '../components/ConfirmModal';
 import SelectNovelModal from '../components/SelectNovelModal';
 
-const SketchesPage: React.FC = () => {
-    const { projectData, setProjectData } = useProjectStore();
-    const themeClasses = useThemeClasses();
+const SketchesPage = () => {
+    const { projectData, setProjectData, themeClasses } = React.useContext(ProjectContext);
     const navigate = useNavigate();
     
-    const [isCreatingSketch, setIsCreatingSketch] = useState(false);
-    const [sketchToDelete, setSketchToDelete] = useState<AggregatedSketch | null>(null);
+    const [isCreatingSketch, setIsCreatingSketch] = React.useState(false);
+    const [sketchToDelete, setSketchToDelete] = React.useState<AggregatedSketch | null>(null);
 
-    const novels = useMemo(() => projectData?.novels || [], [projectData]);
+    const novels = React.useMemo(() => projectData?.novels || [], [projectData]);
     
-    const allSketches: AggregatedSketch[] = useMemo(() => {
+    const allSketches: AggregatedSketch[] = React.useMemo(() => {
         return novels.flatMap(novel => 
             novel.sketches.map(sketch => ({
                 ...sketch,
@@ -27,28 +26,33 @@ const SketchesPage: React.FC = () => {
         ).sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
     }, [novels]);
 
-    const novelsForDropdown = useMemo(() => novels.map(n => ({ id: n.id, title: n.title })), [novels]);
+    const novelsForDropdown = React.useMemo(() => novels.map(n => ({ id: n.id, title: n.title })), [novels]);
 
     const handleCreateSketch = (selectedNovelId: string) => {
         if (!selectedNovelId) return;
     
         const now = new Date().toISOString();
         const newSketch: NovelSketch = {
-            id: crypto.randomUUID(), title: 'Untitled Sketch', content: '<p><br></p>',
-            tags: [], createdAt: now, updatedAt: now,
+            id: crypto.randomUUID(),
+            title: 'Untitled Sketch',
+            content: '<p><br></p>',
+            tags: [],
+            createdAt: now,
+            updatedAt: now,
         };
     
-        setProjectData(data => {
-            if (!data) return null;
-            const novelIndex = data.novels.findIndex(n => n.id === selectedNovelId);
-            if (novelIndex === -1) return data;
-            
-            const updatedNovels = [...data.novels];
+        setProjectData(currentData => {
+            if (!currentData) return null;
+            const novelIndex = currentData.novels.findIndex(n => n.id === selectedNovelId);
+            if (novelIndex === -1) return currentData;
+    
+            const updatedNovels = [...currentData.novels];
             const novelToUpdate = { ...updatedNovels[novelIndex] };
+            
             novelToUpdate.sketches = [newSketch, ...novelToUpdate.sketches];
             updatedNovels[novelIndex] = novelToUpdate;
             
-            return { ...data, novels: updatedNovels };
+            return { ...currentData, novels: updatedNovels };
         });
     
         setIsCreatingSketch(false);
@@ -57,16 +61,16 @@ const SketchesPage: React.FC = () => {
 
     const handleDeleteSketch = () => {
         if (!sketchToDelete) return;
-        setProjectData(data => {
-            if (!data) return null;
-            const novelIndex = data.novels.findIndex(n => n.id === sketchToDelete.novelId);
-            if (novelIndex === -1) return data;
+        setProjectData(currentData => {
+            if (!currentData) return null;
+            const novelIndex = currentData.novels.findIndex(n => n.id === sketchToDelete.novelId);
+            if (novelIndex === -1) return currentData;
 
-            const updatedNovels = [...data.novels];
+            const updatedNovels = [...currentData.novels];
             const currentNovel = { ...updatedNovels[novelIndex] };
             currentNovel.sketches = currentNovel.sketches.filter(s => s.id !== sketchToDelete.id);
             updatedNovels[novelIndex] = currentNovel;
-            return { ...data, novels: updatedNovels };
+            return { ...currentData, novels: updatedNovels };
         });
         setSketchToDelete(null);
     };

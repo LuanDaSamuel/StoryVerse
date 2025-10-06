@@ -1,4 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+
+
+
+import * as React from 'react';
 import { ProjectData, StorageStatus, Theme, StoryIdeaStatus, NovelSketch, UserProfile, SaveStatus } from '../types';
 import { get, set, del } from 'idb-keyval';
 import { useProjectStorage } from './useProjectStorage';
@@ -83,30 +86,29 @@ const sanitizeProjectData = (data: any): ProjectData => {
 
 
 export function useProject() {
-  const [projectData, setProjectData] = useState<ProjectData | null>(null);
-  const [status, setStatus] = useState<StorageStatus>('loading');
-  const [projectName, setProjectName] = useState('');
-  const [storageMode, setStorageMode] = useState<'local' | 'drive' | null>(null);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [projectData, setProjectData] = React.useState<ProjectData | null>(null);
+  const [status, setStatus] = React.useState<StorageStatus>('loading');
+  const [projectName, setProjectName] = React.useState('');
+  const [storageMode, setStorageMode] = React.useState<'local' | 'drive' | null>(null);
+  const [userProfile, setUserProfile] = React.useState<UserProfile | null>(null);
+  const [saveStatus, setSaveStatus] = React.useState<SaveStatus>('idle');
 
-  const saveStatusRef = useRef(saveStatus);
-  useEffect(() => {
+  const saveStatusRef = React.useRef(saveStatus);
+  React.useEffect(() => {
       saveStatusRef.current = saveStatus;
   }, [saveStatus]);
 
-  const isInitialLoadRef = useRef(true);
-  const isDirtyRef = useRef(false);
-  const isSavingRef = useRef(false);
-  const projectDataRef = useRef(projectData);
+  const isInitialLoadRef = React.useRef(true);
+  const isDirtyRef = React.useRef(false);
+  const isSavingRef = React.useRef(false);
+  const projectDataRef = React.useRef(projectData);
   projectDataRef.current = projectData;
 
   const storage = useProjectStorage();
-  const saveProjectRef = useRef<() => Promise<void>>(async () => {});
-  // FIX: Changed the type for window.setTimeout from `React.Timeout` to `number`. `setTimeout` in browsers returns a `number`. The namespace `React` does not contain a `Timeout` type.
-  const saveTimeoutRef = useRef<number | null>(null);
+  const saveProjectRef = React.useRef<() => Promise<void>>(async () => {});
+  const saveTimeoutRef = React.useRef<number | null>(null);
 
-  const saveProject = useCallback(async () => {
+  const saveProject = React.useCallback(async () => {
     // If a save is already happening, or there are no changes, do nothing.
     // The debouncer will catch subsequent changes.
     if (isSavingRef.current || !isDirtyRef.current) {
@@ -174,11 +176,11 @@ export function useProject() {
   }, [storage, storageMode]);
 
   // Keep the ref updated with the latest version of the save function
-  useEffect(() => {
+  React.useEffect(() => {
     saveProjectRef.current = saveProject;
   }, [saveProject]);
 
-  const setProjectDataAndMarkDirty = useCallback((updater: React.SetStateAction<ProjectData | null>) => {
+  const setProjectDataAndMarkDirty = React.useCallback((updater: React.SetStateAction<ProjectData | null>) => {
     setProjectData(prevData => {
         const newData = typeof updater === 'function' ? updater(prevData) : updater;
         if (JSON.stringify(newData) !== JSON.stringify(prevData)) {
@@ -196,14 +198,14 @@ export function useProject() {
 
             saveTimeoutRef.current = window.setTimeout(() => {
                 saveProjectRef.current?.();
-            }, 500); // Reduced delay to 500ms for faster saves
+            }, 1000); // 1-second delay
         }
         return newData;
     });
   }, []);
 
   // Effect to revert 'saved' status to 'idle'.
-  useEffect(() => {
+  React.useEffect(() => {
     if (saveStatus === 'saved') {
         const timeoutId = setTimeout(() => {
             // After the 'Saved!' message has been displayed, transition to idle.
@@ -214,7 +216,7 @@ export function useProject() {
     }
   }, [saveStatus]);
     
-  const flushChanges = useCallback(async () => {
+  const flushChanges = React.useCallback(async () => {
     // This function ensures all pending changes are saved before an action like closing or downloading.
     
     // Cancel any scheduled debounced save.
@@ -234,7 +236,7 @@ export function useProject() {
   }, []);
 
     // Save on visibility change (e.g., switching tabs)
-    useEffect(() => {
+    React.useEffect(() => {
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'hidden') {
                 flushChanges();
@@ -247,7 +249,7 @@ export function useProject() {
     }, [flushChanges]);
 
   // Warn user before leaving with unsaved changes.
-  useEffect(() => {
+  React.useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       // Check ref directly to get the latest status without re-running the effect.
       if (['unsaved', 'saving', 'error'].includes(saveStatusRef.current)) {
@@ -265,7 +267,7 @@ export function useProject() {
     };
   }, []); // Empty dependency array ensures this runs only on mount and unmount.
 
-  const resetState = useCallback(() => {
+  const resetState = React.useCallback(() => {
     setProjectData(null);
     setProjectName('');
     setStorageMode(null);
@@ -274,7 +276,7 @@ export function useProject() {
     isDirtyRef.current = false;
   }, []);
   
-  const signOut = useCallback(async () => {
+  const signOut = React.useCallback(async () => {
     setStatus('loading');
     await flushChanges();
     await storage.signOut();
@@ -292,7 +294,7 @@ export function useProject() {
     }
   };
 
-  const signInWithGoogle = useCallback(async () => {
+  const signInWithGoogle = React.useCallback(async () => {
     setStatus('loading');
     try {
         const profile = await storage.signIn();
@@ -324,7 +326,7 @@ export function useProject() {
     }
   }, [storage, resetState]);
   
-  const createProjectOnDrive = useCallback(async () => {
+  const createProjectOnDrive = React.useCallback(async () => {
     setStatus('loading');
     try {
         const { name } = await storage.createOnDrive(defaultProjectData);
@@ -337,7 +339,7 @@ export function useProject() {
     }
   }, [storage, signOut]);
 
-    const getLocalProjectData = useCallback(async (): Promise<{ name: string; data: ProjectData } | null> => {
+    const getLocalProjectData = React.useCallback(async (): Promise<{ name: string; data: ProjectData } | null> => {
         if (isFileSystemAccessAPISupported) {
             const handle = await storage.getHandleFromIdb();
             if (handle) {
@@ -350,7 +352,7 @@ export function useProject() {
         return null;
     }, [storage]);
 
-  const checkForRecentLocalProject = useCallback(async () => {
+  const checkForRecentLocalProject = React.useCallback(async () => {
     const localData = await getLocalProjectData();
     if (localData) {
         setProjectData(sanitizeProjectData(localData.data));
@@ -362,7 +364,7 @@ export function useProject() {
     return false;
   }, [storage, getLocalProjectData]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isInitialLoadRef.current) return;
 
     const initializeApp = async () => {
@@ -403,7 +405,7 @@ export function useProject() {
     isInitialLoadRef.current = false;
   }, [storage, checkForRecentLocalProject, getLocalProjectData]);
   
-  const openLocalProject = useCallback(async () => {
+  const openLocalProject = React.useCallback(async () => {
     if (!isFileSystemAccessAPISupported) {
         alert("Your browser doesn't support the File System Access API, which is required for local file projects.");
         return;
@@ -431,7 +433,7 @@ export function useProject() {
     }
   }, [storage]);
   
-  const createLocalProject = useCallback(async () => {
+  const createLocalProject = React.useCallback(async () => {
     if (!isFileSystemAccessAPISupported) {
         alert("Your browser doesn't support the File System Access API, which is required for local file projects.");
         return;
@@ -454,7 +456,7 @@ export function useProject() {
     }
   }, [storage]);
   
-  const closeProject = useCallback(async () => {
+  const closeProject = React.useCallback(async () => {
     await flushChanges();
 
     if (storageMode === 'local') {
@@ -465,7 +467,7 @@ export function useProject() {
     setStatus('welcome');
   }, [flushChanges, storageMode, storage, resetState]);
   
-  const downloadProject = useCallback(async () => {
+  const downloadProject = React.useCallback(async () => {
     await flushChanges();
 
     if (!projectDataRef.current) return;
@@ -479,7 +481,7 @@ export function useProject() {
     a.remove();
   }, [flushChanges, projectName]);
 
-  const uploadProjectToDrive = useCallback(async () => {
+  const uploadProjectToDrive = React.useCallback(async () => {
         if (!projectDataRef.current) return;
         setStatus('loading');
         try {
@@ -491,7 +493,7 @@ export function useProject() {
         }
     }, [storage]);
 
-    const overwriteDriveProject = useCallback(async () => {
+    const overwriteDriveProject = React.useCallback(async () => {
         if (!projectDataRef.current) return;
         setStatus('loading');
         await storage.saveToDrive(projectDataRef.current);
@@ -500,7 +502,7 @@ export function useProject() {
         setStatus('ready');
     }, [storage]);
 
-    const loadDriveProjectAndDiscardLocal = useCallback(async () => {
+    const loadDriveProjectAndDiscardLocal = React.useCallback(async () => {
         setStatus('loading');
         const driveProject = await storage.loadFromDrive();
         if (driveProject) {
