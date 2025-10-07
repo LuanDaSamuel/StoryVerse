@@ -119,7 +119,15 @@
 
     <!-- Google API Scripts for Sign-In and Drive -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script src="https://apis.google.com/js/api.js" async defer></script>
+    <script>
+      function onGapiLoad() {
+        // This function will be called once the gapi script is loaded.
+        // We set a flag and dispatch an event that the React app can listen for.
+        window.gapiLoaded = true;
+        window.dispatchEvent(new CustomEvent('gapi-loaded'));
+      }
+    </script>
+    <script src="https://apis.google.com/js/api.js?onload=onGapiLoad" async defer></script>
     
   <script type="importmap">
 {

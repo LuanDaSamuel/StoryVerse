@@ -217,6 +217,18 @@ export function useProjectStorage() {
     }, []);
     
     const initAndRestoreSession = React.useCallback(async (): Promise<UserProfile | null> => {
+        // Wait for the GAPI script to be loaded via the onload callback in index.html
+        await new Promise<void>((resolve, reject) => {
+            if ((window as any).gapiLoaded) {
+                return resolve();
+            }
+            const timeout = setTimeout(() => reject(new Error("Google API script failed to load.")), 10000);
+            window.addEventListener('gapi-loaded', () => {
+                clearTimeout(timeout);
+                resolve();
+            }, { once: true });
+        });
+
         console.log("Initializing GAPI client and attempting to restore session...");
         await new Promise<void>((resolve, reject) => {
              // Add a timeout to prevent getting stuck if gapi fails to load
