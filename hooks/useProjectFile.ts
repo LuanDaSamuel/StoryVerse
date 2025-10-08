@@ -1,6 +1,3 @@
-
-
-
 import * as React from 'react';
 import { ProjectData, StorageStatus, Theme, StoryIdeaStatus, NovelSketch, UserProfile, SaveStatus } from '../types';
 import { get, set, del } from 'idb-keyval';
@@ -284,7 +281,7 @@ export function useProject() {
     setStatus('welcome');
   }, [flushChanges, storage, resetState]);
   
-  const handleDriveProject = (driveProject: { name: string, data: any } | null) => {
+  const handleDriveProject = React.useCallback((driveProject: { name: string, data: any } | null) => {
     if (driveProject) {
         setProjectData(sanitizeProjectData(driveProject.data));
         setProjectName(driveProject.name);
@@ -292,7 +289,7 @@ export function useProject() {
     } else {
         setStatus('drive-no-project');
     }
-  };
+  }, []);
 
   const signInWithGoogle = React.useCallback(async () => {
     setStatus('loading');
@@ -324,7 +321,7 @@ export function useProject() {
         resetState();
         setStatus('welcome');
     }
-  }, [storage, resetState]);
+  }, [storage, resetState, handleDriveProject]);
   
   const createProjectOnDrive = React.useCallback(async () => {
     setStatus('loading');
@@ -362,7 +359,7 @@ export function useProject() {
         return true;
     }
     return false;
-  }, [storage, getLocalProjectData]);
+  }, [getLocalProjectData]);
 
   React.useEffect(() => {
     if (!isInitialLoadRef.current) return;
@@ -376,7 +373,34 @@ export function useProject() {
                 setStorageMode('drive');
                 
                 const localData = await getLocalProjectData();
-                const driveProject = await storage.loadFromDrive();
+                let driveProject;
+
+                try {
+                    driveProject = await storage.loadFromDrive();
+                } catch (error: any) {
+                    if (error.status === 401 || error.status === 403) {
+                        console.warn("Initial Drive load failed with auth error. Refreshing token and retrying.");
+                        const newProfile = await storage.refreshTokenAndGetProfile();
+                        if (newProfile) {
+                            console.log("Token refreshed, retrying Drive load.");
+                            setUserProfile(newProfile);
+                            driveProject = await storage.loadFromDrive();
+                        } else {
+                            console.log("Token refresh failed. Signing out.");
+                            await storage.signOut();
+                            resetState();
+                            // If sign out happens, check for a local project before showing welcome.
+                            const hasLocal = await checkForRecentLocalProject();
+                            if (!hasLocal) {
+                                setStatus('welcome');
+                            }
+                            return; // Exit initializeApp
+                        }
+                    } else {
+                        // Not an auth error, re-throw it to be caught by the outer catch block.
+                        throw error;
+                    }
+                }
 
                 if (driveProject && localData) {
                     setProjectData(sanitizeProjectData(localData.data));
@@ -403,7 +427,7 @@ export function useProject() {
     };
     initializeApp();
     isInitialLoadRef.current = false;
-  }, [storage, checkForRecentLocalProject, getLocalProjectData]);
+  }, [storage, checkForRecentLocalProject, getLocalProjectData, resetState, handleDriveProject, signOut]);
   
   const openLocalProject = React.useCallback(async () => {
     if (!isFileSystemAccessAPISupported) {
@@ -512,7 +536,7 @@ export function useProject() {
         } else {
             setStatus('drive-no-project');
         }
-    }, [storage]);
+    }, [storage, handleDriveProject]);
 
   return { 
     projectData, 

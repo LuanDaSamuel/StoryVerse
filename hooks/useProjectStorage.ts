@@ -7,6 +7,7 @@ const PROJECT_FILE_HANDLE_KEY = 'storyverse-project-file-handle';
 export const DRIVE_PROJECT_FILENAME = 'StoryVerse-Project.json';
 const GAPI_AUTH_TOKEN_KEY = 'storyverse-gapi-auth-token';
 const DRIVE_FILE_ID_KEY = 'storyverse-drive-file-id';
+const USER_PROFILE_KEY = 'storyverse-user-profile';
 const CLIENT_ID = '54041417021-36ab4qaddnugncdodmpbafss1rjvttak.apps.googleusercontent.com';
 const API_KEY = 'AIzaSyBZ-CWnQ9-Jm4Y6kRpCXPDRXMH4S-zCVh8';
 const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email';
@@ -138,6 +139,8 @@ export function useProjectStorage() {
                     console.error("An error occurred loading from stored ID. Clearing ID.", error);
                  }
                  await idbDel(DRIVE_FILE_ID_KEY);
+                 // Rethrow so the caller can handle auth errors
+                 throw error;
             }
         }
 
@@ -171,6 +174,59 @@ export function useProjectStorage() {
         return null;
     }, []);
 
+    const signOut = React.useCallback(async () => {
+        if (gapi.client) {
+            gapi.client.setToken('');
+        }
+        await idbDel(GAPI_AUTH_TOKEN_KEY);
+        await idbDel(DRIVE_FILE_ID_KEY);
+        await idbDel(USER_PROFILE_KEY);
+        driveFileIdRef.current = null;
+        if (google?.accounts?.id) {
+          google.accounts.id.disableAutoSelect();
+        }
+        console.log('User signed out. Local session data cleared.');
+    }, []);
+
+    const refreshTokenAndGetProfile = React.useCallback(async (): Promise<UserProfile | null> => {
+        console.log("Attempting to refresh token silently...");
+        return new Promise((resolve) => {
+            try {
+                const tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: CLIENT_ID,
+                    scope: SCOPES,
+                    callback: async (tokenResponse: TokenResponse) => {
+                        if (tokenResponse && tokenResponse.access_token) {
+                            console.log("Silent token refresh successful.");
+                            const expires_at = Date.now() + (tokenResponse.expires_in * 1000);
+                            const storedToken: StoredToken = { ...tokenResponse, expires_at };
+                            await idbSet(GAPI_AUTH_TOKEN_KEY, storedToken);
+
+                            gapi.client.setToken(tokenResponse);
+                            const userInfo = await gapi.client.request({ path: 'https://www.googleapis.com/oauth2/v3/userinfo' });
+                            const profile: UserProfile = { name: userInfo.result.name, email: userInfo.result.email, picture: userInfo.result.picture };
+                            await idbSet(USER_PROFILE_KEY, profile);
+                            resolve(profile);
+                        } else {
+                            console.log("Silent token refresh failed to get access_token. Signing out.");
+                            await signOut();
+                            resolve(null);
+                        }
+                    },
+                    error_callback: async (error: any) => {
+                        console.warn("Silent token refresh error:", error);
+                        await signOut();
+                        resolve(null);
+                    }
+                });
+                tokenClient.requestAccessToken({ prompt: 'none' });
+            } catch (error) {
+                console.error("Error setting up silent token refresh.", error);
+                signOut().then(() => resolve(null));
+            }
+        });
+    }, [signOut]);
+
     const signIn = React.useCallback(async (): Promise<UserProfile> => {
       return new Promise((resolve, reject) => {
         try {
@@ -188,6 +244,7 @@ export function useProjectStorage() {
                             headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
                         }).then(res => res.json());
                         const profile = { name: userInfo.name, email: userInfo.email, picture: userInfo.picture };
+                        await idbSet(USER_PROFILE_KEY, profile);
                         resolve(profile);
                     } else {
                         reject(new Error("Sign in failed: No access token received."));
@@ -205,33 +262,15 @@ export function useProjectStorage() {
       });
     }, []);
 
-    const signOut = React.useCallback(async () => {
-        if (gapi.client) {
-            gapi.client.setToken('');
-        }
-        await idbDel(GAPI_AUTH_TOKEN_KEY);
-        await idbDel(DRIVE_FILE_ID_KEY);
-        driveFileIdRef.current = null;
-        google.accounts.id.disableAutoSelect();
-        console.log('User signed out. Local session data cleared.');
-    }, []);
-    
     const initAndRestoreSession = React.useCallback(async (): Promise<UserProfile | null> => {
-        // Wait for the GAPI script to be loaded via the onload callback in index.html
         await new Promise<void>((resolve, reject) => {
-            if ((window as any).gapiLoaded) {
-                return resolve();
-            }
+            if ((window as any).gapiLoaded) return resolve();
             const timeout = setTimeout(() => reject(new Error("Google API script failed to load.")), 10000);
-            window.addEventListener('gapi-loaded', () => {
-                clearTimeout(timeout);
-                resolve();
-            }, { once: true });
+            window.addEventListener('gapi-loaded', () => { clearTimeout(timeout); resolve(); }, { once: true });
         });
 
-        console.log("Initializing GAPI client and attempting to restore session...");
+        console.log("Initializing GAPI client...");
         await new Promise<void>((resolve, reject) => {
-             // Add a timeout to prevent getting stuck if gapi fails to load
             const timeout = setTimeout(() => reject(new Error("gapi.load timed out")), 5000);
             gapi.load('client', () => { clearTimeout(timeout); resolve(); });
         });
@@ -241,35 +280,27 @@ export function useProjectStorage() {
         });
 
         const token = await idbGet<StoredToken>(GAPI_AUTH_TOKEN_KEY);
-        if (token && token.access_token && Date.now() < token.expires_at) {
-            console.log("Found valid, non-expired auth token, verifying...");
-            gapi.client.setToken(token);
-            try {
-                const userInfo = await gapi.client.request({
-                    path: 'https://www.googleapis.com/oauth2/v3/userinfo'
-                });
-
-                if (userInfo.result && userInfo.result.email) {
-                    console.log("Session restored successfully for:", userInfo.result.email);
-                    return { name: userInfo.result.name, email: userInfo.result.email, picture: userInfo.result.picture };
-                } else {
-                    console.warn("Token verification failed, user info was invalid.", userInfo);
-                    await signOut();
-                    return null;
-                }
-            } catch (error: any) {
-                console.warn("Restoring session failed, token is likely expired or invalid. Signing out.", error);
-                await signOut();
-                return null;
-            }
-        } else if (token) {
-            console.log("Found expired auth token. Clearing session.");
-            await signOut();
+        if (!token?.access_token) {
+            console.log("No stored token found. User is not signed in.");
+            return null;
         }
+
+        if (Date.now() >= token.expires_at) {
+            console.log("Token expired. Refreshing token on initialization...");
+            return await refreshTokenAndGetProfile();
+        }
+
+        console.log("Found non-expired token. Restoring session without validation.");
+        gapi.client.setToken(token);
+        const profile = await idbGet<UserProfile>(USER_PROFILE_KEY);
         
-        console.log("No valid session found.");
-        return null;
-    }, [signOut]);
+        if (!profile) {
+            console.warn("Inconsistent state: token found but no profile. Forcing refresh.");
+            return await refreshTokenAndGetProfile();
+        }
+
+        return profile;
+    }, [refreshTokenAndGetProfile]);
 
     // --- Local File System Functions ---
     const getHandleFromIdb = async () => idbGet<FileSystemFileHandle>(PROJECT_FILE_HANDLE_KEY);
@@ -304,6 +335,7 @@ export function useProjectStorage() {
 
     return {
         initAndRestoreSession,
+        refreshTokenAndGetProfile,
         signIn,
         signOut,
         loadFromDrive,
