@@ -229,6 +229,12 @@ export const ExclamationTriangleIcon = (props: React.SVGProps<SVGSVGElement>) =>
     </svg>
 );
 
+export const SparklesIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
+      <path fillRule="evenodd" d="M9.344 3.071a.75.75 0 0 1 1.062 0l.938.937a.75.75 0 0 0 1.06 0l.938-.937a.75.75 0 1 1 1.06 1.06l-.937.938a.75.75 0 0 0 0 1.06l.937.938a.75.75 0 1 1-1.06 1.06l-.938-.937a.75.75 0 0 0-1.06 0l-.938.937a.75.75 0 1 1-1.06-1.06l.937-.938a.75.75 0 0 0 0-1.06l-.937-.938a.75.75 0 0 1 0-1.06Zm-3.75 6.688a.75.75 0 0 1 1.06 0l.625.625a.75.75 0 0 0 1.06 0l.625-.625a.75.75 0 1 1 1.06 1.06l-.625.625a.75.75 0 0 0 0 1.06l.625.625a.75.75 0 1 1-1.06 1.06l-.625-.625a.75.75 0 0 0-1.06 0l-.625.625a.75.75 0 1 1-1.06-1.06l.625-.625a.75.75 0 0 0 0-1.06l-.625-.625a.75.75 0 0 1 0-1.06ZM15.5 9.75a.75.75 0 0 1 .75.75v.008c0 .414.336.75.75.75h.008a.75.75 0 0 1 0 1.5h-.008a.75.75 0 0 1-.75-.75v-.008a.75.75 0 0 1-.75-.75Z" clipRule="evenodd" />
+    </svg>
+);
+
 // FIX: Added missing CheckIcon for save status indicator.
 export const CheckIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>

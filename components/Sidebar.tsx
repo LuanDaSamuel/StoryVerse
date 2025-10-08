@@ -1,8 +1,9 @@
 import * as React from 'react';
 import { NavLink } from 'react-router-dom';
-import { AppLogoIcon, HomeIcon, PlusIcon, SettingsIcon, LightbulbIcon, QuillPenIcon, LoadingIcon, CheckIcon, ExclamationTriangleIcon } from './Icons';
+import { AppLogoIcon, HomeIcon, PlusIcon, SettingsIcon, LightbulbIcon, QuillPenIcon, LoadingIcon, CheckIcon, ExclamationTriangleIcon, SparklesIcon } from './Icons';
 import SettingsModal from './SettingsModal';
 import { ProjectContext } from '../contexts/ProjectContext';
+import WhatsNewModal from './WhatsNewModal';
 
 interface SidebarProps {
     onLinkClick?: () => void;
@@ -33,6 +34,7 @@ const SaveStatusIndicator = () => {
 
 const Sidebar = ({ onLinkClick = () => {} }: SidebarProps) => {
     const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
+    const [isWhatsNewOpen, setIsWhatsNewOpen] = React.useState(false);
     const { theme, themeClasses, userProfile, signOut } = React.useContext(ProjectContext);
 
     const navLinkClasses = ({ isActive }: { isActive: boolean }): string => {
@@ -94,9 +96,13 @@ const Sidebar = ({ onLinkClick = () => {} }: SidebarProps) => {
                 )}
 
                 <div className="p-4 border-t border-inherit">
-                    <div className="h-5">
+                    <div className="h-6 mb-2">
                         <SaveStatusIndicator />
                     </div>
+                    <button onClick={() => setIsWhatsNewOpen(true)} className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${sidebarTextColor} hover:${themeClasses.bgTertiary}`}>
+                        <SparklesIcon className="w-5 h-5" />
+                        <span>What's New</span>
+                    </button>
                     <button onClick={() => setIsSettingsOpen(true)} className={`mt-2 w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${sidebarTextColor} hover:${themeClasses.bgTertiary}`}>
                         <SettingsIcon className="w-5 h-5" />
                         <span>Settings</span>
@@ -107,6 +113,7 @@ const Sidebar = ({ onLinkClick = () => {} }: SidebarProps) => {
                 </div>
             </div>
             <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+            <WhatsNewModal isOpen={isWhatsNewOpen} onClose={() => setIsWhatsNewOpen(false)} />
         </>
     );
 };
