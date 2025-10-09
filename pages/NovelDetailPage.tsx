@@ -126,11 +126,12 @@ const NovelDetailPage = () => {
                 // Clean the HTML by removing empty paragraphs which can mess with styling.
                 const cleanedHtml = html.replace(/<p>(\s|&nbsp;|<br\s*\/?>)*<\/p>/gi, '');
 
-                const headingRegex = /<h[123][^>]*>.*?<\/h[123]>/g;
-                const matches = [...cleanedHtml.matchAll(headingRegex)];
+                // FIX: Replaced fragile chapter splitting logic with a more robust method.
+                const headingSplitRegex = /(<h[123][^>]*>.*?<\/h[123]>)/i;
+                const parts = cleanedHtml.split(headingSplitRegex).filter(part => part.trim() !== '');
 
-                if (matches.length === 0) {
-                    // No headings found, treat the whole file as one chapter
+                if (parts.length <= 1) {
+                    // No headings found, or only content without a heading. Treat as one chapter.
                     const now = new Date().toISOString();
                     allNewChapters.push({
                         id: crypto.randomUUID(),
@@ -142,11 +143,11 @@ const NovelDetailPage = () => {
                         history: [],
                     });
                 } else {
-                    // Headings found, split into chapters
-                    let lastIndex = 0;
-                    // Handle content before the first heading
-                    if (matches[0].index && matches[0].index > 0) {
-                        const preContent = cleanedHtml.substring(0, matches[0].index).trim();
+                    const tempDiv = document.createElement('div');
+
+                    // Check for any content before the first heading, treat it as a prologue.
+                    if (!parts[0].match(/^<h[123]/i)) {
+                        const preContent = parts.shift()?.trim();
                         if (preContent) {
                             const now = new Date().toISOString();
                             allNewChapters.push({
@@ -161,26 +162,30 @@ const NovelDetailPage = () => {
                         }
                     }
 
-                    matches.forEach((match, i) => {
-                        const tempDiv = document.createElement('div');
-                        tempDiv.innerHTML = match[0];
+                    // Process the remaining parts in pairs of [heading, content].
+                    for (let i = 0; i < parts.length; i += 2) {
+                        const headingHtml = parts[i];
+                        const contentHtml = parts[i + 1] || ''; // Content may be empty if it's the last chapter.
+                        
+                        tempDiv.innerHTML = headingHtml;
                         const chapterTitle = tempDiv.textContent?.trim() || `Chapter ${allNewChapters.length + 1}`;
                         
-                        const startIndex = match.index || 0;
-                        const endIndex = (i + 1 < matches.length) ? (matches[i + 1].index || cleanedHtml.length) : cleanedHtml.length;
-                        const content = cleanedHtml.substring(startIndex, endIndex);
-
-                        const now = new Date().toISOString();
-                        allNewChapters.push({
-                            id: crypto.randomUUID(),
-                            title: chapterTitle,
-                            content: content.trim(),
-                            wordCount: 0,
-                            createdAt: now,
-                            updatedAt: now,
-                            history: [],
-                        });
-                    });
+                        // The chapter's content should include its own heading.
+                        const fullChapterContent = (headingHtml + contentHtml).trim();
+                        
+                        if (fullChapterContent) {
+                            const now = new Date().toISOString();
+                            allNewChapters.push({
+                                id: crypto.randomUUID(),
+                                title: chapterTitle,
+                                content: fullChapterContent,
+                                wordCount: 0,
+                                createdAt: now,
+                                updatedAt: now,
+                                history: [],
+                            });
+                        }
+                    }
                 }
             } catch (error) {
                 console.error(`Error processing file ${file.name}:`, error);

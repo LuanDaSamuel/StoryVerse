@@ -1,7 +1,8 @@
 import * as React from 'react';
 import { ProjectData, StorageStatus, Theme, StoryIdeaStatus, NovelSketch, UserProfile, SaveStatus } from '../types';
 import { get, set, del } from 'idb-keyval';
-import { useProjectStorage } from './useProjectStorage';
+// FIX: Imported PermanentAuthError to handle specific authentication failures.
+import { useProjectStorage, PermanentAuthError } from './useProjectStorage';
 
 // --- Constants ---
 const LOCAL_BACKUP_KEY = 'storyverse-local-backup';
@@ -104,17 +105,43 @@ export function useProject() {
   const storage = useProjectStorage();
   const saveProjectRef = React.useRef<() => Promise<void>>(async () => {});
   const saveTimeoutRef = React.useRef<number | null>(null);
+  
+  const resetState = React.useCallback(() => {
+    setProjectData(null);
+    setProjectName('');
+    setStorageMode(null);
+    setUserProfile(null);
+    setSaveStatus('idle');
+    isDirtyRef.current = false;
+  }, []);
 
+  const flushChanges = React.useCallback(async () => {
+    if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+    }
+    if (!isSavingRef.current && isDirtyRef.current) {
+      await saveProjectRef.current?.();
+    }
+    while (isSavingRef.current) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  }, []);
+  
+  const signOut = React.useCallback(async () => {
+    setStatus('loading');
+    await flushChanges();
+    await storage.signOut();
+    resetState();
+    setStatus('welcome');
+  }, [flushChanges, storage, resetState]);
+
+  // FIX: Refactored the save function to handle permanent auth errors gracefully by signing the user out.
   const saveProject = React.useCallback(async () => {
-    // If a save is already happening, or there are no changes, do nothing.
-    // The debouncer will catch subsequent changes.
     if (isSavingRef.current || !isDirtyRef.current) {
         return;
     }
 
     isSavingRef.current = true;
-    // Mark as clean *before* saving. Any new edits that occur *during* the save
-    // operation will set this back to true, ensuring the debouncer schedules another save.
     isDirtyRef.current = false;
     setSaveStatus('saving');
 
@@ -123,54 +150,49 @@ export function useProject() {
         console.error("Attempted to save but no project data was available.");
         setSaveStatus('error');
         isSavingRef.current = false;
-        // The data is still "dirty" because the save failed before it began.
         isDirtyRef.current = true;
         return;
     }
 
     const MAX_RETRIES = 3;
-    const INITIAL_DELAY_MS = 1500; // Start with a slightly longer delay
+    const INITIAL_DELAY_MS = 1500;
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
             if (storageMode === 'drive') {
                 await storage.saveToDrive(dataToSave);
             } else if (storageMode === 'local') {
-                // For local files, also update the IndexedDB backup.
                 await set(LOCAL_BACKUP_KEY, dataToSave);
                 await storage.saveToFileHandle(dataToSave);
             }
-
-            // --- Success ---
             setSaveStatus('saved');
             isSavingRef.current = false;
-            // A new save might have been queued by the debouncer if edits happened during this save.
-            // The `saveProject` call from that debouncer will handle it. We are done here.
-            return; 
-
-        } catch (error) {
+            return;
+        } catch (error: any) {
             console.error(`Save attempt ${attempt}/${MAX_RETRIES} failed for storage mode '${storageMode}':`, error);
 
-            if (attempt === MAX_RETRIES) {
-                // --- Final Failure ---
-                // All retries have been exhausted. Show the error to the user.
+            if (error instanceof PermanentAuthError) {
                 setSaveStatus('error');
-                // The changes are still unsaved.
                 isDirtyRef.current = true;
                 isSavingRef.current = false;
-                // Stop the retry loop. The user will need to trigger a new save,
-                // either by editing again or with a manual save button (if we add one).
+                alert(`${error.message}\n\nYou will be signed out to protect your work.`);
+                await signOut();
                 return;
             }
 
-            // --- Retry ---
-            // Wait before the next attempt, using exponential backoff.
+            if (attempt === MAX_RETRIES) {
+                setSaveStatus('error');
+                isDirtyRef.current = true;
+                isSavingRef.current = false;
+                return;
+            }
+
             const delay = INITIAL_DELAY_MS * Math.pow(2, attempt - 1);
             console.log(`Will retry in ${delay}ms...`);
             await new Promise(resolve => setTimeout(resolve, delay));
         }
     }
-  }, [storage, storageMode]);
+  }, [storage, storageMode, signOut]);
 
   // Keep the ref updated with the latest version of the save function
   React.useEffect(() => {
@@ -183,8 +205,6 @@ export function useProject() {
         if (JSON.stringify(newData) !== JSON.stringify(prevData)) {
             isDirtyRef.current = true;
 
-            // Only show "unsaved" if a save isn't already in progress.
-            // This prevents the UI from flickering between "Saving..." and "Unsaved".
             if (!isSavingRef.current) {
                 setSaveStatus('unsaved');
             }
@@ -205,33 +225,12 @@ export function useProject() {
   React.useEffect(() => {
     if (saveStatus === 'saved') {
         const timeoutId = setTimeout(() => {
-            // After the 'Saved!' message has been displayed, transition to idle.
-            // The debouncer in `setProjectDataAndMarkDirty` will trigger the next save if needed.
             setSaveStatus('idle');
         }, 1500); // Duration to display the "Saved!" message.
         return () => clearTimeout(timeoutId);
     }
   }, [saveStatus]);
     
-  const flushChanges = React.useCallback(async () => {
-    // This function ensures all pending changes are saved before an action like closing or downloading.
-    
-    // Cancel any scheduled debounced save.
-    if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-    }
-  
-    // If a save isn't in progress but there are pending changes, start one immediately.
-    if (!isSavingRef.current && isDirtyRef.current) {
-      await saveProjectRef.current?.();
-    }
-  
-    // Wait for the save we just kicked off (if any) to complete.
-    while (isSavingRef.current) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-  }, []);
-
     // Save on visibility change (e.g., switching tabs)
     React.useEffect(() => {
         const handleVisibilityChange = () => {
@@ -263,23 +262,6 @@ export function useProject() {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, []); // Empty dependency array ensures this runs only on mount and unmount.
-
-  const resetState = React.useCallback(() => {
-    setProjectData(null);
-    setProjectName('');
-    setStorageMode(null);
-    setUserProfile(null);
-    setSaveStatus('idle');
-    isDirtyRef.current = false;
-  }, []);
-  
-  const signOut = React.useCallback(async () => {
-    setStatus('loading');
-    await flushChanges();
-    await storage.signOut();
-    resetState();
-    setStatus('welcome');
-  }, [flushChanges, storage, resetState]);
   
   const handleDriveProject = React.useCallback((driveProject: { name: string, data: any } | null) => {
     if (driveProject) {

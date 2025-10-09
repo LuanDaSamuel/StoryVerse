@@ -21,6 +21,14 @@ interface StoredToken extends TokenResponse {
     expires_at: number;
 }
 
+// FIX: Added a custom error class for unrecoverable authentication issues.
+export class PermanentAuthError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'PermanentAuthError';
+    }
+}
+
 
 // --- Helper Functions ---
 async function verifyPermission(handle: FileSystemHandle) {
@@ -68,6 +76,59 @@ export function useProjectStorage() {
         return { fileId: fileId, name: createResponse.result.name };
     }, []);
 
+    const signOut = React.useCallback(async () => {
+        if (gapi.client) {
+            gapi.client.setToken('');
+        }
+        await idbDel(GAPI_AUTH_TOKEN_KEY);
+        await idbDel(DRIVE_FILE_ID_KEY);
+        await idbDel(USER_PROFILE_KEY);
+        driveFileIdRef.current = null;
+        if (google?.accounts?.id) {
+          google.accounts.id.disableAutoSelect();
+        }
+        console.log('User signed out. Local session data cleared.');
+    }, []);
+
+    // FIX: Updated to no longer sign out automatically, allowing the caller to handle failures.
+    const refreshTokenAndGetProfile = React.useCallback(async (): Promise<UserProfile | null> => {
+        console.log("Attempting to refresh token silently...");
+        return new Promise((resolve) => {
+            try {
+                const tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: CLIENT_ID,
+                    scope: SCOPES,
+                    callback: async (tokenResponse: TokenResponse) => {
+                        if (tokenResponse && tokenResponse.access_token) {
+                            console.log("Silent token refresh successful.");
+                            const expires_at = Date.now() + (tokenResponse.expires_in * 1000);
+                            const storedToken: StoredToken = { ...tokenResponse, expires_at };
+                            await idbSet(GAPI_AUTH_TOKEN_KEY, storedToken);
+
+                            gapi.client.setToken(tokenResponse);
+                            const userInfo = await gapi.client.request({ path: 'https://www.googleapis.com/oauth2/v3/userinfo' });
+                            const profile: UserProfile = { name: userInfo.result.name, email: userInfo.result.email, picture: userInfo.result.picture };
+                            await idbSet(USER_PROFILE_KEY, profile);
+                            resolve(profile);
+                        } else {
+                            console.log("Silent token refresh failed to get access_token.");
+                            resolve(null);
+                        }
+                    },
+                    error_callback: (error: any) => {
+                        console.warn("Silent token refresh error:", error);
+                        resolve(null);
+                    }
+                });
+                tokenClient.requestAccessToken({ prompt: 'none' });
+            } catch (error) {
+                console.error("Error setting up silent token refresh.", error);
+                resolve(null);
+            }
+        });
+    }, []);
+
+    // FIX: Made saveToDrive more robust. It now attempts to refresh an expired token and retry saving once.
     const saveToDrive = React.useCallback(async (data: ProjectData) => {
         let fileId = driveFileIdRef.current || await idbGet<string>(DRIVE_FILE_ID_KEY);
     
@@ -80,22 +141,42 @@ export function useProjectStorage() {
         }
         
         driveFileIdRef.current = fileId;
+
+        const doSaveRequest = () => gapi.client.request({
+            path: `/upload/drive/v3/files/${fileId}`,
+            method: 'PATCH',
+            params: { uploadType: 'media' },
+            body: JSON.stringify(data)
+        });
     
         try {
             console.log(`Initiating upload for Drive file: ${fileId} via gapi.client.request`);
-            
-            await gapi.client.request({
-                path: `/upload/drive/v3/files/${fileId}`,
-                method: 'PATCH',
-                params: { uploadType: 'media' },
-                body: JSON.stringify(data)
-            });
-    
+            await doSaveRequest();
             console.log("File updated successfully.");
-    
         } catch (error: any) {
             console.error("Failed to update Drive file:", error);
     
+            // If it's an auth error, try to refresh the token and retry once.
+            if (error.status === 401 || error.status === 403) {
+                console.log("Save failed due to auth error. Refreshing token...");
+                const newProfile = await refreshTokenAndGetProfile();
+                if (newProfile) {
+                    console.log("Token refreshed. Retrying save...");
+                    try {
+                        await doSaveRequest();
+                        console.log("File updated successfully on retry.");
+                        return; // Success!
+                    } catch (retryError: any) {
+                        console.error("Save failed even after token refresh.", retryError);
+                        // If retry fails, it's a more serious problem. Throw a permanent error.
+                        throw new PermanentAuthError("Could not save to Google Drive after refreshing session. Your permissions might have changed.");
+                    }
+                } else {
+                    console.error("Token refresh failed. This is a permanent auth error.");
+                    throw new PermanentAuthError("Could not refresh your Google session. Please sign in again to continue saving.");
+                }
+            }
+            
             // Handle cases where the file might have been deleted on Drive.
             if (error.status === 404) {
                  console.log("File not found on Drive. Creating a new one.");
@@ -105,10 +186,10 @@ export function useProjectStorage() {
                  return;
             }
     
-            // Re-throw other errors so the calling hook (useProjectFile) can handle retries and UI state.
+            // Re-throw other errors (like network errors) so the calling hook can handle retries.
             throw error;
         }
-    }, [createOnDrive]);
+    }, [createOnDrive, refreshTokenAndGetProfile]);
 
     const loadFromDrive = React.useCallback(async (): Promise<{ name: string, data: ProjectData } | null> => {
         const storedFileId = await idbGet<string>(DRIVE_FILE_ID_KEY);
@@ -173,59 +254,6 @@ export function useProjectStorage() {
         console.log("No project file found on Google Drive.");
         return null;
     }, []);
-
-    const signOut = React.useCallback(async () => {
-        if (gapi.client) {
-            gapi.client.setToken('');
-        }
-        await idbDel(GAPI_AUTH_TOKEN_KEY);
-        await idbDel(DRIVE_FILE_ID_KEY);
-        await idbDel(USER_PROFILE_KEY);
-        driveFileIdRef.current = null;
-        if (google?.accounts?.id) {
-          google.accounts.id.disableAutoSelect();
-        }
-        console.log('User signed out. Local session data cleared.');
-    }, []);
-
-    const refreshTokenAndGetProfile = React.useCallback(async (): Promise<UserProfile | null> => {
-        console.log("Attempting to refresh token silently...");
-        return new Promise((resolve) => {
-            try {
-                const tokenClient = google.accounts.oauth2.initTokenClient({
-                    client_id: CLIENT_ID,
-                    scope: SCOPES,
-                    callback: async (tokenResponse: TokenResponse) => {
-                        if (tokenResponse && tokenResponse.access_token) {
-                            console.log("Silent token refresh successful.");
-                            const expires_at = Date.now() + (tokenResponse.expires_in * 1000);
-                            const storedToken: StoredToken = { ...tokenResponse, expires_at };
-                            await idbSet(GAPI_AUTH_TOKEN_KEY, storedToken);
-
-                            gapi.client.setToken(tokenResponse);
-                            const userInfo = await gapi.client.request({ path: 'https://www.googleapis.com/oauth2/v3/userinfo' });
-                            const profile: UserProfile = { name: userInfo.result.name, email: userInfo.result.email, picture: userInfo.result.picture };
-                            await idbSet(USER_PROFILE_KEY, profile);
-                            resolve(profile);
-                        } else {
-                            console.log("Silent token refresh failed to get access_token. Signing out.");
-                            await signOut();
-                            resolve(null);
-                        }
-                    },
-                    error_callback: async (error: any) => {
-                        console.warn("Silent token refresh error:", error);
-                        await signOut();
-                        resolve(null);
-                    }
-                });
-                tokenClient.requestAccessToken({ prompt: 'none' });
-            } catch (error) {
-                console.error("Error setting up silent token refresh.", error);
-                signOut().then(() => resolve(null));
-            }
-        });
-    }, [signOut]);
 
     const signIn = React.useCallback(async (): Promise<UserProfile> => {
       return new Promise((resolve, reject) => {
