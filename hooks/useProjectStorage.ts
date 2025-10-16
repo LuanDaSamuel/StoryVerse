@@ -128,8 +128,22 @@ export function useProjectStorage() {
         });
     }, []);
 
-    // FIX: Made saveToDrive more robust. It now attempts to refresh an expired token and retry saving once.
+    // FIX: Made saveToDrive more robust by proactively refreshing expired tokens before saving.
     const saveToDrive = React.useCallback(async (data: ProjectData) => {
+        // Proactive token check to prevent save failures from expired tokens,
+        // which can happen if the computer was asleep. We refresh if the token
+        // is missing, expired, or will expire in the next 5 minutes.
+        const token = await idbGet<StoredToken>(GAPI_AUTH_TOKEN_KEY);
+        const FIVE_MINUTES_IN_MS = 5 * 60 * 1000;
+        if (!token || !token.access_token || Date.now() >= (token.expires_at - FIVE_MINUTES_IN_MS)) {
+            console.log("Token is missing, expired, or expiring soon. Refreshing proactively.");
+            const newProfile = await refreshTokenAndGetProfile();
+            if (!newProfile) {
+                // If proactive refresh fails, we can't save. This is a permanent error.
+                throw new PermanentAuthError("Could not refresh your Google session. Please sign in again to continue saving.");
+            }
+        }
+        
         let fileId = driveFileIdRef.current || await idbGet<string>(DRIVE_FILE_ID_KEY);
     
         if (!fileId) {
@@ -156,7 +170,8 @@ export function useProjectStorage() {
         } catch (error: any) {
             console.error("Failed to update Drive file:", error);
     
-            // If it's an auth error, try to refresh the token and retry once.
+            // If it's an auth error, try to refresh the token and retry once. This is a fallback
+            // in case the token was invalidated on the server-side before its expiry time.
             if (error.status === 401 || error.status === 403) {
                 console.log("Save failed due to auth error. Refreshing token...");
                 const newProfile = await refreshTokenAndGetProfile();
@@ -290,7 +305,7 @@ export function useProjectStorage() {
       });
     }, []);
 
-    const initAndRestoreSession = React.useCallback(async (): Promise<UserProfile | null> => {
+    const initGapiClient = React.useCallback(async (): Promise<void> => {
         await new Promise<void>((resolve, reject) => {
             if ((window as any).gapiLoaded) return resolve();
             const timeout = setTimeout(() => reject(new Error("Google API script failed to load.")), 10000);
@@ -306,29 +321,7 @@ export function useProjectStorage() {
             console.error("GAPI client init failed:", err);
             throw new Error(`Initialization failed:\n${err.details || 'Unknown error.'}`);
         });
-
-        const token = await idbGet<StoredToken>(GAPI_AUTH_TOKEN_KEY);
-        if (!token?.access_token) {
-            console.log("No stored token found. User is not signed in.");
-            return null;
-        }
-
-        if (Date.now() >= token.expires_at) {
-            console.log("Token expired. Refreshing token on initialization...");
-            return await refreshTokenAndGetProfile();
-        }
-
-        console.log("Found non-expired token. Restoring session without validation.");
-        gapi.client.setToken(token);
-        const profile = await idbGet<UserProfile>(USER_PROFILE_KEY);
-        
-        if (!profile) {
-            console.warn("Inconsistent state: token found but no profile. Forcing refresh.");
-            return await refreshTokenAndGetProfile();
-        }
-
-        return profile;
-    }, [refreshTokenAndGetProfile]);
+    }, []);
 
     // --- Local File System Functions ---
     const getHandleFromIdb = async () => idbGet<FileSystemFileHandle>(PROJECT_FILE_HANDLE_KEY);
@@ -362,7 +355,7 @@ export function useProjectStorage() {
     };
 
     return {
-        initAndRestoreSession,
+        initGapiClient,
         refreshTokenAndGetProfile,
         signIn,
         signOut,

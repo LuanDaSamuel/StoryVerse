@@ -187,6 +187,7 @@ const SketchEditorModal = ({ sketch, onClose, onSave, novels, novelId: contextua
                             placeholder="Sketch Title"
                             className={`w-full text-3xl font-bold bg-transparent outline-none mb-4 ${themeClasses.accentText}`}
                         />
+                        {/* FIX: Added children to ToolbarButton components to pass in the icon, resolving missing property errors. */}
                         <div className="sticky top-0 z-10 bg-gray-800 p-2 rounded-md mb-4 flex items-center space-x-1">
                             <ToolbarButton onClick={(e) => applyCommand(e, 'bold')} isActive={activeFormats.isBold}><BoldIcon className="w-5 h-5"/></ToolbarButton>
                             <ToolbarButton onClick={(e) => applyCommand(e, 'italic')} isActive={activeFormats.isItalic}><ItalicIcon className="w-5 h-5"/></ToolbarButton>

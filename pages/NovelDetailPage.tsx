@@ -105,7 +105,8 @@ const NovelDetailPage = () => {
         if (!pendingFiles || novelIndex === -1) return;
         setIsDocxConfirmOpen(false);
 
-        const sortedFiles = Array.from(pendingFiles).sort((a, b) =>
+        // FIX: Cast Array.from result to File[] to fix type inference issues with FileList.
+        const sortedFiles: File[] = (Array.from(pendingFiles) as File[]).sort((a: File, b: File) =>
             a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
         );
 
@@ -187,7 +188,8 @@ const NovelDetailPage = () => {
                         }
                     }
                 }
-            } catch (error) {
+            // FIX: Explicitly type the error to 'any' to allow accessing properties on it.
+            } catch (error: any) {
                 console.error(`Error processing file ${file.name}:`, error);
                 alert(`Failed to process ${file.name}. It might be corrupted or not a valid .docx file.`);
             }

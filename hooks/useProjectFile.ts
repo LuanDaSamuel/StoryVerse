@@ -127,13 +127,16 @@ export function useProject() {
     }
   }, []);
   
-  const signOut = React.useCallback(async () => {
-    setStatus('loading');
-    await flushChanges();
-    await storage.signOut();
-    resetState();
-    setStatus('welcome');
-  }, [flushChanges, storage, resetState]);
+    const signOut = React.useCallback(async (options?: { flush?: boolean }) => {
+        const shouldFlush = options?.flush ?? true;
+        setStatus('loading');
+        if (shouldFlush) {
+            await flushChanges();
+        }
+        await storage.signOut();
+        resetState();
+        setStatus('welcome');
+    }, [flushChanges, storage, resetState]);
 
   // FIX: Refactored the save function to handle permanent auth errors gracefully by signing the user out.
   const saveProject = React.useCallback(async () => {
@@ -176,7 +179,7 @@ export function useProject() {
                 isDirtyRef.current = true;
                 isSavingRef.current = false;
                 alert(`${error.message}\n\nYou will be signed out to protect your work.`);
-                await signOut();
+                await signOut({ flush: false });
                 return;
             }
 
@@ -261,8 +264,47 @@ export function useProject() {
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, []); // Empty dependency array ensures this runs only on mount and unmount.
+  }, []);
   
+    // --- Inactivity Timer for Auto-Sign Out ---
+    const inactivityTimeoutRef = React.useRef<number | null>(null);
+    const storageModeRef = React.useRef(storageMode);
+    React.useEffect(() => {
+        storageModeRef.current = storageMode;
+    }, [storageMode]);
+
+    const signOutAfterInactivity = React.useCallback(() => {
+        if (storageModeRef.current === 'drive') {
+            console.log("Signing out due to inactivity.");
+            alert("You have been signed out due to 15 minutes of inactivity.");
+            signOut();
+        }
+    }, [signOut]);
+
+    const resetInactivityTimer = React.useCallback(() => {
+        if (inactivityTimeoutRef.current) {
+            clearTimeout(inactivityTimeoutRef.current);
+        }
+        if (storageModeRef.current === 'drive') {
+            inactivityTimeoutRef.current = window.setTimeout(signOutAfterInactivity, 15 * 60 * 1000); // 15 minutes
+        }
+    }, [signOutAfterInactivity]);
+
+    React.useEffect(() => {
+        if (storageMode === 'drive') {
+            const events: (keyof WindowEventMap)[] = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+            events.forEach(event => window.addEventListener(event, resetInactivityTimer));
+            resetInactivityTimer(); // Start the timer when user signs in
+
+            return () => {
+                events.forEach(event => window.removeEventListener(event, resetInactivityTimer));
+                if (inactivityTimeoutRef.current) {
+                    clearTimeout(inactivityTimeoutRef.current);
+                }
+            };
+        }
+    }, [storageMode, resetInactivityTimer]);
+
   const handleDriveProject = React.useCallback((driveProject: { name: string, data: any } | null) => {
     if (driveProject) {
         setProjectData(sanitizeProjectData(driveProject.data));
@@ -348,58 +390,11 @@ export function useProject() {
 
     const initializeApp = async () => {
         try {
-            const profile = await storage.initAndRestoreSession();
-            if (profile) {
-                console.log("Restored Google session.");
-                setUserProfile(profile);
-                setStorageMode('drive');
-                
-                const localData = await getLocalProjectData();
-                let driveProject;
-
-                try {
-                    driveProject = await storage.loadFromDrive();
-                } catch (error: any) {
-                    if (error.status === 401 || error.status === 403) {
-                        console.warn("Initial Drive load failed with auth error. Refreshing token and retrying.");
-                        const newProfile = await storage.refreshTokenAndGetProfile();
-                        if (newProfile) {
-                            console.log("Token refreshed, retrying Drive load.");
-                            setUserProfile(newProfile);
-                            driveProject = await storage.loadFromDrive();
-                        } else {
-                            console.log("Token refresh failed. Signing out.");
-                            await storage.signOut();
-                            resetState();
-                            // If sign out happens, check for a local project before showing welcome.
-                            const hasLocal = await checkForRecentLocalProject();
-                            if (!hasLocal) {
-                                setStatus('welcome');
-                            }
-                            return; // Exit initializeApp
-                        }
-                    } else {
-                        // Not an auth error, re-throw it to be caught by the outer catch block.
-                        throw error;
-                    }
-                }
-
-                if (driveProject && localData) {
-                    setProjectData(sanitizeProjectData(localData.data));
-                    setProjectName(localData.name);
-                    setStatus('drive-conflict');
-                } else if (driveProject) {
-                    handleDriveProject(driveProject);
-                } else {
-                    setStatus('drive-no-project');
-                }
-            } else {
-                console.log("No active Google session. Checking for local project.");
-                const hasLocal = await checkForRecentLocalProject();
-                if (!hasLocal) {
-                    console.log("No local project found. Displaying welcome screen.");
-                    setStatus('welcome');
-                }
+            await storage.initGapiClient();
+            const hasLocal = await checkForRecentLocalProject();
+            if (!hasLocal) {
+                console.log("No local project found. Displaying welcome screen.");
+                setStatus('welcome');
             }
         } catch (error: any) {
             console.error("Initialization failed:", error);
@@ -409,7 +404,7 @@ export function useProject() {
     };
     initializeApp();
     isInitialLoadRef.current = false;
-  }, [storage, checkForRecentLocalProject, getLocalProjectData, resetState, handleDriveProject, signOut]);
+  }, [storage, checkForRecentLocalProject]);
   
   const openLocalProject = React.useCallback(async () => {
     if (!isFileSystemAccessAPISupported) {

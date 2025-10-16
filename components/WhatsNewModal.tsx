@@ -12,6 +12,13 @@ const WhatsNewModal = ({ isOpen, onClose }: WhatsNewModalProps) => {
 
     const updates = [
         {
+            date: 'October 9, 2025',
+            items: [
+                "**Stability Fix**: Improved the Google Drive auto-login feature. The app now proactively checks and refreshes your session, preventing save errors when you return after a long break.",
+                "**Bug Fixes**: Resolved minor bugs in the editor toolbars and DOCX file import to ensure smoother operation."
+            ]
+        },
+        {
             date: 'October 8, 2025',
             items: [
                 "Hello world!",

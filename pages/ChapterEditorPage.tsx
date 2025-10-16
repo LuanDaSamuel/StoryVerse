@@ -1257,6 +1257,7 @@ const ChapterEditorPage = () => {
                                 className="absolute bottom-full mb-2 p-4 rounded-lg shadow-lg bg-stone-900/80 border border-white/10 backdrop-blur-sm w-[320px]"
                             >
                                 <div className="space-y-4">
+                                    {/* FIX: Ensure ToolbarDropdown components have children as required by their props, resolving compilation errors. */}
                                     <ToolbarDropdown label="Paragraph Style" value={currentFormat.paragraphStyle} onChange={(e) => applyParagraphStyle(e.target.value)}>
                                         <option value="p">Paragraph</option>
                                         <option value="blockquote">Blockquote</option>
