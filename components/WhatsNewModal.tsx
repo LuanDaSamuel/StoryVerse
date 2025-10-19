@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { CloseIcon, SparklesIcon } from './Icons';
+import { useTranslations } from '../hooks/useTranslations';
 
 interface WhatsNewModalProps {
   isOpen: boolean;
@@ -9,6 +10,7 @@ interface WhatsNewModalProps {
 
 const WhatsNewModal = ({ isOpen, onClose }: WhatsNewModalProps) => {
     const { theme, themeClasses } = React.useContext(ProjectContext);
+    const t = useTranslations();
 
     const updates = [
         {
@@ -73,7 +75,7 @@ const WhatsNewModal = ({ isOpen, onClose }: WhatsNewModalProps) => {
                 <div className="flex justify-between items-center mb-6">
                     <h2 className={`text-2xl font-bold flex items-center space-x-3`}>
                         <SparklesIcon className="w-6 h-6" />
-                        <span>What's New</span>
+                        <span>{t.whatsNewTitle}</span>
                     </h2>
                     <button onClick={onClose} className={`p-1 -m-1 rounded-full hover:${themeClasses.bgTertiary}`} aria-label="Close">
                         <CloseIcon className="w-6 h-6" />
@@ -93,7 +95,7 @@ const WhatsNewModal = ({ isOpen, onClose }: WhatsNewModalProps) => {
                     ))}
                     <div className={`mt-3 p-3 rounded-md ${theme === 'book' ? 'bg-amber-100 text-amber-800' : 'bg-slate-700 text-slate-300'}`}>
                         <p>
-                            <strong className="font-semibold">Pro Tip:</strong> If you see an 'Error saving' message, a quick reload of the app usually fixes the issue.
+                            <strong className="font-semibold">{t.proTip}</strong> {t.proTipMessage}
                         </p>
                     </div>
                 </div>

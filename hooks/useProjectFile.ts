@@ -1,7 +1,6 @@
 import * as React from 'react';
-import { ProjectData, StorageStatus, Theme, StoryIdeaStatus, NovelSketch, UserProfile, SaveStatus } from '../types';
+import { ProjectData, StorageStatus, Theme, StoryIdeaStatus, NovelSketch, UserProfile, SaveStatus, Language } from '../types';
 import { get, set, del } from 'idb-keyval';
-// FIX: Imported PermanentAuthError to handle specific authentication failures.
 import { useProjectStorage, PermanentAuthError } from './useProjectStorage';
 
 // --- Constants ---
@@ -9,7 +8,7 @@ const LOCAL_BACKUP_KEY = 'storyverse-local-backup';
 const isFileSystemAccessAPISupported = 'showOpenFilePicker' in window;
 
 const defaultProjectData: ProjectData = {
-  settings: { theme: 'book', baseFontSize: 18 },
+  settings: { theme: 'book', baseFontSize: 18, language: 'en' },
   novels: [],
   storyIdeas: [],
 };
@@ -26,6 +25,9 @@ const sanitizeProjectData = (data: any): ProjectData => {
     }
     if (typeof data.settings.baseFontSize === 'number') {
       sanitized.settings.baseFontSize = data.settings.baseFontSize;
+    }
+    if (['en', 'vi', 'fi'].includes(data.settings.language)) {
+        sanitized.settings.language = data.settings.language as Language;
     }
   }
 
@@ -138,7 +140,6 @@ export function useProject() {
         setStatus('welcome');
     }, [flushChanges, storage, resetState]);
 
-  // FIX: Refactored the save function to handle permanent auth errors gracefully by signing the user out.
   const saveProject = React.useCallback(async () => {
     if (isSavingRef.current || !isDirtyRef.current) {
         return;

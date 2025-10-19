@@ -4,6 +4,7 @@ import { AppLogoIcon, HomeIcon, PlusIcon, SettingsIcon, LightbulbIcon, QuillPenI
 import SettingsModal from './SettingsModal';
 import { ProjectContext } from '../contexts/ProjectContext';
 import WhatsNewModal from './WhatsNewModal';
+import { useTranslations } from '../hooks/useTranslations';
 
 interface SidebarProps {
     onLinkClick?: () => void;
@@ -11,22 +12,23 @@ interface SidebarProps {
 
 const SaveStatusIndicator = () => {
     const { theme, saveStatus } = React.useContext(ProjectContext);
+    const t = useTranslations();
 
     const baseClasses = 'flex items-center space-x-2 text-xs font-semibold';
 
     switch (saveStatus) {
         case 'unsaved':
             const unsavedColor = theme === 'dark' ? 'text-amber-400' : 'text-amber-600';
-            return <div className={`${baseClasses} ${unsavedColor}`}><span>Unsaved changes</span></div>;
+            return <div className={`${baseClasses} ${unsavedColor}`}><span>{t.saveStatusUnsaved}</span></div>;
         case 'saving':
             const savingColor = theme === 'dark' ? 'text-blue-400' : 'text-blue-600';
-            return <div className={`${baseClasses} ${savingColor}`}><LoadingIcon className="w-4 h-4 animate-spin" /><span>Saving...</span></div>;
+            return <div className={`${baseClasses} ${savingColor}`}><LoadingIcon className="w-4 h-4 animate-spin" /><span>{t.saveStatusSaving}</span></div>;
         case 'saved':
             const savedColor = theme === 'dark' ? 'text-green-400' : 'text-green-600';
-            return <div className={`${baseClasses} ${savedColor}`}><CheckIcon className="w-4 h-4" /><span>Saved!</span></div>;
+            return <div className={`${baseClasses} ${savedColor}`}><CheckIcon className="w-4 h-4" /><span>{t.saveStatusSaved}</span></div>;
         case 'error':
             const errorColor = theme === 'dark' ? 'text-red-400' : 'text-red-600';
-            return <div className={`${baseClasses} ${errorColor}`}><ExclamationTriangleIcon className="w-4 h-4" /><span>Error saving</span></div>;
+            return <div className={`${baseClasses} ${errorColor}`}><ExclamationTriangleIcon className="w-4 h-4" /><span>{t.saveStatusError}</span></div>;
         default:
             return null; // 'idle'
     }
@@ -36,6 +38,7 @@ const Sidebar = ({ onLinkClick = () => {} }: SidebarProps) => {
     const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
     const [isWhatsNewOpen, setIsWhatsNewOpen] = React.useState(false);
     const { theme, themeClasses, userProfile, signOut } = React.useContext(ProjectContext);
+    const t = useTranslations();
 
     const navLinkClasses = ({ isActive }: { isActive: boolean }): string => {
         const baseClasses = `flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors`;
@@ -64,19 +67,19 @@ const Sidebar = ({ onLinkClick = () => {} }: SidebarProps) => {
                 <nav className="flex-1 p-4 space-y-2">
                     <NavLink to="/" className={navLinkClasses} onClick={onLinkClick}>
                         <HomeIcon className="w-5 h-5" />
-                        <span>Home page</span>
+                        <span>{t.homePage}</span>
                     </NavLink>
                     <NavLink to="/create-novel" className={navLinkClasses} onClick={onLinkClick}>
                         <PlusIcon className="w-5 h-5" />
-                        <span>Create Novel</span>
+                        <span>{t.createNovel}</span>
                     </NavLink>
                     <NavLink to="/demos" className={navLinkClasses} onClick={onLinkClick}>
                         <LightbulbIcon className="w-5 h-5" />
-                        <span>Idea Box</span>
+                        <span>{t.ideaBox}</span>
                     </NavLink>
                     <NavLink to="/sketches" className={navLinkClasses} onClick={onLinkClick}>
                         <QuillPenIcon className="w-5 h-5" />
-                        <span>Sketches</span>
+                        <span>{t.sketches}</span>
                     </NavLink>
                 </nav>
 
@@ -90,7 +93,7 @@ const Sidebar = ({ onLinkClick = () => {} }: SidebarProps) => {
                             </div>
                         </div>
                          <button onClick={signOut} className={`w-full text-center mt-2 px-3 py-2 rounded-md text-sm font-medium transition-colors hover:${themeClasses.bgTertiary}`}>
-                             Sign Out
+                             {t.signOut}
                          </button>
                      </div>
                 )}
@@ -101,11 +104,11 @@ const Sidebar = ({ onLinkClick = () => {} }: SidebarProps) => {
                     </div>
                     <button onClick={() => setIsWhatsNewOpen(true)} className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${sidebarTextColor} hover:${themeClasses.bgTertiary}`}>
                         <SparklesIcon className="w-5 h-5" />
-                        <span>What's New</span>
+                        <span>{t.whatsNew}</span>
                     </button>
                     <button onClick={() => setIsSettingsOpen(true)} className={`mt-2 w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${sidebarTextColor} hover:${themeClasses.bgTertiary}`}>
                         <SettingsIcon className="w-5 h-5" />
-                        <span>Settings</span>
+                        <span>{t.settings}</span>
                     </button>
                     <p className={`mt-4 text-xs text-center ${themeClasses.textSecondary}`}>
                         &copy; {new Date().getFullYear()} StoryVerse

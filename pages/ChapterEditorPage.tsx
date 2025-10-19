@@ -128,7 +128,6 @@ const FindReplaceModal = ({ isOpen, onClose, editorRef, onReplaceAllInNovel }: {
 
   const clearHighlights = React.useCallback(() => {
     if (!editorRef.current) return;
-// FIX: Changed generic function call to type assertion for compatibility to resolve "Untyped function calls may not accept type arguments" error.
     const highlights = Array.from(editorRef.current.querySelectorAll('.search-highlight, .current-match') as NodeListOf<HTMLElement>);
     highlights.forEach(node => {
         const parent = node.parentNode;
@@ -630,7 +629,6 @@ const ChapterEditorPage = () => {
             document.execCommand('styleWithCSS', false, 'true');
             document.execCommand('hiliteColor', false, DUMMY_COLOR_RGB);
 
-// FIX: Changed generic function call to type assertion for compatibility to resolve "Untyped function calls may not accept type arguments" error.
             const tempSpans = Array.from(editorRef.current.querySelectorAll(`span[style*="background-color: ${DUMMY_COLOR_RGB}"]`) as NodeListOf<HTMLElement>);
             
             const parentsToClean = new Set<Node>();
@@ -1257,7 +1255,6 @@ const ChapterEditorPage = () => {
                                 className="absolute bottom-full mb-2 p-4 rounded-lg shadow-lg bg-stone-900/80 border border-white/10 backdrop-blur-sm w-[320px]"
                             >
                                 <div className="space-y-4">
-                                    {/* FIX: Ensure ToolbarDropdown components have children as required by their props, resolving compilation errors. */}
                                     <ToolbarDropdown label="Paragraph Style" value={currentFormat.paragraphStyle} onChange={(e) => applyParagraphStyle(e.target.value)}>
                                         <option value="p">Paragraph</option>
                                         <option value="blockquote">Blockquote</option>

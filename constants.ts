@@ -1,6 +1,3 @@
-
-
-
 import { Theme, ThemeConfig } from './types';
 
 export const THEME_CONFIG: Record<Theme, ThemeConfig> = {
@@ -31,14 +28,6 @@ export const THEME_CONFIG: Record<Theme, ThemeConfig> = {
     logoColor: 'text-[#C7A985]',
   },
 };
-
-export const TAG_OPTIONS: string[] = [
-  'Action', 'Adventure', 'Boy Love', 'Comedy', 'Drama', 'Fantasy', 'Girl Love', 'Harem',
-  'Historical', 'Horror', 'Isekai', 'Josei', 'LitRPG', 'Martial Arts', 'Mecha', 'Military',
-  'Mystery', 'Post-Apocalyptic', 'Psychological', 'Reverse Harem', 'Romance', 'School Life',
-  'Sci-Fi', 'Seinen', 'Shoujo', 'Shounen', 'Slice of Life', 'Supernatural', 'Thriller',
-  'Tragedy', 'Tsundere', 'Vampire', 'Yandere',
-];
 
 export const SKETCH_TAG_OPTIONS: string[] = [
     'Character', 'Plot Point', 'Location', 'Worldbuilding', 'Dialogue', 'Scene Idea', 'Research', 'Note', 'Outline'

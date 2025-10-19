@@ -1,21 +1,24 @@
 import * as React from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
-import { TAG_OPTIONS, enhancePlainText, enhanceHtml } from '../constants';
+import { enhancePlainText } from '../constants';
 import { Novel, Chapter } from '../types';
-import { BackIcon, BookOpenIcon, DownloadIcon, TrashIcon, UploadIcon, PlusIcon, TextIcon } from '../components/Icons';
+import { BackIcon, BookOpenIcon, DownloadIcon, TrashIcon, UploadIcon, PlusIcon, TextIcon, CloseIcon } from '../components/Icons';
 import ConfirmModal from '../components/ConfirmModal';
 import NovelHistoryPage from '../components/NovelHistoryPage';
 import ExportModal from '../components/ExportModal';
 import * as mammoth from 'mammoth';
+import { useTranslations } from '../hooks/useTranslations';
 
 const NovelDetailPage = () => {
     const { novelId } = useParams<{ novelId: string }>();
     const navigate = useNavigate();
     const { projectData, setProjectData, themeClasses } = React.useContext(ProjectContext);
+    const t = useTranslations();
     const coverImageInputRef = React.useRef<HTMLInputElement>(null);
     const docxInputRef = React.useRef<HTMLInputElement>(null);
     const descriptionTextareaRef = React.useRef<HTMLTextAreaElement>(null);
+    const tagInputRef = React.useRef<HTMLInputElement>(null);
 
     const [isExportModalOpen, setIsExportModalOpen] = React.useState(false);
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = React.useState(false);
@@ -23,6 +26,8 @@ const NovelDetailPage = () => {
     const [activeTab, setActiveTab] = React.useState<'Details' | 'History'>('Details');
     const [isDocxConfirmOpen, setIsDocxConfirmOpen] = React.useState(false);
     const [pendingFiles, setPendingFiles] = React.useState<FileList | null>(null);
+    const [isAddingTag, setIsAddingTag] = React.useState(false);
+    const [newTag, setNewTag] = React.useState('');
 
     const { novel, novelIndex } = React.useMemo(() => {
         const novels = projectData?.novels;
@@ -49,11 +54,10 @@ const NovelDetailPage = () => {
         });
     };
 
-    // Auto-resize the description textarea to fit its content.
     React.useEffect(() => {
         if (descriptionTextareaRef.current) {
             const textarea = descriptionTextareaRef.current;
-            textarea.style.height = 'auto'; // Reset height to allow shrinking
+            textarea.style.height = 'auto';
             textarea.style.height = `${textarea.scrollHeight}px`;
         }
     }, [novel?.description]);
@@ -91,6 +95,12 @@ const NovelDetailPage = () => {
             return currentData;
         });
     }, [novelIndex, setProjectData]);
+    
+    React.useEffect(() => {
+        if (isAddingTag) {
+            tagInputRef.current?.focus();
+        }
+    }, [isAddingTag]);
 
     const handleFileSelectForDocx = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
@@ -98,14 +108,13 @@ const NovelDetailPage = () => {
             setPendingFiles(files);
             setIsDocxConfirmOpen(true);
         }
-        e.target.value = ''; // Reset file input to allow selecting same file(s) again
+        e.target.value = '';
     };
 
     const handleDocxImport = async () => {
         if (!pendingFiles || novelIndex === -1) return;
         setIsDocxConfirmOpen(false);
 
-        // FIX: Cast Array.from result to File[] to fix type inference issues with FileList.
         const sortedFiles: File[] = (Array.from(pendingFiles) as File[]).sort((a: File, b: File) =>
             a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
         );
@@ -124,15 +133,12 @@ const NovelDetailPage = () => {
                 const arrayBuffer = await file.arrayBuffer();
                 const { value: html } = await mammoth.convertToHtml({ arrayBuffer }, { styleMap });
                 
-                // Clean the HTML by removing empty paragraphs which can mess with styling.
                 const cleanedHtml = html.replace(/<p>(\s|&nbsp;|<br\s*\/?>)*<\/p>/gi, '');
 
-                // FIX: Replaced fragile chapter splitting logic with a more robust method.
                 const headingSplitRegex = /(<h[123][^>]*>.*?<\/h[123]>)/i;
                 const parts = cleanedHtml.split(headingSplitRegex).filter(part => part.trim() !== '');
 
                 if (parts.length <= 1) {
-                    // No headings found, or only content without a heading. Treat as one chapter.
                     const now = new Date().toISOString();
                     allNewChapters.push({
                         id: crypto.randomUUID(),
@@ -146,7 +152,6 @@ const NovelDetailPage = () => {
                 } else {
                     const tempDiv = document.createElement('div');
 
-                    // Check for any content before the first heading, treat it as a prologue.
                     if (!parts[0].match(/^<h[123]/i)) {
                         const preContent = parts.shift()?.trim();
                         if (preContent) {
@@ -163,15 +168,13 @@ const NovelDetailPage = () => {
                         }
                     }
 
-                    // Process the remaining parts in pairs of [heading, content].
                     for (let i = 0; i < parts.length; i += 2) {
                         const headingHtml = parts[i];
-                        const contentHtml = parts[i + 1] || ''; // Content may be empty if it's the last chapter.
+                        const contentHtml = parts[i + 1] || ''; 
                         
                         tempDiv.innerHTML = headingHtml;
                         const chapterTitle = tempDiv.textContent?.trim() || `Chapter ${allNewChapters.length + 1}`;
                         
-                        // The chapter's content should include its own heading.
                         const fullChapterContent = (headingHtml + contentHtml).trim();
                         
                         if (fullChapterContent) {
@@ -188,7 +191,6 @@ const NovelDetailPage = () => {
                         }
                     }
                 }
-            // FIX: Explicitly type the error to 'any' to allow accessing properties on it.
             } catch (error: any) {
                 console.error(`Error processing file ${file.name}:`, error);
                 alert(`Failed to process ${file.name}. It might be corrupted or not a valid .docx file.`);
@@ -209,7 +211,6 @@ const NovelDetailPage = () => {
                 if (novelIndex >= updatedNovels.length) return currentData;
                 const currentNovel = updatedNovels[novelIndex];
                 
-                // Replace all existing chapters with the newly imported ones
                 const updatedNovel = { ...currentNovel, chapters: allNewChapters };
                 updatedNovels[novelIndex] = updatedNovel;
 
@@ -223,7 +224,7 @@ const NovelDetailPage = () => {
     if (!projectData || !novel) {
         return (
             <div className={`flex items-center justify-center h-screen ${themeClasses.bg} ${themeClasses.text}`}>
-                Novel not found.
+                {t.novelNotFound}
             </div>
         );
     }
@@ -245,29 +246,46 @@ const NovelDetailPage = () => {
         }
     };
 
-    const handleTagClick = (tag: string) => {
+    const handleAddTag = () => {
         if (novelIndex === -1) return;
-        
+        const trimmedTag = newTag.trim();
+        if (trimmedTag && !novel.tags.includes(trimmedTag) && novel.tags.length < 6) {
+            setProjectData(currentData => {
+                if (!currentData) return null;
+                const updatedNovels = [...currentData.novels];
+                const currentNovel = updatedNovels[novelIndex];
+                updatedNovels[novelIndex] = { ...currentNovel, tags: [...currentNovel.tags, trimmedTag] };
+                return { ...currentData, novels: updatedNovels };
+            });
+        }
+        setNewTag('');
+        setIsAddingTag(false);
+    };
+    
+    const handleRemoveTag = (tagToRemove: string) => {
+        if (novelIndex === -1) return;
         setProjectData(currentData => {
             if (!currentData) return null;
             const updatedNovels = [...currentData.novels];
-            if (novelIndex >= updatedNovels.length) return currentData;
-            
             const currentNovel = updatedNovels[novelIndex];
-            const currentTags = currentNovel.tags;
-            let newTags;
-
-            if (currentTags.includes(tag)) {
-                newTags = currentTags.filter(t => t !== tag);
-            } else if (currentTags.length < 6) {
-                newTags = [...currentTags, tag];
-            } else {
-                return currentData; // No change
-            }
-            
-            updatedNovels[novelIndex] = { ...currentNovel, tags: newTags };
+            updatedNovels[novelIndex] = { ...currentNovel, tags: currentNovel.tags.filter(t => t !== tagToRemove) };
             return { ...currentData, novels: updatedNovels };
         });
+    };
+
+    const handleTagInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleAddTag();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            setNewTag('');
+            setIsAddingTag(false);
+        }
+    };
+
+    const handleTagInputBlur = () => {
+        handleAddTag();
     };
 
     const confirmDeleteNovel = () => {
@@ -329,27 +347,49 @@ const NovelDetailPage = () => {
         return (
             <>
                 <div className="pt-4">
-                    <h3 className={`font-bold mb-4 ${themeClasses.accentText}`}>Tags (up to 6)</h3>
-                    <div className="flex flex-wrap gap-2">
-                        {TAG_OPTIONS.map(tag => (
-                            <button
-                                key={tag}
-                                onClick={() => handleTagClick(tag)}
-                                className={`px-3 py-1 text-sm rounded-full transition-colors ${
-                                    novel.tags.includes(tag)
-                                        ? `${themeClasses.accent} ${themeClasses.accentText}`
-                                        : `${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-80`
-                                }`}
-                            >
-                                {tag}
-                            </button>
+                    <h3 className={`font-bold mb-2 ${themeClasses.accentText}`}>{t.tags}</h3>
+                    <p className={`text-sm mb-4 ${themeClasses.textSecondary}`}>{t.tagsHint}</p>
+                    <div className="flex flex-wrap gap-2 items-center min-h-[2.5rem]">
+                        {novel.tags.map(tag => (
+                            <div key={tag} className={`flex items-center space-x-2 px-3 py-1 text-sm rounded-full font-semibold ${themeClasses.accent} ${themeClasses.accentText}`}>
+                                <span>{tag}</span>
+                                <button
+                                    onClick={() => handleRemoveTag(tag)}
+                                    className="-mr-1 p-0.5 rounded-full hover:bg-black/10"
+                                    aria-label={t.removeTag(tag)}
+                                >
+                                    <CloseIcon className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
                         ))}
+                        {novel.tags.length < 6 && (
+                            isAddingTag ? (
+                                <input
+                                    ref={tagInputRef}
+                                    type="text"
+                                    value={newTag}
+                                    onChange={(e) => setNewTag(e.target.value)}
+                                    onKeyDown={handleTagInputKeyDown}
+                                    onBlur={handleTagInputBlur}
+                                    placeholder={t.addTagPlaceholder}
+                                    className={`text-sm px-3 py-1 rounded-full ${themeClasses.input} border ${themeClasses.border} outline-none`}
+                                />
+                            ) : (
+                                <button
+                                    onClick={() => setIsAddingTag(true)}
+                                    className={`flex items-center space-x-1 px-3 py-1 text-sm rounded-full transition-colors ${themeClasses.bgSecondary} ${themeClasses.accentText} hover:opacity-80`}
+                                >
+                                    <span>{t.addTag}</span>
+                                    <PlusIcon className="w-4 h-4" />
+                                </button>
+                            )
+                        )}
                     </div>
                 </div>
 
                 <div className={`p-6 -m-6 mt-8 rounded-lg ${themeClasses.bgSecondary}`}>
                     <div className="flex justify-between items-center mb-4">
-                        <h2 className={`text-xl font-bold ${themeClasses.accentText}`}>Chapters</h2>
+                        <h2 className={`text-xl font-bold ${themeClasses.accentText}`}>{t.chapters}</h2>
                         <input
                             type="file"
                             ref={docxInputRef}
@@ -362,13 +402,13 @@ const NovelDetailPage = () => {
                             onClick={() => docxInputRef.current?.click()}
                             className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-80`}
                         >
-                            Import from DOCX
+                            {t.importFromDocx}
                         </button>
                     </div>
                     
                     <button onClick={handleAddChapter} className={`w-full flex items-center justify-center space-x-2 p-4 rounded-lg border-2 border-dashed transition-colors ${themeClasses.border} ${themeClasses.textSecondary} hover:border-opacity-70 hover:text-opacity-70 mb-4`}>
                         <PlusIcon className="w-5 h-5"/>
-                        <span>Add New Chapter</span>
+                        <span>{t.addNewChapter}</span>
                     </button>
                     
                     <div className="space-y-3">
@@ -384,14 +424,14 @@ const NovelDetailPage = () => {
                                         </p>
                                         <div className={`flex items-center space-x-2 text-sm ${themeClasses.textSecondary}`}>
                                             <TextIcon className="w-4 h-4" />
-                                            <span>{(chapter.wordCount || 0).toLocaleString()} words</span>
+                                            <span>{(chapter.wordCount || 0).toLocaleString()} {t.wordsCount}</span>
                                         </div>
                                     </div>
                                 </Link>
                                 <button
                                     onClick={() => setChapterToDelete(chapter)}
                                     className={`flex-shrink-0 p-2 -mr-2 rounded-full text-red-500 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/10`}
-                                    aria-label={`Delete chapter ${chapter.title}`}
+                                    aria-label={t.deleteChapterTitle(chapter.title)}
                                 >
                                     <TrashIcon className="w-5 h-5" />
                                 </button>
@@ -407,31 +447,31 @@ const NovelDetailPage = () => {
         <div className={`p-4 sm:p-8 md:p-12 ${themeClasses.bg} min-h-screen overflow-y-auto`}>
             <button onClick={() => navigate('/')} className={`flex items-center space-x-2 mb-8 ${themeClasses.text} opacity-70 hover:opacity-100`}>
                 <BackIcon className="w-5 h-5" />
-                <span>Back to Home page</span>
+                <span>{t.backTo} {t.homePage}</span>
             </button>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Left Column */}
                 <div className="lg:col-span-1 space-y-8">
                     <div className={`p-6 rounded-lg ${themeClasses.bgSecondary}`}>
-                        <h2 className={`text-xl font-bold mb-4 ${themeClasses.accentText}`}>Cover Image</h2>
+                        <h2 className={`text-xl font-bold mb-4 ${themeClasses.accentText}`}>{t.coverImage}</h2>
                         <div className="relative w-full aspect-[3/4]">
                             {novel.coverImage ? (
                                 <img src={novel.coverImage} alt="Cover" className="w-full h-full object-cover rounded-md" />
                             ) : (
                                 <div className={`w-full h-full flex items-center justify-center rounded-md ${themeClasses.bgTertiary}`}>
-                                    <span className={themeClasses.textSecondary}>No Cover</span>
+                                    <span className={themeClasses.textSecondary}>{t.noCover}</span>
                                 </div>
                             )}
                         </div>
                          <input type="file" ref={coverImageInputRef} onChange={handleCoverImageChange} className="hidden" accept="image/*" />
                         <button onClick={() => coverImageInputRef.current?.click()} className={`w-full mt-4 py-2 px-4 rounded-lg font-semibold transition-colors ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-80`}>
-                            Upload File
+                            {t.uploadFile}
                         </button>
                     </div>
 
                     <div className={`p-6 rounded-lg ${themeClasses.bgSecondary}`}>
-                         <h2 className={`text-xl font-bold mb-4 ${themeClasses.accentText}`}>Actions</h2>
+                         <h2 className={`text-xl font-bold mb-4 ${themeClasses.accentText}`}>{t.actions}</h2>
                          <div className="space-y-3">
                             <button 
                                 onClick={() => navigate(`/novel/${novelId}/read`)} 
@@ -439,18 +479,18 @@ const NovelDetailPage = () => {
                                 className={`w-full flex items-center space-x-3 text-left px-4 py-3 rounded-lg font-semibold transition-colors ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed`}
                             >
                                 <BookOpenIcon className="w-5 h-5"/>
-                                <span>Read Novel</span>
+                                <span>{t.readNovel}</span>
                             </button>
                             <button 
                                 onClick={() => setIsExportModalOpen(true)} 
                                 className={`w-full flex items-center space-x-3 text-left px-4 py-3 rounded-lg font-semibold transition-colors ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-80`}
                             >
                                 <DownloadIcon className="w-5 h-5"/>
-                                <span>Export Novel</span>
+                                <span>{t.exportNovel}</span>
                             </button>
                             <button onClick={() => setIsDeleteConfirmOpen(true)} className="w-full flex items-center space-x-3 text-left px-4 py-3 rounded-lg font-semibold transition-colors bg-red-700 text-red-100 hover:bg-red-800">
                                 <TrashIcon className="w-5 h-5"/>
-                                <span>Delete Story</span>
+                                <span>{t.deleteStory}</span>
                             </button>
                          </div>
                     </div>
@@ -469,7 +509,7 @@ const NovelDetailPage = () => {
                                     updateNovelDetails({ title: enhanced });
                                 }
                             }}
-                            placeholder="Novel Title"
+                            placeholder={t.novelTitlePlaceholder}
                             className={`text-5xl font-bold bg-transparent outline-none w-full ${themeClasses.accentText}`}
                         />
                         <textarea
@@ -482,7 +522,7 @@ const NovelDetailPage = () => {
                                     updateNovelDetails({ description: enhanced });
                                 }
                             }}
-                            placeholder="A short, captivating description of your novel..."
+                            placeholder={t.novelDescriptionPlaceholder}
                             className={`text-lg mt-1 bg-transparent outline-none w-full resize-none min-h-[7rem] max-h-96 ${themeClasses.textSecondary}`}
                         />
                     </div>
@@ -493,13 +533,13 @@ const NovelDetailPage = () => {
                                     onClick={() => setActiveTab('Details')}
                                     className={`whitespace-nowrap py-3 px-1 text-base font-semibold ${activeTab === 'Details' ? `border-b-2 ${themeClasses.accentBorder} ${themeClasses.accentText}` : `border-transparent ${themeClasses.textSecondary} hover:text-opacity-80`}`}
                                 >
-                                    Details
+                                    {t.details}
                                 </button>
                                 <button
                                     onClick={() => setActiveTab('History')}
                                     className={`whitespace-nowrap py-3 px-1 text-base font-semibold ${activeTab === 'History' ? `border-b-2 ${themeClasses.accentBorder} ${themeClasses.accentText}` : `border-transparent ${themeClasses.textSecondary} hover:text-opacity-80`}`}
                                 >
-                                    History
+                                    {t.history}
                                 </button>
                             </nav>
                         </div>
@@ -519,22 +559,22 @@ const NovelDetailPage = () => {
                 isOpen={isDeleteConfirmOpen}
                 onClose={() => setIsDeleteConfirmOpen(false)}
                 onConfirm={confirmDeleteNovel}
-                title={`Delete "${novel.title}"?`}
-                message="Are you sure? This will permanently delete the entire novel and all its chapters. This action cannot be undone."
+                title={t.deleteNovelTitle(novel.title)}
+                message={t.deleteNovelMessage}
             />
             <ConfirmModal
                 isOpen={!!chapterToDelete}
                 onClose={() => setChapterToDelete(null)}
                 onConfirm={handleDeleteChapter}
-                title={`Delete chapter "${chapterToDelete?.title}"?`}
-                message="Are you sure you want to delete this chapter? This cannot be undone."
+                title={t.deleteChapterTitle(chapterToDelete?.title || '')}
+                message={t.deleteChapterMessage}
             />
             <ConfirmModal
                 isOpen={isDocxConfirmOpen}
                 onClose={() => { setIsDocxConfirmOpen(false); setPendingFiles(null); }}
                 onConfirm={handleDocxImport}
-                title={`Import from ${pendingFiles?.length === 1 && pendingFiles.item(0) ? `"${(pendingFiles.item(0) as File).name}"` : `${pendingFiles?.length || 0} files`}?`}
-                message="This will replace all existing chapters in this novel with the content from the selected DOCX file(s). This action cannot be undone."
+                title={t.importDocxTitle(pendingFiles?.length || 0, pendingFiles?.item(0)?.name || '')}
+                message={t.importDocxMessage}
                 confirmButtonClass={`px-6 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}
             />
         </div>

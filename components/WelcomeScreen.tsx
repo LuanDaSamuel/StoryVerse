@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { AppLogoIcon, GoogleIcon, DocumentPlusIcon, FolderIcon } from './Icons';
+import { useTranslations } from '../hooks/useTranslations';
 
 interface WelcomeScreenProps {
   onGoogleSignIn: () => void;
@@ -8,6 +9,8 @@ interface WelcomeScreenProps {
 }
 
 const WelcomeScreen = ({ onGoogleSignIn, onCreateLocalProject, onOpenLocalProject }: WelcomeScreenProps) => {
+  const t = useTranslations();
+
   return (
     <div className="flex flex-col items-center justify-center h-screen w-full p-4 bg-gradient-to-br from-slate-900 to-[#0F172A] text-slate-200">
       <div className="flex flex-col items-center text-center">
@@ -20,9 +23,9 @@ const WelcomeScreen = ({ onGoogleSignIn, onCreateLocalProject, onOpenLocalProjec
 
       <div className="mt-12 w-full max-w-md p-8 rounded-xl shadow-2xl bg-slate-800/60 backdrop-blur-lg border border-slate-700">
         <div className="text-center">
-            <h2 className="text-2xl font-bold text-white">Welcome, Creator!</h2>
+            <h2 className="text-2xl font-bold text-white">{t.welcomeCreator}</h2>
             <p className="mt-4 text-slate-400">
-              Sign in with Google to save your work to the cloud, or work with a local file on your computer.
+              {t.welcomeMessage}
             </p>
         </div>
 
@@ -32,12 +35,12 @@ const WelcomeScreen = ({ onGoogleSignIn, onCreateLocalProject, onOpenLocalProjec
               className="flex items-center justify-center w-full px-6 py-4 text-lg font-semibold rounded-lg bg-white text-gray-800 hover:bg-gray-200 transition-colors shadow-lg"
             >
               <GoogleIcon className="w-6 h-6 mr-3" />
-              Sign in with Google
+              {t.signInWithGoogle}
             </button>
 
             <div className="relative flex py-2 items-center">
                 <div className="flex-grow border-t border-slate-600"></div>
-                <span className="flex-shrink mx-4 text-slate-400 text-sm">OR</span>
+                <span className="flex-shrink mx-4 text-slate-400 text-sm">{t.or}</span>
                 <div className="flex-grow border-t border-slate-600"></div>
             </div>
 
@@ -47,14 +50,14 @@ const WelcomeScreen = ({ onGoogleSignIn, onCreateLocalProject, onOpenLocalProjec
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-3 font-semibold rounded-lg bg-slate-700 text-slate-200 hover:bg-slate-600 transition-colors shadow"
                 >
                   <DocumentPlusIcon className="w-5 h-5" />
-                  Create New
+                  {t.createNew}
                 </button>
                 <button
                   onClick={onOpenLocalProject}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-3 font-semibold rounded-lg bg-slate-700 text-slate-200 hover:bg-slate-600 transition-colors shadow"
                 >
                   <FolderIcon className="w-5 h-5" />
-                  Open Local File
+                  {t.openLocalFile}
                 </button>
             </div>
         </div>

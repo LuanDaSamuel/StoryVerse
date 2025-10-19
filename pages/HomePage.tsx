@@ -3,18 +3,20 @@ import { Link } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { enhancePlainText } from '../constants';
 import { Novel } from '../types';
+import { useTranslations } from '../hooks/useTranslations';
 
 const HomePage = () => {
     const { projectData, themeClasses } = React.useContext(ProjectContext);
+    const t = useTranslations();
     const novels = projectData?.novels || [];
 
     if (novels.length === 0) {
         return (
             <div className={`p-4 sm:p-8 md:p-12 ${themeClasses.bg} h-full flex flex-col items-center justify-center`}>
                 <div className={`w-full max-w-3xl p-8 text-center rounded-lg ${themeClasses.bgSecondary}`}>
-                    <h2 className={`text-2xl font-bold mb-2 ${themeClasses.accentText}`}>You haven't created any novels yet.</h2>
+                    <h2 className={`text-2xl font-bold mb-2 ${themeClasses.accentText}`}>{t.noNovelsYet}</h2>
                     <p className={`${themeClasses.accentText} opacity-80`}>
-                        Click on "Create Novel" in the sidebar to get started!
+                        {t.noNovelsHint}
                     </p>
                 </div>
             </div>
@@ -24,7 +26,7 @@ const HomePage = () => {
     return (
         <div className={`p-4 sm:p-8 md:p-12 ${themeClasses.bg}`}>
             <div className="flex justify-between items-center mb-8">
-                <h1 className={`text-3xl font-bold ${themeClasses.text}`}>Home page</h1>
+                <h1 className={`text-3xl font-bold ${themeClasses.text}`}>{t.homePage}</h1>
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">

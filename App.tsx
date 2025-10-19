@@ -1,3 +1,5 @@
+
+
 import * as React from 'react';
 import { HashRouter, Routes, Route, Navigate, useParams, useNavigate, useMatch } from 'react-router-dom';
 import { useProject } from './hooks/useProjectFile';
@@ -15,7 +17,10 @@ import SketchesPage from './pages/SketchesPage';
 import SketchEditorPage from './pages/SketchEditorPage';
 import { THEME_CONFIG } from './constants';
 import { LoadingIcon, Bars3Icon, DocumentPlusIcon, UploadIcon, CloudIcon } from './components/Icons';
-import { Theme } from './types';
+import { Theme, Language } from './types';
+import { LanguageContext } from './contexts/LanguageContext';
+import { translations } from './utils/translations';
+import { useTranslations } from './hooks/useTranslations';
 
 const NovelEditRedirect = () => {
     const { novelId } = useParams<{ novelId: string }>();
@@ -43,6 +48,7 @@ const NovelEditRedirect = () => {
 
 const AppContent = () => {
     const project = useProject();
+    const t = useTranslations();
     
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = React.useState(false);
     const navigate = useNavigate();
@@ -61,6 +67,15 @@ const AppContent = () => {
         // Fallback to 'book' theme if the saved theme from a project file is no longer valid.
         return (projectTheme in THEME_CONFIG) ? projectTheme as Theme : 'book';
     }, [project.projectData]);
+
+    const language = React.useMemo(() => {
+        const projectLang = project.projectData?.settings?.language || 'en';
+        return (projectLang in translations) ? projectLang as Language : 'en';
+    }, [project.projectData]);
+
+    const currentTranslations = React.useMemo(() => {
+        return translations[language];
+    }, [language]);
 
     const themeClasses = React.useMemo(() => {
         return THEME_CONFIG[theme];
@@ -119,7 +134,7 @@ const AppContent = () => {
                             </button>
                             </div>
                             <div className="mt-8 text-center">
-                                <button onClick={project.signOut} className={`text-sm ${themeClasses.textSecondary} hover:underline`}>
+                                <button onClick={() => project.signOut()} className={`text-sm ${themeClasses.textSecondary} hover:underline`}>
                                     Sign Out & Use Local File
                                 </button>
                             </div>
@@ -157,7 +172,7 @@ const AppContent = () => {
                                 </button>
                             </div>
                              <div className="mt-8 text-center">
-                                <button onClick={project.signOut} className={`text-sm ${themeClasses.textSecondary} hover:underline`}>
+                                <button onClick={() => project.signOut()} className={`text-sm ${themeClasses.textSecondary} hover:underline`}>
                                     Sign Out & Cancel
                                 </button>
                             </div>
@@ -224,9 +239,11 @@ const AppContent = () => {
 
     return (
         <ProjectContext.Provider value={contextValue}>
-            <div className="font-sans">
-                {renderContent()}
-            </div>
+            <LanguageContext.Provider value={currentTranslations}>
+                <div className="font-sans">
+                    {renderContent()}
+                </div>
+            </LanguageContext.Provider>
         </ProjectContext.Provider>
     );
 };

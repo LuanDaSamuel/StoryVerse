@@ -4,7 +4,6 @@ import { StoryIdea, StoryIdeaStatus } from '../types';
 import { SKETCH_TAG_OPTIONS, enhanceHtml } from '../constants';
 import { CloseIcon, BoldIcon, ItalicIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, H1Icon, H2Icon, H3Icon } from './Icons';
 
-// FIX: Refactored to use a standard interface and React.FC for better type safety and to resolve compiler errors.
 interface ToolbarButtonProps {
   onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
   isActive: boolean;
@@ -139,7 +138,6 @@ const StoryIdeaEditorModal = ({ idea, onClose, onSave }: StoryIdeaEditorModalPro
             id: idea?.id || crypto.randomUUID(),
             title: title || 'Untitled Idea',
             synopsis: synopsisHtml,
-            // FIX: The 'wordCount' property was missing and is now calculated and included.
             wordCount,
             tags,
             status,
@@ -189,7 +187,6 @@ const StoryIdeaEditorModal = ({ idea, onClose, onSave }: StoryIdeaEditorModalPro
                             placeholder="Idea Title"
                             className={`w-full text-3xl font-bold bg-transparent outline-none mb-4 ${themeClasses.accentText}`}
                         />
-                        {/* FIX: Added children to ToolbarButton components to pass in the icon, resolving missing property errors. */}
                         <div className="sticky top-0 z-10 bg-gray-800 p-2 rounded-md mb-4 flex items-center space-x-1">
                             <ToolbarButton onClick={(e) => applyCommand(e, 'bold')} isActive={activeFormats.isBold}><BoldIcon className="w-5 h-5"/></ToolbarButton>
                             <ToolbarButton onClick={(e) => applyCommand(e, 'italic')} isActive={activeFormats.isItalic}><ItalicIcon className="w-5 h-5"/></ToolbarButton>

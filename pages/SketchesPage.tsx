@@ -6,10 +6,12 @@ import { enhancePlainText } from '../constants';
 import { PlusIcon } from '../components/Icons';
 import ConfirmModal from '../components/ConfirmModal';
 import SelectNovelModal from '../components/SelectNovelModal';
+import { useTranslations } from '../hooks/useTranslations';
 
 const SketchesPage = () => {
     const { projectData, setProjectData, themeClasses } = React.useContext(ProjectContext);
     const navigate = useNavigate();
+    const t = useTranslations();
     
     const [isCreatingSketch, setIsCreatingSketch] = React.useState(false);
     const [sketchToDelete, setSketchToDelete] = React.useState<AggregatedSketch | null>(null);
@@ -79,31 +81,31 @@ const SketchesPage = () => {
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = html;
         const text = tempDiv.textContent || '';
-        if (!text.trim()) return 'Empty sketch.';
+        if (!text.trim()) return t.emptySketch;
         return text.trim().substring(0, 100) + (text.length > 100 ? '...' : '');
     };
 
     return (
         <div className={`p-8 md:p-12 ${themeClasses.bg} h-full overflow-y-auto`}>
             <div className="flex justify-between items-center mb-8">
-                <h1 className={`text-3xl font-bold ${themeClasses.text}`}>Sketches</h1>
+                <h1 className={`text-3xl font-bold ${themeClasses.text}`}>{t.sketches}</h1>
                 <button 
                     onClick={() => setIsCreatingSketch(true)} 
                     className={`flex items-center space-x-2 px-4 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90 disabled:opacity-50`}
                     disabled={novels.length === 0}
-                    title={novels.length === 0 ? "You must create a novel first" : "Create a new sketch"}
+                    title={novels.length === 0 ? t.createNovelFirst : t.createNewSketch}
                 >
                     <PlusIcon className="w-5 h-5" />
-                    <span>New Sketch</span>
+                    <span>{t.newSketch}</span>
                 </button>
             </div>
             
             {allSketches.length === 0 ? (
                  <div className={`p-8 md:p-12 h-full flex flex-col items-center justify-center -mt-16`}>
                     <div className={`w-full max-w-3xl p-8 text-center rounded-lg ${themeClasses.bgSecondary}`}>
-                        <h2 className={`text-2xl font-bold mb-2 ${themeClasses.accentText}`}>You don't have any sketches yet.</h2>
+                        <h2 className={`text-2xl font-bold mb-2 ${themeClasses.accentText}`}>{t.noSketchesYet}</h2>
                         <p className={`${themeClasses.accentText} opacity-80`}>
-                            {novels.length === 0 ? "Create a novel to start adding sketches." : "Click 'New Sketch' to capture your first idea!"}
+                            {novels.length === 0 ? t.noSketchesHintNovel : t.noSketchesHint}
                         </p>
                     </div>
                 </div>
@@ -142,8 +144,8 @@ const SketchesPage = () => {
                 isOpen={!!sketchToDelete}
                 onClose={() => setSketchToDelete(null)}
                 onConfirm={handleDeleteSketch}
-                title={`Delete sketch "${sketchToDelete?.title}"?`}
-                message="Are you sure you want to delete this sketch? This action is permanent and cannot be undone."
+                title={t.deleteSketchTitle(sketchToDelete?.title || '')}
+                message={t.deleteSketchMessage}
             />
         </div>
     );

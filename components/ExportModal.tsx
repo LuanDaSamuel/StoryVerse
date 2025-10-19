@@ -3,6 +3,7 @@ import { ProjectContext } from '../contexts/ProjectContext';
 import { Novel } from '../types';
 import { CloseIcon } from './Icons';
 import { enhancePlainText, enhanceHtml } from '../constants';
+import { useTranslations } from '../hooks/useTranslations';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -12,6 +13,7 @@ interface ExportModalProps {
 
 const ExportModal = ({ isOpen, onClose, novel }: ExportModalProps) => {
     const { themeClasses } = React.useContext(ProjectContext);
+    const t = useTranslations();
 
     if (!isOpen) return null;
 
@@ -104,35 +106,35 @@ const ExportModal = ({ isOpen, onClose, novel }: ExportModalProps) => {
                 className={`p-8 rounded-lg shadow-2xl w-full max-w-lg m-4 ${themeClasses.bgSecondary} ${modalTextColor} border ${themeClasses.border}`}
                 onClick={(e) => e.stopPropagation()}
             >
-                <h2 className="text-2xl font-bold">Export Novel</h2>
+                <h2 className="text-2xl font-bold">{t.exportNovelTitle}</h2>
                 <p className={`mt-1 mb-6 ${themeClasses.textSecondary}`}>
-                    Choose a format to download "{novel.title}" as a single file.
+                    {t.exportNovelMessage(novel.title)}
                 </p>
                 
                 <div className="space-y-4">
                     <button onClick={handleExportHtml} className={`w-full text-left p-4 rounded-lg transition-colors ${themeClasses.bg} hover:opacity-90`}>
-                        <h3 className={`font-bold text-lg ${themeClasses.text}`}>HTML Document (.html)</h3>
+                        <h3 className={`font-bold text-lg ${themeClasses.text}`}>{t.exportHtmlTitle}</h3>
                         <p className={`mt-1 text-sm ${themeClasses.text} text-opacity-70`}>
-                            Best for quality and stability. Preserves all formatting. Can be opened in any browser and printed to a high-quality PDF.
+                            {t.exportHtmlDesc}
                         </p>
                     </button>
                     <button onClick={handleExportTxt} className={`w-full text-left p-4 rounded-lg transition-colors ${themeClasses.bg} hover:opacity-90`}>
-                        <h3 className={`font-bold text-lg ${themeClasses.text}`}>Plain Text (.txt)</h3>
+                        <h3 className={`font-bold text-lg ${themeClasses.text}`}>{t.exportTxtTitle}</h3>
                         <p className={`mt-1 text-sm ${themeClasses.text} text-opacity-70`}>
-                            Best for compatibility. Loses formatting like bold and italic.
+                            {t.exportTxtDesc}
                         </p>
                     </button>
                     <button onClick={handleExportMd} className={`w-full text-left p-4 rounded-lg transition-colors ${themeClasses.bg} hover:opacity-90`}>
-                        <h3 className={`font-bold text-lg ${themeClasses.text}`}>Markdown (.md)</h3>
+                        <h3 className={`font-bold text-lg ${themeClasses.text}`}>{t.exportMdTitle}</h3>
                         <p className={`mt-1 text-sm ${themeClasses.text} text-opacity-70`}>
-                            Preserves bold and italic formatting. Good for web platforms.
+                            {t.exportMdDesc}
                         </p>
                     </button>
                 </div>
 
                 <div className="flex justify-end mt-8">
                     <button onClick={onClose} className={`px-6 py-2 font-semibold rounded-lg ${themeClasses.bgTertiary} ${modalTextColor} hover:opacity-80`}>
-                        Cancel
+                        {t.cancel}
                     </button>
                 </div>
             </div>

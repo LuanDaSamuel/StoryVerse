@@ -1,8 +1,11 @@
+
+
 import * as React from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { enhanceHtml, enhancePlainText } from '../constants';
 import { BackIcon, Bars3Icon, ChevronLeftIcon, ChevronRightIcon, CloseIcon } from '../components/Icons';
+import { useTranslations } from '../hooks/useTranslations';
 
 const ChapterListModal = ({ isOpen, onClose, novelId, novel, themeClasses }: {
     isOpen: boolean;
@@ -11,6 +14,7 @@ const ChapterListModal = ({ isOpen, onClose, novelId, novel, themeClasses }: {
     novel: { title: string; chapters: { id: string; title: string }[] };
     themeClasses: any;
 }) => {
+    const t = useTranslations();
     if (!isOpen) return null;
 
     return (
@@ -25,7 +29,7 @@ const ChapterListModal = ({ isOpen, onClose, novelId, novel, themeClasses }: {
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold">Chapters</h2>
+                    <h2 className="text-xl font-bold">{t.chapters}</h2>
                     <button onClick={onClose} className={`p-1 rounded-full hover:${themeClasses.bgTertiary}`}>
                         <CloseIcon className="w-6 h-6" />
                     </button>
@@ -55,6 +59,7 @@ const ReadNovelPage = () => {
     const { novelId, chapterId } = useParams<{ novelId: string; chapterId?: string }>();
     const navigate = useNavigate();
     const { projectData, themeClasses } = React.useContext(ProjectContext);
+    const t = useTranslations();
 
     const [isChapterListOpen, setIsChapterListOpen] = React.useState(false);
     const mainRef = React.useRef<HTMLElement>(null);
@@ -124,7 +129,7 @@ const ReadNovelPage = () => {
     if (!novel || !currentChapter) {
         return (
             <div className={`flex h-screen items-center justify-center ${themeClasses.bg} ${themeClasses.text}`}>
-                <p>Loading chapter...</p>
+                <p>{t.loading}...</p>
             </div>
         );
     }
@@ -147,12 +152,12 @@ const ReadNovelPage = () => {
                      <div className="flex items-center space-x-4">
                         <button onClick={() => setIsChapterListOpen(true)} className={`flex items-center space-x-2 p-2 rounded-md hover:${themeClasses.bgTertiary}`}>
                             <Bars3Icon className={`w-6 h-6 ${themeClasses.text}`} />
-                            <span className="font-sans font-semibold">Chapters</span>
+                            <span className="font-sans font-semibold">{t.chapters}</span>
                         </button>
                      </div>
                     <button onClick={() => navigate(`/novel/${novelId}`)} className={`flex items-center space-x-2 font-sans ${themeClasses.text} opacity-70 hover:opacity-100`}>
                         <BackIcon className="w-5 h-5" />
-                        <span>Back to Details</span>
+                        <span>{t.backToDetails}</span>
                     </button>
                 </header>
                 
@@ -181,7 +186,7 @@ const ReadNovelPage = () => {
                                     className={`inline-flex items-center gap-2 px-4 py-2 rounded-full font-semibold transition-colors ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-80`}
                                 >
                                     <ChevronLeftIcon className="w-5 h-5" />
-                                    Previous Chapter
+                                    {t.previous} {t.chapter}
                                 </Link>
                             ) : (<div />) /* Placeholder to keep "Next" button on the right */}
 
@@ -190,7 +195,7 @@ const ReadNovelPage = () => {
                                     to={`/novel/${novelId}/read/${nextChapter.id}`}
                                     className={`inline-flex items-center gap-2 px-4 py-2 rounded-full font-semibold transition-colors ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-80`}
                                 >
-                                    Next Chapter
+                                    {t.next} {t.chapter}
                                     <ChevronRightIcon className="w-5 h-5" />
                                 </Link>
                              ) : (<div />)}

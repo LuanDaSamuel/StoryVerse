@@ -21,7 +21,6 @@ interface StoredToken extends TokenResponse {
     expires_at: number;
 }
 
-// FIX: Added a custom error class for unrecoverable authentication issues.
 export class PermanentAuthError extends Error {
     constructor(message: string) {
         super(message);
@@ -90,7 +89,6 @@ export function useProjectStorage() {
         console.log('User signed out. Local session data cleared.');
     }, []);
 
-    // FIX: Updated to no longer sign out automatically, allowing the caller to handle failures.
     const refreshTokenAndGetProfile = React.useCallback(async (): Promise<UserProfile | null> => {
         console.log("Attempting to refresh token silently...");
         return new Promise((resolve) => {
@@ -128,7 +126,6 @@ export function useProjectStorage() {
         });
     }, []);
 
-    // FIX: Made saveToDrive more robust by proactively refreshing expired tokens before saving.
     const saveToDrive = React.useCallback(async (data: ProjectData) => {
         // Proactive token check to prevent save failures from expired tokens,
         // which can happen if the computer was asleep. We refresh if the token

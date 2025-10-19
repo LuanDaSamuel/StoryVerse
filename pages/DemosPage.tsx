@@ -6,9 +6,11 @@ import { PlusIcon, UploadIcon, BackIcon, TrashIcon } from '../components/Icons';
 import ConfirmModal from '../components/ConfirmModal';
 import { enhancePlainText } from '../constants';
 import * as mammoth from 'mammoth';
+import { useTranslations } from '../hooks/useTranslations';
 
 const DemosPage = () => {
     const { projectData, setProjectData, themeClasses } = React.useContext(ProjectContext);
+    const t = useTranslations();
     const navigate = useNavigate();
     const [isDocxConfirmOpen, setIsDocxConfirmOpen] = React.useState(false);
     const [pendingImportData, setPendingImportData] = React.useState<{ title: string; synopsisHtml: string; originalFilename: string } | null>(null);
@@ -128,7 +130,7 @@ const DemosPage = () => {
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = html;
         const text = tempDiv.textContent || '';
-        if (!text.trim()) return 'No synopsis yet.';
+        if (!text.trim()) return t.noSynopsis;
         return text.trim().substring(0, 150) + (text.length > 150 ? '...' : '');
     };
 
@@ -141,7 +143,7 @@ const DemosPage = () => {
     return (
         <div className={`p-4 sm:p-8 md:p-12 ${themeClasses.bg} h-full overflow-y-auto`}>
             <div className="flex justify-between items-center mb-8">
-                <h1 className={`text-3xl font-bold ${themeClasses.text}`}>Idea Box</h1>
+                <h1 className={`text-3xl font-bold ${themeClasses.text}`}>{t.ideaBox}</h1>
                 <div className="flex items-center space-x-2">
                     <input
                         type="file"
@@ -155,14 +157,14 @@ const DemosPage = () => {
                         className={`flex items-center space-x-2 px-4 py-2 font-semibold rounded-lg ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-90`}
                     >
                         <UploadIcon className="w-5 h-5" />
-                        <span>Import DOCX</span>
+                        <span>{t.importFromDocx}</span>
                     </button>
                     <button
                         onClick={handleNewIdea}
                         className={`flex items-center space-x-2 px-4 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}
                     >
                         <PlusIcon className="w-5 h-5" />
-                        <span>New Idea</span>
+                        <span>{t.newIdea}</span>
                     </button>
                 </div>
             </div>
@@ -170,13 +172,13 @@ const DemosPage = () => {
             {storyIdeas.length === 0 ? (
                 <div className={`p-8 md:p-12 h-full flex flex-col items-center justify-center -mt-16`}>
                     <div className={`w-full max-w-3xl p-8 text-center rounded-lg ${themeClasses.bgSecondary}`}>
-                        <h2 className={`text-2xl font-bold mb-2 ${themeClasses.accentText}`}>Your Idea Box is empty.</h2>
+                        <h2 className={`text-2xl font-bold mb-2 ${themeClasses.accentText}`}>{t.emptyIdeaBox}</h2>
                         <p className={`${themeClasses.accentText} opacity-80 mb-6`}>
-                            Click 'New Idea' to capture your first story concept, or import an idea from a DOCX file.
+                            {t.emptyIdeaBoxHint}
                         </p>
                         <Link to="/" className={`inline-flex items-center space-x-2 px-4 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}>
                             <BackIcon className="w-5 h-5" />
-                            <span>Go to Home page</span>
+                            <span>{t.goToHomePage}</span>
                         </Link>
                     </div>
                 </div>
@@ -208,7 +210,7 @@ const DemosPage = () => {
                                     setIdeaToDelete(idea);
                                 }}
                                 className={`absolute top-3 right-3 p-2 rounded-full text-red-500 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-opacity`}
-                                aria-label={`Delete idea: ${enhancePlainText(idea.title)}`}
+                                aria-label={t.deleteIdeaTitle(enhancePlainText(idea.title))}
                             >
                                 <TrashIcon className="w-5 h-5" />
                             </button>
@@ -221,22 +223,22 @@ const DemosPage = () => {
                 isOpen={isDocxConfirmOpen}
                 onClose={() => { setIsDocxConfirmOpen(false); setPendingImportData(null); }}
                 onConfirm={handleDocxImport}
-                title={`Import from "${pendingImportData?.originalFilename}"?`}
+                title={t.importIdeaTitle(pendingImportData?.originalFilename || '')}
                 message={
                     pendingImportData ? (
                         <div>
-                            <p className="mb-4">This will create a new story idea with the following detected content:</p>
+                            <p className="mb-4">{t.importIdeaMessage}</p>
                             <div className={`p-3 rounded-lg border ${themeClasses.border} ${themeClasses.bgTertiary}`}>
-                                <p className="font-semibold text-sm">TITLE</p>
+                                <p className="font-semibold text-sm">{t.title}</p>
                                 <p className={`mb-2 ${themeClasses.accentText}`}>{enhancePlainText(pendingImportData.title)}</p>
-                                <p className="font-semibold text-sm">SYNOPSIS PREVIEW</p>
+                                <p className="font-semibold text-sm">{t.synopsisPreview}</p>
                                 <p className={`text-sm italic ${themeClasses.textSecondary}`}>
                                     {getSnippet(pendingImportData.synopsisHtml)}
                                 </p>
                             </div>
-                            <p className="mt-4">Do you want to proceed?</p>
+                            <p className="mt-4">{t.proceed}</p>
                         </div>
-                    ) : "Loading preview..."
+                    ) : t.loading
                 }
                 confirmButtonClass={`px-6 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}
             />
@@ -244,8 +246,8 @@ const DemosPage = () => {
                 isOpen={!!ideaToDelete}
                 onClose={() => setIdeaToDelete(null)}
                 onConfirm={handleDeleteIdea}
-                title={`Delete "${ideaToDelete?.title}"?`}
-                message="Are you sure you want to delete this story idea? This action is permanent and cannot be undone."
+                title={t.deleteIdeaConfirmTitle(ideaToDelete?.title || '')}
+                message={t.deleteIdeaMessage}
             />
         </div>
     );

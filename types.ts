@@ -1,4 +1,5 @@
 export type Theme = 'dark' | 'book';
+export type Language = 'en' | 'vi' | 'fi';
 
 export type SaveStatus = 'idle' | 'unsaved' | 'saving' | 'saved' | 'error';
 
@@ -24,12 +25,10 @@ export interface Novel {
   coverImage?: string; // base64 string
   tags: string[];
   chapters: Chapter[];
-  // FIX: Added sketches to the Novel type to support the sketches feature.
   sketches: NovelSketch[];
   createdAt: string;
 }
 
-// FIX: Added NovelSketch type to define the structure of a novel sketch.
 export interface NovelSketch {
   id: string;
   title: string;
@@ -39,7 +38,6 @@ export interface NovelSketch {
   updatedAt: string;
 }
 
-// FIX: Added AggregatedSketch type which extends NovelSketch with novel context.
 export interface AggregatedSketch extends NovelSketch {
   novelId: string;
   novelTitle: string;
@@ -62,6 +60,7 @@ export interface ProjectData {
   settings: {
     theme: Theme;
     baseFontSize: number;
+    language: Language;
   };
   novels: Novel[];
   storyIdeas: StoryIdea[];

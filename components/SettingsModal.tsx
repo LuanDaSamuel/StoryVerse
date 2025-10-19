@@ -1,9 +1,10 @@
 import * as React from 'react';
 import { ProjectContext } from '../contexts/ProjectContext';
-import { Theme } from '../types';
+import { Theme, Language } from '../types';
 import { THEME_CONFIG } from '../constants';
 import { CloseIcon, DownloadIcon, TrashIcon, GoogleIcon } from './Icons';
 import ConfirmModal from './ConfirmModal';
+import { useTranslations } from '../hooks/useTranslations';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
       projectData, theme, setProjectData, downloadProject, closeProject, 
       themeClasses, projectName, storageMode, signOut, connectLocalToDrive
   } = React.useContext(ProjectContext);
+  const t = useTranslations();
   const [isConfirmOpen, setIsConfirmOpen] = React.useState(false);
 
   if (!isOpen || !projectData) return null;
@@ -30,6 +32,17 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
         return {
             ...currentData,
             settings: { ...currentData.settings, theme: newTheme },
+        };
+    });
+  };
+
+  const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newLang = e.target.value as Language;
+    setProjectData(currentData => {
+        if (!currentData) return null;
+        return {
+            ...currentData,
+            settings: { ...currentData.settings, language: newLang },
         };
     });
   };
@@ -65,11 +78,9 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
   };
   
   const storageLocation = storageMode === 'drive' ? 'Google Drive' : 'a local file';
-  const closeButtonText = storageMode === 'drive' ? 'Sign Out & Close' : 'Close Project';
-  const confirmTitle = storageMode === 'drive' ? 'Sign Out?' : 'Close Project?';
-  const confirmMessage = storageMode === 'drive'
-    ? "Are you sure you want to sign out? Your project is saved on Google Drive. You can sign back in to access it again."
-    : "Are you sure you want to close this project? Any unsaved changes will be saved before closing. You can reopen it later from your files.";
+  const closeButtonText = storageMode === 'drive' ? t.signOutAndClose : t.closeProject;
+  const confirmTitle = storageMode === 'drive' ? t.signOutTitle : t.closeProjectTitle;
+  const confirmMessage = storageMode === 'drive' ? t.signOutMessage : t.closeProjectMessage;
 
 
   return (
@@ -80,7 +91,7 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
             onClick={(e) => e.stopPropagation()}
         >
           <div className="flex justify-between items-center mb-6">
-            <h2 className={`text-2xl font-bold ${modalTextColor}`}>Settings</h2>
+            <h2 className={`text-2xl font-bold ${modalTextColor}`}>{t.settings}</h2>
             <button onClick={onClose} className={`p-1 -m-1 rounded-full hover:${themeClasses.bgTertiary}`} aria-label="Close">
               <CloseIcon className="w-6 h-6" />
             </button>
@@ -88,7 +99,21 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
 
           <div className="space-y-6">
             <div>
-              <h3 className="font-semibold mb-2">Theme</h3>
+              <label htmlFor="language-select" className="block font-semibold mb-2">{t.language}</label>
+              <select
+                id="language-select"
+                value={projectData.settings.language}
+                onChange={handleLanguageChange}
+                className={`w-full p-2 rounded-md ${themeClasses.input} border ${themeClasses.border}`}
+              >
+                <option value="en">English</option>
+                <option value="vi">Tiếng Việt</option>
+                <option value="fi">Suomi</option>
+              </select>
+            </div>
+            
+            <div>
+              <h3 className="font-semibold mb-2">{t.theme}</h3>
               <div className="grid grid-cols-2 gap-4">
                 {themeOptions.map(option => (
                   <button key={option.name} onClick={() => handleThemeChange(option.name)} className={`p-3 rounded-lg border-2 transition-all ${getActiveThemeBorderStyle(option.name)}`}>
@@ -106,7 +131,7 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
             </div>
 
             <div>
-              <label htmlFor="base-font-size" className="block font-semibold mb-2">Reading Font Size</label>
+              <label htmlFor="base-font-size" className="block font-semibold mb-2">{t.readingFontSize}</label>
               <select
                 id="base-font-size"
                 value={projectData.settings.baseFontSize}
@@ -122,22 +147,22 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
             </div>
 
             <div>
-              <h3 className={`font-semibold mb-2 ${subHeadingStyle}`}>Project Management</h3>
+              <h3 className={`font-semibold mb-2 ${subHeadingStyle}`}>{t.projectManagement}</h3>
               <div className={`p-4 rounded-lg ${themeClasses.bgTertiary}`}>
-                <p className="font-semibold">Project Name</p>
+                <p className="font-semibold">{t.projectName}</p>
                 <p className={`${descriptionColor} text-sm break-words`}>{projectName}</p>
-                <p className="font-semibold mt-3">Storage Location</p>
-                <p className={`${descriptionColor} text-sm`}>Your project is saved in {storageLocation}.</p>
+                <p className="font-semibold mt-3">{t.storageLocation}</p>
+                <p className={`${descriptionColor} text-sm`}>{t.storageLocationText(storageLocation)}</p>
                 <div className="mt-4 grid grid-cols-1 gap-3">
                   {storageMode === 'local' && (
                     <button onClick={connectLocalToDrive} className="w-full flex items-center justify-center space-x-2 px-4 py-2 text-sm font-semibold rounded-lg transition-colors bg-white text-gray-800 hover:bg-gray-200">
                       <GoogleIcon className="w-4 h-4" />
-                      <span>Connect to Google Drive</span>
+                      <span>{t.connectToGDrive}</span>
                     </button>
                   )}
                   <button onClick={downloadProject} className={`w-full flex items-center justify-center space-x-2 px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${themeClasses.bgSecondary} ${themeClasses.accentText} hover:opacity-80`}>
                     <DownloadIcon className="w-4 h-4" />
-                    <span>Download a Copy</span>
+                    <span>{t.downloadACopy}</span>
                   </button>
                   <button onClick={() => setIsConfirmOpen(true)} className="w-full flex items-center justify-center space-x-2 px-4 py-2 text-sm font-semibold rounded-lg transition-colors bg-red-700 text-red-100 hover:bg-red-800">
                     <TrashIcon className="w-4 h-4" />

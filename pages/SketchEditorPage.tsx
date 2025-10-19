@@ -103,7 +103,6 @@ const FindReplaceModal = ({ isOpen, onClose, editorRef }: { isOpen: boolean, onC
   );
 };
 
-// FIX: Added the missing SketchEditorPage component definition and export.
 const SketchEditorPage = () => {
     const { novelId, sketchId } = useParams<{ novelId: string; sketchId: string }>();
     const navigate = useNavigate();

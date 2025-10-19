@@ -2,6 +2,7 @@ import * as React from 'react';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { CloseIcon } from './Icons';
 import { enhancePlainText } from '../constants';
+import { useTranslations } from '../hooks/useTranslations';
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -14,6 +15,7 @@ interface ConfirmModalProps {
 
 const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message, confirmButtonClass }: ConfirmModalProps) => {
     const { themeClasses } = React.useContext(ProjectContext);
+    const t = useTranslations();
 
     if (!isOpen) return null;
 
@@ -44,13 +46,13 @@ const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message, confirmButto
                   onClick={onClose}
                   className={`px-6 py-2 font-semibold rounded-lg ${themeClasses.bgTertiary} hover:opacity-80 transition-opacity`}
                 >
-                  Cancel
+                  {t.cancel}
                 </button>
                 <button
                   onClick={handleConfirm}
                   className={confirmButtonClass || "px-6 py-2 font-semibold rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors"}
                 >
-                  Confirm
+                  {t.confirm}
                 </button>
             </div>
           </div>
