@@ -5,15 +5,17 @@ import { BackIcon, ChevronLeftIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, Li
 import { enhanceHtml, enhancePlainText, SKETCH_TAG_OPTIONS } from '../constants';
 import { StoryIdea, StoryIdeaStatus } from '../types';
 import ConfirmModal from '../components/ConfirmModal';
+import { useTranslations } from '../hooks/useTranslations';
 
 const SaveStatusIndicator = () => {
     const { theme, saveStatus } = React.useContext(ProjectContext);
+    const t = useTranslations();
     const baseClasses = 'flex items-center space-x-2 text-sm font-sans font-semibold';
     switch (saveStatus) {
-        case 'unsaved': return <div className={`${baseClasses} ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`}><span>Unsaved changes</span></div>;
-        case 'saving': return <div className={`${baseClasses} ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}><LoadingIcon className="w-4 h-4 animate-spin" /><span>Saving...</span></div>;
-        case 'saved': return <div className={`${baseClasses} ${theme === 'dark' ? 'text-green-400' : 'text-green-600'}`}><CheckIcon className="w-4 h-4" /><span>Saved!</span></div>;
-        case 'error': return <div className={`${baseClasses} ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}><ExclamationTriangleIcon className="w-4 h-4" /><span>Error saving</span></div>;
+        case 'unsaved': return <div className={`${baseClasses} ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`}><span>{t.saveStatusUnsaved}</span></div>;
+        case 'saving': return <div className={`${baseClasses} ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}><LoadingIcon className="w-4 h-4 animate-spin" /><span>{t.saveStatusSaving}</span></div>;
+        case 'saved': return <div className={`${baseClasses} ${theme === 'dark' ? 'text-green-400' : 'text-green-600'}`}><CheckIcon className="w-4 h-4" /><span>{t.saveStatusSaved}</span></div>;
+        case 'error': return <div className={`${baseClasses} ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}><ExclamationTriangleIcon className="w-4 h-4" /><span>{t.saveStatusError}</span></div>;
         default: return null;
     }
 };
@@ -175,6 +177,7 @@ const StoryIdeaEditorPage = () => {
     const { ideaId } = useParams<{ ideaId: string }>();
     const navigate = useNavigate();
     const { projectData, setProjectData, themeClasses } = React.useContext(ProjectContext);
+    const t = useTranslations();
     
     const editorRef = React.useRef<HTMLDivElement>(null);
     const editorContentRef = React.useRef<string>("");
@@ -357,6 +360,10 @@ const StoryIdeaEditorPage = () => {
                 <div className={`fixed top-0 right-0 h-full z-40 transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
                     <div className={`w-80 h-full ${themeClasses.bgSecondary} ${themeClasses.accentText} text-sm font-sans border-l ${themeClasses.border} flex flex-col`}>
                         <div className={`px-4 py-3 flex justify-between items-center border-b ${themeClasses.border}`}><span className="font-bold text-base">IDEA DETAILS</span><button onClick={() => setIsSidebarOpen(false)}><ChevronLeftIcon className="w-5 h-5"/></button></div>
+                        <div className={`px-4 py-4 border-b ${themeClasses.border}`}>
+                            <p className="text-3xl font-bold">{(idea.wordCount || 0).toLocaleString()}</p>
+                            <p className={`text-sm uppercase ${themeClasses.textSecondary}`}>{t.words}</p>
+                        </div>
                         <div className="flex-1 p-4 space-y-6 overflow-y-auto">
                            <div>
                                 <h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Status</h3>

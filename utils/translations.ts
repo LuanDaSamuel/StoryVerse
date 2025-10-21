@@ -9,6 +9,8 @@ export const translations = {
     delete: 'Delete',
     backTo: 'Back to',
     loading: 'Loading...',
+    words: 'WORDS',
+    wordsCount: 'words',
 
     // Welcome Screen
     welcomeCreator: 'Welcome, Creator!',
@@ -68,7 +70,6 @@ export const translations = {
     importDocxTitle: (count: number, name: string) => `Import from ${count === 1 ? `"${name}"` : `${count} files`}?`,
     importDocxMessage: 'This will replace all existing chapters in this novel with the content from the selected DOCX file(s). This action cannot be undone.',
     noCover: 'No Cover',
-    wordsCount: 'words',
     noHistory: "No activity has been recorded for this novel yet.",
     changeRecordedFor: "Change recorded for:",
 
@@ -79,7 +80,6 @@ export const translations = {
     returnToDetails: 'Return to Details',
     chapterTitlePlaceholder: 'Chapter Title',
     editorTools: 'EDITOR TOOLS',
-    words: 'WORDS',
     chapterOutline: 'Chapter Outline',
     findAndReplace: 'Find & Replace',
     find: 'Find...',
@@ -185,6 +185,8 @@ export const translations = {
     delete: 'Xóa',
     backTo: 'Quay lại',
     loading: 'Đang tải...',
+    words: 'TỪ',
+    wordsCount: 'từ',
 
     // Welcome Screen
     welcomeCreator: 'Chào mừng, Người sáng tạo!',
@@ -244,7 +246,6 @@ export const translations = {
     importDocxTitle: (count: number, name: string) => `Nhập từ ${count === 1 ? `"${name}"` : `${count} tệp`}?`,
     importDocxMessage: 'Thao tác này sẽ thay thế tất cả các chương hiện có trong tiểu thuyết này bằng nội dung từ (các) tệp DOCX đã chọn. Hành động này không thể hoàn tác.',
     noCover: 'Không có bìa',
-    wordsCount: 'từ',
     noHistory: 'Chưa có hoạt động nào được ghi lại cho cuốn tiểu thuyết này.',
     changeRecordedFor: 'Thay đổi được ghi lại cho:',
     
@@ -255,7 +256,6 @@ export const translations = {
     returnToDetails: 'Quay lại chi tiết',
     chapterTitlePlaceholder: 'Tên chương',
     editorTools: 'CÔNG CỤ BIÊN TẬP',
-    words: 'TỪ',
     chapterOutline: 'Dàn ý chương',
     findAndReplace: 'Tìm & Thay thế',
     find: 'Tìm...',
@@ -361,6 +361,8 @@ export const translations = {
     delete: 'Poista',
     backTo: 'Takaisin',
     loading: 'Ladataan...',
+    words: 'SANAA',
+    wordsCount: 'sanaa',
 
     // Welcome Screen
     welcomeCreator: 'Tervetuloa, luoja!',
@@ -420,7 +422,6 @@ export const translations = {
     importDocxTitle: (count: number, name: string) => `Tuodaanko ${count === 1 ? `"${name}"` : `${count} tiedostoa`}?`,
     importDocxMessage: 'Tämä korvaa kaikki tämän romaanin olemassa olevat luvut valitun DOCX-tiedoston (tai tiedostojen) sisällöllä. Toimintoa ei voi kumota.',
     noCover: 'Ei kantta',
-    wordsCount: 'sanaa',
     noHistory: 'Tälle romaanille ei ole vielä kirjattu toimintaa.',
     changeRecordedFor: 'Muutos kirjattu kohteelle:',
     
@@ -431,7 +432,6 @@ export const translations = {
     returnToDetails: 'Palaa tietoihin',
     chapterTitlePlaceholder: 'Luvun otsikko',
     editorTools: 'MUOKKAUSTYÖKALUT',
-    words: 'SANAA',
     chapterOutline: 'Luvun jäsennys',
     findAndReplace: 'Etsi & Korvaa',
     find: 'Etsi...',

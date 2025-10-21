@@ -4,27 +4,29 @@ import { ProjectContext } from '../contexts/ProjectContext';
 import { BackIcon, BookOpenIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, TextIcon, SearchIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, CloseIcon, Bars3Icon, DownloadIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, LoadingIcon, CheckIcon, ExclamationTriangleIcon } from '../components/Icons';
 import { enhancePlainText, enhanceHtml, THEME_CONFIG } from '../constants';
 import ExportModal from '../components/ExportModal';
+import { useTranslations } from '../hooks/useTranslations';
 
 // --- Reusable Components ---
 
 const SaveStatusIndicator = () => {
     const { theme, saveStatus } = React.useContext(ProjectContext);
+    const t = useTranslations();
 
     const baseClasses = 'flex items-center space-x-2 text-sm font-sans font-semibold';
 
     switch (saveStatus) {
         case 'unsaved':
             const unsavedColor = theme === 'dark' ? 'text-amber-400' : 'text-amber-600';
-            return <div className={`${baseClasses} ${unsavedColor}`}><span>Unsaved changes</span></div>;
+            return <div className={`${baseClasses} ${unsavedColor}`}><span>{t.saveStatusUnsaved}</span></div>;
         case 'saving':
             const savingColor = theme === 'dark' ? 'text-blue-400' : 'text-blue-600';
-            return <div className={`${baseClasses} ${savingColor}`}><LoadingIcon className="w-4 h-4 animate-spin" /><span>Saving...</span></div>;
+            return <div className={`${baseClasses} ${savingColor}`}><LoadingIcon className="w-4 h-4 animate-spin" /><span>{t.saveStatusSaving}</span></div>;
         case 'saved':
             const savedColor = theme === 'dark' ? 'text-green-400' : 'text-green-600';
-            return <div className={`${baseClasses} ${savedColor}`}><CheckIcon className="w-4 h-4" /><span>Saved!</span></div>;
+            return <div className={`${baseClasses} ${savedColor}`}><CheckIcon className="w-4 h-4" /><span>{t.saveStatusSaved}</span></div>;
         case 'error':
             const errorColor = theme === 'dark' ? 'text-red-400' : 'text-red-600';
-            return <div className={`${baseClasses} ${errorColor}`}><ExclamationTriangleIcon className="w-4 h-4" /><span>Error saving</span></div>;
+            return <div className={`${baseClasses} ${errorColor}`}><ExclamationTriangleIcon className="w-4 h-4" /><span>{t.saveStatusError}</span></div>;
         default:
             return null; // 'idle'
     }
@@ -76,6 +78,8 @@ const ChapterListModal = ({ isOpen, onClose, novel, currentChapterId, themeClass
     );
 };
 
+// FIX: Moved ToolbarDropdownProps and ToolbarDropdown outside of the ChapterEditorPage component.
+// This prevents the component from being redefined on every render, which can cause state issues and confuse TypeScript's type inference.
 interface ToolbarDropdownProps {
     label: string;
     value: string;
@@ -341,6 +345,7 @@ const ChapterEditorPage = () => {
     const { novelId, chapterId } = useParams<{ novelId: string; chapterId: string }>();
     const navigate = useNavigate();
     const { projectData, setProjectData, theme, themeClasses, saveStatus } = React.useContext(ProjectContext);
+    const t = useTranslations();
     
     const editorRef = React.useRef<HTMLDivElement>(null);
     const editorContentRef = React.useRef<string>("");
@@ -1206,7 +1211,7 @@ const ChapterEditorPage = () => {
 
                         <div className={`px-4 py-4 border-b ${themeClasses.border}`}>
                             <p className="text-3xl font-bold">{(chapter.wordCount || 0).toLocaleString()}</p>
-                            <p className={themeClasses.textSecondary}>WORDS</p>
+                            <p className={`text-sm uppercase ${themeClasses.textSecondary}`}>{t.words}</p>
                         </div>
 
                         <div className="flex-1 overflow-y-auto">

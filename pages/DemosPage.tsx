@@ -204,6 +204,11 @@ const DemosPage = () => {
                                     {getSnippet(idea.synopsis)}
                                 </p>
                             </div>
+                             <div className="mt-4 pt-3 border-t border-inherit">
+                                <span className={`text-xs font-semibold ${themeClasses.textSecondary}`}>
+                                    {(idea.wordCount || 0).toLocaleString()} {t.wordsCount}
+                                </span>
+                            </div>
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();

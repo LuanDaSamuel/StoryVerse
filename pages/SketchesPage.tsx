@@ -38,6 +38,7 @@ const SketchesPage = () => {
             id: crypto.randomUUID(),
             title: 'Untitled Sketch',
             content: '<p><br></p>',
+            wordCount: 0,
             tags: [],
             createdAt: now,
             updatedAt: now,
@@ -128,6 +129,11 @@ const SketchesPage = () => {
                                 <p className={`text-sm mt-3 ${themeClasses.textSecondary}`}>
                                     {getSnippet(sketch.content)}
                                 </p>
+                            </div>
+                             <div className="mt-4 pt-3 border-t border-inherit">
+                                <span className={`text-xs font-semibold ${themeClasses.textSecondary}`}>
+                                    {(sketch.wordCount || 0).toLocaleString()} {t.wordsCount}
+                                </span>
                             </div>
                         </div>
                     ))}

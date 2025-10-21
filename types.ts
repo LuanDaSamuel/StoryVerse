@@ -33,6 +33,7 @@ export interface NovelSketch {
   id: string;
   title: string;
   content: string; // HTML content
+  wordCount: number;
   tags: string[];
   createdAt: string;
   updatedAt: string;

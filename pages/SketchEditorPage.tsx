@@ -5,15 +5,17 @@ import { BackIcon, ChevronLeftIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, Li
 import { enhanceHtml, enhancePlainText, SKETCH_TAG_OPTIONS } from '../constants';
 import { NovelSketch } from '../types';
 import ConfirmModal from '../components/ConfirmModal';
+import { useTranslations } from '../hooks/useTranslations';
 
 const SaveStatusIndicator = () => {
     const { theme, saveStatus } = React.useContext(ProjectContext);
+    const t = useTranslations();
     const baseClasses = 'flex items-center space-x-2 text-sm font-sans font-semibold';
     switch (saveStatus) {
-        case 'unsaved': return <div className={`${baseClasses} ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`}><span>Unsaved changes</span></div>;
-        case 'saving': return <div className={`${baseClasses} ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}><LoadingIcon className="w-4 h-4 animate-spin" /><span>Saving...</span></div>;
-        case 'saved': return <div className={`${baseClasses} ${theme === 'dark' ? 'text-green-400' : 'text-green-600'}`}><CheckIcon className="w-4 h-4" /><span>Saved!</span></div>;
-        case 'error': return <div className={`${baseClasses} ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}><ExclamationTriangleIcon className="w-4 h-4" /><span>Error saving</span></div>;
+        case 'unsaved': return <div className={`${baseClasses} ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`}><span>{t.saveStatusUnsaved}</span></div>;
+        case 'saving': return <div className={`${baseClasses} ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}><LoadingIcon className="w-4 h-4 animate-spin" /><span>{t.saveStatusSaving}</span></div>;
+        case 'saved': return <div className={`${baseClasses} ${theme === 'dark' ? 'text-green-400' : 'text-green-600'}`}><CheckIcon className="w-4 h-4" /><span>{t.saveStatusSaved}</span></div>;
+        case 'error': return <div className={`${baseClasses} ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}><ExclamationTriangleIcon className="w-4 h-4" /><span>{t.saveStatusError}</span></div>;
         default: return null;
     }
 };
@@ -107,6 +109,7 @@ const SketchEditorPage = () => {
     const { novelId, sketchId } = useParams<{ novelId: string; sketchId: string }>();
     const navigate = useNavigate();
     const { projectData, setProjectData, themeClasses } = React.useContext(ProjectContext);
+    const t = useTranslations();
     
     const editorRef = React.useRef<HTMLDivElement>(null);
     const editorContentRef = React.useRef<string>("");
@@ -146,11 +149,20 @@ const SketchEditorPage = () => {
             
             if (!updatedSketches[sketchIndex]) return currentData;
 
-            updatedSketches[sketchIndex] = {
+            let updatedSketch = {
                 ...updatedSketches[sketchIndex],
                 ...updates,
                 updatedAt: new Date().toISOString(),
             };
+
+            if ('content' in updates) {
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = updates.content || '';
+                const text = tempDiv.textContent || "";
+                updatedSketch.wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+            }
+            
+            updatedSketches[sketchIndex] = updatedSketch;
             
             novelToUpdate.sketches = updatedSketches;
             updatedNovels[novelIndex] = novelToUpdate;
@@ -294,6 +306,10 @@ const SketchEditorPage = () => {
                 <div className={`fixed top-0 right-0 h-full z-40 transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
                     <div className={`w-80 h-full ${themeClasses.bgSecondary} ${themeClasses.accentText} text-sm font-sans border-l ${themeClasses.border} flex flex-col`}>
                         <div className={`px-4 py-3 flex justify-between items-center border-b ${themeClasses.border}`}><span className="font-bold text-base">SKETCH DETAILS</span><button onClick={() => setIsSidebarOpen(false)}><ChevronLeftIcon className="w-5 h-5"/></button></div>
+                        <div className={`px-4 py-4 border-b ${themeClasses.border}`}>
+                            <p className="text-3xl font-bold">{(sketch.wordCount || 0).toLocaleString()}</p>
+                            <p className={`text-sm uppercase ${themeClasses.textSecondary}`}>{t.words}</p>
+                        </div>
                         <div className="flex-1 p-4 space-y-6 overflow-y-auto">
                            <div><h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Novel</h3><p className="px-3 py-2 rounded-md bg-black/10">{enhancePlainText(novel.title)}</p></div>
                            <div><h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Tags</h3><div className="flex flex-wrap gap-1.5">{SKETCH_TAG_OPTIONS.map(t => <button key={t} onClick={() => handleTagClick(t)} className={`px-2 py-1 text-xs rounded-full font-semibold ${sketch.tags.includes(t) ? `${themeClasses.accent} ${themeClasses.accentText}` : `${themeClasses.bgTertiary} hover:opacity-80`}`}>{t}</button>)}</div></div>

@@ -55,6 +55,7 @@ const sanitizeProjectData = (data: any): ProjectData => {
             id: sketch.id || crypto.randomUUID(),
             title: sketch.title || 'Untitled Sketch',
             content: sketch.content || '',
+            wordCount: typeof sketch.wordCount === 'number' ? sketch.wordCount : 0,
             tags: Array.isArray(sketch.tags) ? sketch.tags : [],
             createdAt: sketch.createdAt || new Date().toISOString(),
             updatedAt: sketch.updatedAt || new Date().toISOString(),

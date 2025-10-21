@@ -10,6 +10,8 @@ interface ToolbarButtonProps {
   children: React.ReactNode;
 }
 
+// FIX: Moved ToolbarButton outside of the SketchEditorModal component.
+// This prevents the component from being redefined on every render, which can cause state issues and confuse TypeScript's type inference.
 const ToolbarButton = ({
   onClick,
   isActive,
@@ -135,10 +137,18 @@ const SketchEditorModal = ({ sketch, onClose, onSave, novels, novelId: contextua
             return;
         }
         const now = new Date().toISOString();
+        // FIX: Calculate wordCount from the editor's content.
+        const contentHtml = editorRef.current?.innerHTML || '';
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = contentHtml;
+        const textContent = tempDiv.textContent || '';
+        const wordCount = textContent.trim().split(/\s+/).filter(Boolean).length;
+        
         const finalSketch: NovelSketch = {
             id: sketch?.id || crypto.randomUUID(),
             title: title || 'Untitled Sketch',
-            content: editorRef.current?.innerHTML || '',
+            content: contentHtml,
+            wordCount,
             tags,
             createdAt: sketch?.createdAt || now,
             updatedAt: now,

@@ -10,6 +10,8 @@ interface ToolbarButtonProps {
   children: React.ReactNode;
 }
 
+// FIX: Moved ToolbarButton outside of the StoryIdeaEditorModal component.
+// This prevents the component from being redefined on every render, which can cause state issues and confuse TypeScript's type inference.
 const ToolbarButton = ({
   onClick,
   isActive,
