@@ -360,10 +360,7 @@ const StoryIdeaEditorPage = () => {
                 <div className={`fixed top-0 right-0 h-full z-40 transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
                     <div className={`w-80 h-full ${themeClasses.bgSecondary} ${themeClasses.accentText} text-sm font-sans border-l ${themeClasses.border} flex flex-col`}>
                         <div className={`px-4 py-3 flex justify-between items-center border-b ${themeClasses.border}`}><span className="font-bold text-base">IDEA DETAILS</span><button onClick={() => setIsSidebarOpen(false)}><ChevronLeftIcon className="w-5 h-5"/></button></div>
-                        <div className={`px-4 py-4 border-b ${themeClasses.border}`}>
-                            <p className="text-3xl font-bold">{(idea.wordCount || 0).toLocaleString()}</p>
-                            <p className={`text-sm uppercase ${themeClasses.textSecondary}`}>{t.words}</p>
-                        </div>
+                        
                         <div className="flex-1 p-4 space-y-6 overflow-y-auto">
                            <div>
                                 <h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Status</h3>
@@ -396,6 +393,10 @@ const StoryIdeaEditorPage = () => {
                             <div className="w-px h-5 bg-white/20 mx-1" />
                             <button onClick={(e) => applyCommand(e, 'undo')} className="p-2 rounded-full text-white/70 hover:text-white transition-colors"><UndoIcon className="w-5 h-5"/></button>
                             <button onClick={(e) => applyCommand(e, 'redo')} className="p-2 rounded-full text-white/70 hover:text-white transition-colors"><RedoIcon className="w-5 h-5"/></button>
+                            <div className="w-px h-5 bg-white/20 mx-1" />
+                            <div className="px-3 text-sm text-white/70 font-sans" aria-live="polite">
+                                {(idea.wordCount || 0).toLocaleString()} {t.wordsCount}
+                            </div>
                         </div>
                     </div>
                 </div>

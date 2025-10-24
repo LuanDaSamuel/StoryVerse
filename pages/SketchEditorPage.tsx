@@ -306,10 +306,6 @@ const SketchEditorPage = () => {
                 <div className={`fixed top-0 right-0 h-full z-40 transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
                     <div className={`w-80 h-full ${themeClasses.bgSecondary} ${themeClasses.accentText} text-sm font-sans border-l ${themeClasses.border} flex flex-col`}>
                         <div className={`px-4 py-3 flex justify-between items-center border-b ${themeClasses.border}`}><span className="font-bold text-base">SKETCH DETAILS</span><button onClick={() => setIsSidebarOpen(false)}><ChevronLeftIcon className="w-5 h-5"/></button></div>
-                        <div className={`px-4 py-4 border-b ${themeClasses.border}`}>
-                            <p className="text-3xl font-bold">{(sketch.wordCount || 0).toLocaleString()}</p>
-                            <p className={`text-sm uppercase ${themeClasses.textSecondary}`}>{t.words}</p>
-                        </div>
                         <div className="flex-1 p-4 space-y-6 overflow-y-auto">
                            <div><h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Novel</h3><p className="px-3 py-2 rounded-md bg-black/10">{enhancePlainText(novel.title)}</p></div>
                            <div><h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Tags</h3><div className="flex flex-wrap gap-1.5">{SKETCH_TAG_OPTIONS.map(t => <button key={t} onClick={() => handleTagClick(t)} className={`px-2 py-1 text-xs rounded-full font-semibold ${sketch.tags.includes(t) ? `${themeClasses.accent} ${themeClasses.accentText}` : `${themeClasses.bgTertiary} hover:opacity-80`}`}>{t}</button>)}</div></div>
@@ -335,6 +331,10 @@ const SketchEditorPage = () => {
                             <div className="w-px h-5 bg-white/20 mx-1" />
                             <button onClick={(e) => applyCommand(e, 'undo')} className="p-2 rounded-full text-white/70 hover:text-white transition-colors"><UndoIcon className="w-5 h-5"/></button>
                             <button onClick={(e) => applyCommand(e, 'redo')} className="p-2 rounded-full text-white/70 hover:text-white transition-colors"><RedoIcon className="w-5 h-5"/></button>
+                            <div className="w-px h-5 bg-white/20 mx-1" />
+                            <div className="px-3 text-sm text-white/70 font-sans" aria-live="polite">
+                                {(sketch.wordCount || 0).toLocaleString()} {t.wordsCount}
+                            </div>
                         </div>
                     </div>
                 </div>

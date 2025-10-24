@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
-import { BackIcon, BookOpenIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, TextIcon, SearchIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, CloseIcon, Bars3Icon, DownloadIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, LoadingIcon, CheckIcon, ExclamationTriangleIcon } from '../components/Icons';
+import { BackIcon, BookOpenIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, TextIcon, SearchIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, CloseIcon, Bars3Icon, DownloadIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, LoadingIcon, CheckIcon, ExclamationTriangleIcon, ClipboardIcon } from '../components/Icons';
 import { enhancePlainText, enhanceHtml, THEME_CONFIG } from '../constants';
 import ExportModal from '../components/ExportModal';
 import { useTranslations } from '../hooks/useTranslations';
@@ -357,6 +357,7 @@ const ChapterEditorPage = () => {
     const [isChapterListModalOpen, setIsChapterListModalOpen] = React.useState(false);
     const [isFormatPanelOpen, setIsFormatPanelOpen] = React.useState(false);
     const [isExportModalOpen, setIsExportModalOpen] = React.useState(false);
+    const [isCopied, setIsCopied] = React.useState(false);
     const [activeFormats, setActiveFormats] = React.useState({ isBold: false, isItalic: false, isUL: false, isOL: false });
     const [currentFormat, setCurrentFormat] = React.useState({
         paragraphStyle: 'p',
@@ -978,6 +979,20 @@ const ChapterEditorPage = () => {
         updateChapterField('content', newHTML);
     };
 
+    const handleCopyContent = React.useCallback(async () => {
+        if (editorRef.current) {
+            try {
+                // Using innerText preserves paragraph breaks better than textContent.
+                const textToCopy = editorRef.current.innerText;
+                await navigator.clipboard.writeText(textToCopy);
+                setIsCopied(true);
+                setTimeout(() => setIsCopied(false), 2000); // Reset after 2 seconds
+            } catch (err) {
+                console.error('Failed to copy text: ', err);
+            }
+        }
+    }, []);
+
     // --- Effects ---
     // This effect handles loading content when the chapter is switched.
     React.useEffect(() => {
@@ -1209,11 +1224,6 @@ const ChapterEditorPage = () => {
                             </button>
                         </div>
 
-                        <div className={`px-4 py-4 border-b ${themeClasses.border}`}>
-                            <p className="text-3xl font-bold">{(chapter.wordCount || 0).toLocaleString()}</p>
-                            <p className={`text-sm uppercase ${themeClasses.textSecondary}`}>{t.words}</p>
-                        </div>
-
                         <div className="flex-1 overflow-y-auto">
                            <div className={`border-b ${themeClasses.border}`}>
                                 <button
@@ -1224,6 +1234,18 @@ const ChapterEditorPage = () => {
                                         <Bars3Icon className="w-5 h-5" />
                                         <span>Chapter Outline</span>
                                     </div>
+                                </button>
+                            </div>
+                            <div className={`border-b ${themeClasses.border}`}>
+                                <button
+                                    onClick={handleCopyContent}
+                                    className={`w-full flex justify-between items-center py-3 px-4 font-semibold text-left transition-colors hover:${themeClasses.bgTertiary}`}
+                                >
+                                    <div className="flex items-center space-x-3">
+                                        <ClipboardIcon className="w-5 h-5" />
+                                        <span>Copy Chapter Text</span>
+                                    </div>
+                                    {isCopied && <span className="text-xs text-green-400 font-normal">Copied!</span>}
                                 </button>
                             </div>
                             <div className={`border-b ${themeClasses.border}`}>
@@ -1260,14 +1282,17 @@ const ChapterEditorPage = () => {
                                 className="absolute bottom-full mb-2 p-4 rounded-lg shadow-lg bg-stone-900/80 border border-white/10 backdrop-blur-sm w-[320px]"
                             >
                                 <div className="space-y-4">
+                                    {/* FIX: Added children to ToolbarDropdown as required by its props. */}
                                     <ToolbarDropdown label="Paragraph Style" value={currentFormat.paragraphStyle} onChange={(e) => applyParagraphStyle(e.target.value)}>
                                         <option value="p">Paragraph</option>
                                         <option value="blockquote">Blockquote</option>
                                     </ToolbarDropdown>
+                                    {/* FIX: Added children to ToolbarDropdown as required by its props. */}
                                     <ToolbarDropdown label="Font" value={currentFormat.font} onChange={(e) => applyFont(e.target.value)}>
                                         {fontOptions.map(font => <option key={font.name} value={font.value}>{font.name}</option>)}
                                     </ToolbarDropdown>
                                     <div className="grid grid-cols-2 gap-4">
+                                        {/* FIX: Added children to ToolbarDropdown as required by its props. */}
                                         <ToolbarDropdown label="Size" value={currentFormat.size} onChange={(e) => applyFontSize(e.target.value)}>
                                             <option value="14px">14</option>
                                             <option value="16px">16</option>
@@ -1275,6 +1300,7 @@ const ChapterEditorPage = () => {
                                             <option value="20px">20</option>
                                             <option value="24px">24</option>
                                         </ToolbarDropdown>
+                                        {/* FIX: Added children to ToolbarDropdown as required by its props. */}
                                         <ToolbarDropdown label="Paragraph Spacing" value={currentFormat.paragraphSpacing} onChange={(e) => applyParagraphSpacing(e.target.value)}>
                                             <option value="0.5em">0.5</option>
                                             <option value="1em">1.0</option>
@@ -1309,6 +1335,10 @@ const ChapterEditorPage = () => {
                             <div className="w-px h-5 bg-white/20 mx-1"></div>
                             <button onClick={() => applyCommand('undo')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors`}><UndoIcon className="w-5 h-5"/></button>
                             <button onClick={() => applyCommand('redo')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors`}><RedoIcon className="w-5 h-5"/></button>
+                            <div className="w-px h-5 bg-white/20 mx-1"></div>
+                            <div className="px-3 text-sm text-white/70 font-sans" aria-live="polite">
+                                {(chapter.wordCount || 0).toLocaleString()} {t.wordsCount}
+                            </div>
                         </div>
                     </div>
                 </div>
