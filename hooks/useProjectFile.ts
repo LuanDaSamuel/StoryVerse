@@ -5,6 +5,7 @@ import { useProjectStorage, PermanentAuthError } from './useProjectStorage';
 
 // --- Constants ---
 const LOCAL_BACKUP_KEY = 'storyverse-local-backup';
+const LOCAL_UNLOAD_BACKUP_KEY = 'storyverse-unload-backup';
 const isFileSystemAccessAPISupported = 'showOpenFilePicker' in window;
 
 const defaultProjectData: ProjectData = {
@@ -137,6 +138,7 @@ export function useProject() {
             await flushChanges();
         }
         await storage.signOut();
+        localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
         resetState();
         setStatus('welcome');
     }, [flushChanges, storage, resetState]);
@@ -170,6 +172,7 @@ export function useProject() {
                 await set(LOCAL_BACKUP_KEY, dataToSave);
                 await storage.saveToFileHandle(dataToSave);
             }
+            localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
             setSaveStatus('saved');
             isSavingRef.current = false;
             return;
@@ -214,6 +217,12 @@ export function useProject() {
                 setSaveStatus('unsaved');
             }
 
+            try {
+                localStorage.setItem(LOCAL_UNLOAD_BACKUP_KEY, JSON.stringify(newData));
+            } catch (e) {
+                console.error("Failed to write to localStorage backup", e);
+            }
+
             if (saveTimeoutRef.current) {
                 clearTimeout(saveTimeoutRef.current);
             }
@@ -248,25 +257,6 @@ export function useProject() {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, [flushChanges]);
-
-  // Warn user before leaving with unsaved changes.
-  React.useEffect(() => {
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      // Check ref directly to get the latest status without re-running the effect.
-      if (['unsaved', 'saving', 'error'].includes(saveStatusRef.current)) {
-        event.preventDefault();
-        // Required for legacy browsers.
-        event.returnValue = '';
-        return ''; // Triggers the prompt in modern browsers.
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, []);
   
     // --- Inactivity Timer for Auto-Sign Out ---
     const inactivityTimeoutRef = React.useRef<number | null>(null);
@@ -376,6 +366,29 @@ export function useProject() {
     }, [storage]);
 
   const checkForRecentLocalProject = React.useCallback(async () => {
+    try {
+        const backupJson = localStorage.getItem(LOCAL_UNLOAD_BACKUP_KEY);
+        if (backupJson) {
+            console.log("Found unload backup, restoring...");
+            const unloadBackup = sanitizeProjectData(JSON.parse(backupJson));
+            
+            if (isFileSystemAccessAPISupported) {
+                const handle = await storage.getHandleFromIdb();
+                if (handle) {
+                    await storage.saveToFileHandle(unloadBackup);
+                    console.log("Restored unload backup to File Handle.");
+                }
+            }
+            await set(LOCAL_BACKUP_KEY, unloadBackup);
+            console.log("Restored unload backup to IndexedDB.");
+
+            localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
+        }
+    } catch (e) {
+        console.error("Error processing unload backup:", e);
+        localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
+    }
+
     const localData = await getLocalProjectData();
     if (localData) {
         setProjectData(sanitizeProjectData(localData.data));
@@ -385,7 +398,7 @@ export function useProject() {
         return true;
     }
     return false;
-  }, [getLocalProjectData]);
+  }, [getLocalProjectData, storage]);
 
   React.useEffect(() => {
     if (!isInitialLoadRef.current) return;
@@ -466,6 +479,7 @@ export function useProject() {
         await storage.clearHandleFromIdb();
         await del(LOCAL_BACKUP_KEY);
     }
+    localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
     resetState();
     setStatus('welcome');
   }, [flushChanges, storageMode, storage, resetState]);
