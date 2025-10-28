@@ -109,6 +109,7 @@ export function useProject() {
   const saveProjectRef = React.useRef<() => Promise<void>>(async () => {});
   const saveTimeoutRef = React.useRef<number | null>(null);
   const inactivityTimerRef = React.useRef<number | null>(null);
+  const localStorageBackupTimeoutRef = React.useRef<number | null>(null);
   
   const resetState = React.useCallback(() => {
     setProjectData(null);
@@ -265,37 +266,41 @@ export function useProject() {
   const setProjectDataAndMarkDirty = React.useCallback((updater: React.SetStateAction<ProjectData | null>) => {
     setProjectData(prevData => {
         const newData = typeof updater === 'function' ? updater(prevData) : updater;
+
+        // PERFORMANCE FIX: The previous JSON.stringify comparison on every keystroke was the
+        // primary cause of typing lag. It has been removed. We now assume any call to this
+        // function implies a change that needs to be persisted.
         
-        // This check prevents redundant updates and save triggers if the data hasn't actually changed.
-        if (JSON.stringify(newData) !== JSON.stringify(prevData)) {
-            // CRITICAL FIX: Update the ref immediately with the new data.
-            // This ensures that the debounced saveProject function will always
-            // have access to the absolute latest state, preventing race conditions
-            // where stale data could be saved.
-            projectDataRef.current = newData;
-            isDirtyRef.current = true;
+        projectDataRef.current = newData;
+        isDirtyRef.current = true;
 
-            // If a save isn't already in progress, show the 'unsaved' status.
-            if (!isSavingRef.current) {
-                setSaveStatus('unsaved');
-            }
+        if (!isSavingRef.current) {
+            setSaveStatus('unsaved');
+        }
 
-            // Maintain a synchronous backup in localStorage in case the user closes the tab before save.
+        // PERFORMANCE FIX: Throttle the synchronous localStorage backup. Writing to localStorage on
+        // every keystroke is slow and blocks the main thread. This ensures it only happens
+        // periodically during rapid typing.
+        if (localStorageBackupTimeoutRef.current) {
+            clearTimeout(localStorageBackupTimeoutRef.current);
+        }
+        localStorageBackupTimeoutRef.current = window.setTimeout(() => {
             try {
+                // This stringify is still expensive, but now it only runs periodically, not on every input event.
                 localStorage.setItem(LOCAL_UNLOAD_BACKUP_KEY, JSON.stringify(newData));
             } catch (e) {
                 console.error("Failed to write to localStorage backup", e);
             }
+        }, 500); // Backup at most every 500ms.
 
-            // Debounce the save operation.
-            if (saveTimeoutRef.current) {
-                clearTimeout(saveTimeoutRef.current);
-            }
-
-            saveTimeoutRef.current = window.setTimeout(() => {
-                saveProjectRef.current?.();
-            }, 1000); // 1-second delay after the last change.
+        // Debounce the actual save operation. This is correct.
+        if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current);
         }
+        saveTimeoutRef.current = window.setTimeout(() => {
+            saveProjectRef.current?.();
+        }, 1000); // 1-second delay after the last change.
+        
         return newData;
     });
   }, []);
