@@ -14,6 +14,27 @@ const WhatsNewModal = ({ isOpen, onClose }: WhatsNewModalProps) => {
 
     const updates = [
         {
+            date: 'October 12, 2025',
+            items: [
+                "**Security Update**: Re-introduced the 15-minute inactivity timer for Google Drive sessions. You will be automatically signed out for security.",
+                "**Improved Session Handling**: The app is now more robust in handling expired sessions during save operations, reducing save errors.",
+            ]
+        },
+        {
+            date: 'October 11, 2025',
+            items: [
+                "**Sign-In Flow Updated**: Reverted to a manual sign-in process to improve stability and prevent save issues. The app will no longer sign you in automatically.",
+                "**Smoother Re-authentication**: While sign-in is now manual, returning users with an active Google session in their browser should still experience a quick, streamlined sign-in process.",
+            ]
+        },
+        {
+            date: 'October 10, 2025',
+            items: [
+                "**Major Stability Update**: Reworked the Google Drive integration for a more stable and seamless experience. The app will now automatically sign you back in when you revisit, keeping your session active.",
+                "**Removed Inactivity Sign-out**: You will no longer be signed out after 15 minutes of inactivity. The app will keep your session alive in the background.",
+            ]
+        },
+        {
             date: 'October 9, 2025',
             items: [
                 "**Stability Fix**: Improved the Google Drive auto-login feature. The app now proactively checks and refreshes your session, preventing save errors when you return after a long break.",

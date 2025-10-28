@@ -197,23 +197,23 @@ const SketchEditorModal = ({ sketch, onClose, onSave, novels, novelId: contextua
                             className={`w-full text-3xl font-bold bg-transparent outline-none mb-4 ${themeClasses.accentText}`}
                         />
                         <div className="sticky top-0 z-10 bg-gray-800 p-2 rounded-md mb-4 flex items-center space-x-1">
-                            {/* FIX: Added icon components as children to ToolbarButton. */}
+                            {/* FIX: Added missing children props to ToolbarButton components. */}
                             <ToolbarButton onClick={(e) => applyCommand(e, 'bold')} isActive={activeFormats.isBold}><BoldIcon className="w-5 h-5"/></ToolbarButton>
-                            {/* FIX: Added icon components as children to ToolbarButton. */}
+                            {/* FIX: Added missing children props to ToolbarButton components. */}
                             <ToolbarButton onClick={(e) => applyCommand(e, 'italic')} isActive={activeFormats.isItalic}><ItalicIcon className="w-5 h-5"/></ToolbarButton>
                             <div className="w-px h-5 bg-gray-600 mx-1"></div>
-                            {/* FIX: Added icon components as children to ToolbarButton. */}
+                            {/* FIX: Added missing children props to ToolbarButton components. */}
                             <ToolbarButton onClick={(e) => applyBlockFormat(e, 'h1')} isActive={activeFormats.currentBlock === 'h1'}><H1Icon className="w-5 h-5"/></ToolbarButton>
-                            {/* FIX: Added icon components as children to ToolbarButton. */}
+                            {/* FIX: Added missing children props to ToolbarButton components. */}
                             <ToolbarButton onClick={(e) => applyBlockFormat(e, 'h2')} isActive={activeFormats.currentBlock === 'h2'}><H2Icon className="w-5 h-5"/></ToolbarButton>
-                            {/* FIX: Added icon components as children to ToolbarButton. */}
+                            {/* FIX: Added missing children props to ToolbarButton components. */}
                             <ToolbarButton onClick={(e) => applyBlockFormat(e, 'h3')} isActive={activeFormats.currentBlock === 'h3'}><H3Icon className="w-5 h-5"/></ToolbarButton>
                             <div className="w-px h-5 bg-gray-600 mx-1"></div>
-                            {/* FIX: Added icon components as children to ToolbarButton. */}
+                            {/* FIX: Added missing children props to ToolbarButton components. */}
                             <ToolbarButton onClick={(e) => applyCommand(e, 'insertUnorderedList')} isActive={activeFormats.isUL}><ListBulletIcon className="w-5 h-5"/></ToolbarButton>
-                            {/* FIX: Added icon components as children to ToolbarButton. */}
+                            {/* FIX: Added missing children props to ToolbarButton components. */}
                             <ToolbarButton onClick={(e) => applyCommand(e, 'insertOrderedList')} isActive={activeFormats.isOL}><OrderedListIcon className="w-5 h-5"/></ToolbarButton>
-                            {/* FIX: Added icon components as children to ToolbarButton. */}
+                            {/* FIX: Added missing children props to ToolbarButton components. */}
                             <ToolbarButton onClick={(e) => applyBlockFormat(e, 'blockquote')} isActive={activeFormats.currentBlock === 'blockquote'}><BlockquoteIcon className="w-5 h-5"/></ToolbarButton>
                         </div>
                         <div

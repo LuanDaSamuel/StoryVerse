@@ -104,11 +104,11 @@ export function useProject() {
   const isDirtyRef = React.useRef(false);
   const isSavingRef = React.useRef(false);
   const projectDataRef = React.useRef(projectData);
-  projectDataRef.current = projectData;
 
   const storage = useProjectStorage();
   const saveProjectRef = React.useRef<() => Promise<void>>(async () => {});
   const saveTimeoutRef = React.useRef<number | null>(null);
+  const inactivityTimerRef = React.useRef<number | null>(null);
   
   const resetState = React.useCallback(() => {
     setProjectData(null);
@@ -133,15 +133,59 @@ export function useProject() {
   
     const signOut = React.useCallback(async (options?: { flush?: boolean }) => {
         const shouldFlush = options?.flush ?? true;
+        
+        // Clear the inactivity timer immediately to prevent it from re-firing during the sign-out process.
+        if (inactivityTimerRef.current) {
+            clearTimeout(inactivityTimerRef.current);
+        }
+        
         setStatus('loading');
         if (shouldFlush) {
-            await flushChanges();
+            try {
+                await flushChanges();
+            } catch (error) {
+                console.error("Failed to flush changes during sign out:", error);
+                // Proceed with sign out anyway, but don't remove the unload backup
+                // as changes were not successfully saved.
+            }
         }
         await storage.signOut();
-        localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
+        // CRITICAL FIX: Do not remove the unload backup here.
+        // It should only be removed on a *successful* save (handled by `saveProject`)
+        // or on a clean `closeProject`. Removing it here when signOut is called
+        // from an error state would cause data loss.
         resetState();
         setStatus('welcome');
     }, [flushChanges, storage, resetState]);
+
+  const resetInactivityTimer = React.useCallback(() => {
+    if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+    }
+    inactivityTimerRef.current = window.setTimeout(async () => {
+        // No alert needed. Just sign the user out smoothly.
+        // Their work will be saved, and they will be at the welcome screen when they return.
+        await signOut({ flush: true });
+    }, 15 * 60 * 1000); // 15 minutes
+  }, [signOut]);
+
+  React.useEffect(() => {
+    // This effect sets up the inactivity timer only for Google Drive sessions.
+    if (status === 'ready' && storageMode === 'drive') {
+        const events: (keyof WindowEventMap)[] = ['mousemove', 'keydown', 'mousedown', 'touchstart'];
+        
+        resetInactivityTimer();
+
+        events.forEach(event => window.addEventListener(event, resetInactivityTimer));
+
+        return () => {
+            if (inactivityTimerRef.current) {
+                clearTimeout(inactivityTimerRef.current);
+            }
+            events.forEach(event => window.removeEventListener(event, resetInactivityTimer));
+        };
+    }
+  }, [status, storageMode, resetInactivityTimer]);
 
   const saveProject = React.useCallback(async () => {
     if (isSavingRef.current || !isDirtyRef.current) {
@@ -173,8 +217,17 @@ export function useProject() {
                 await storage.saveToFileHandle(dataToSave);
             }
             localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
-            setSaveStatus('saved');
             isSavingRef.current = false;
+            
+            // If new changes have come in while the save was in progress,
+            // the state is already dirty. In this case, we should ensure the status
+            // is 'unsaved' and not flash a misleading 'saved' message which could
+            // trigger a re-render with stale data.
+            if (isDirtyRef.current) {
+                setSaveStatus('unsaved');
+            } else {
+                setSaveStatus('saved');
+            }
             return;
         } catch (error: any) {
             console.error(`Save attempt ${attempt}/${MAX_RETRIES} failed for storage mode '${storageMode}':`, error);
@@ -183,7 +236,9 @@ export function useProject() {
                 setSaveStatus('error');
                 isDirtyRef.current = true;
                 isSavingRef.current = false;
-                alert(`${error.message}\n\nYou will be signed out to protect your work.`);
+                // No alert needed. The user will be signed out and taken to the welcome screen.
+                // This prevents the UI from getting stuck on a blocking dialog.
+                console.error("Permanent Authentication Error:", error.message, "Signing out.");
                 await signOut({ flush: false });
                 return;
             }
@@ -210,26 +265,36 @@ export function useProject() {
   const setProjectDataAndMarkDirty = React.useCallback((updater: React.SetStateAction<ProjectData | null>) => {
     setProjectData(prevData => {
         const newData = typeof updater === 'function' ? updater(prevData) : updater;
+        
+        // This check prevents redundant updates and save triggers if the data hasn't actually changed.
         if (JSON.stringify(newData) !== JSON.stringify(prevData)) {
+            // CRITICAL FIX: Update the ref immediately with the new data.
+            // This ensures that the debounced saveProject function will always
+            // have access to the absolute latest state, preventing race conditions
+            // where stale data could be saved.
+            projectDataRef.current = newData;
             isDirtyRef.current = true;
 
+            // If a save isn't already in progress, show the 'unsaved' status.
             if (!isSavingRef.current) {
                 setSaveStatus('unsaved');
             }
 
+            // Maintain a synchronous backup in localStorage in case the user closes the tab before save.
             try {
                 localStorage.setItem(LOCAL_UNLOAD_BACKUP_KEY, JSON.stringify(newData));
             } catch (e) {
                 console.error("Failed to write to localStorage backup", e);
             }
 
+            // Debounce the save operation.
             if (saveTimeoutRef.current) {
                 clearTimeout(saveTimeoutRef.current);
             }
 
             saveTimeoutRef.current = window.setTimeout(() => {
                 saveProjectRef.current?.();
-            }, 1000); // 1-second delay
+            }, 1000); // 1-second delay after the last change.
         }
         return newData;
     });
@@ -239,7 +304,10 @@ export function useProject() {
   React.useEffect(() => {
     if (saveStatus === 'saved') {
         const timeoutId = setTimeout(() => {
-            setSaveStatus('idle');
+            // Only revert to idle if no new changes have come in.
+            if (!isDirtyRef.current) {
+                setSaveStatus('idle');
+            }
         }, 1500); // Duration to display the "Saved!" message.
         return () => clearTimeout(timeoutId);
     }
@@ -258,48 +326,11 @@ export function useProject() {
         };
     }, [flushChanges]);
   
-    // --- Inactivity Timer for Auto-Sign Out ---
-    const inactivityTimeoutRef = React.useRef<number | null>(null);
-    const storageModeRef = React.useRef(storageMode);
-    React.useEffect(() => {
-        storageModeRef.current = storageMode;
-    }, [storageMode]);
-
-    const signOutAfterInactivity = React.useCallback(() => {
-        if (storageModeRef.current === 'drive') {
-            console.log("Signing out due to inactivity.");
-            alert("You have been signed out due to 15 minutes of inactivity.");
-            signOut();
-        }
-    }, [signOut]);
-
-    const resetInactivityTimer = React.useCallback(() => {
-        if (inactivityTimeoutRef.current) {
-            clearTimeout(inactivityTimeoutRef.current);
-        }
-        if (storageModeRef.current === 'drive') {
-            inactivityTimeoutRef.current = window.setTimeout(signOutAfterInactivity, 15 * 60 * 1000); // 15 minutes
-        }
-    }, [signOutAfterInactivity]);
-
-    React.useEffect(() => {
-        if (storageMode === 'drive') {
-            const events: (keyof WindowEventMap)[] = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
-            events.forEach(event => window.addEventListener(event, resetInactivityTimer));
-            resetInactivityTimer(); // Start the timer when user signs in
-
-            return () => {
-                events.forEach(event => window.removeEventListener(event, resetInactivityTimer));
-                if (inactivityTimeoutRef.current) {
-                    clearTimeout(inactivityTimeoutRef.current);
-                }
-            };
-        }
-    }, [storageMode, resetInactivityTimer]);
-
   const handleDriveProject = React.useCallback((driveProject: { name: string, data: any } | null) => {
     if (driveProject) {
-        setProjectData(sanitizeProjectData(driveProject.data));
+        const sanitizedData = sanitizeProjectData(driveProject.data);
+        setProjectData(sanitizedData);
+        projectDataRef.current = sanitizedData;
         setProjectName(driveProject.name);
         setStatus('ready');
     } else {
@@ -318,13 +349,17 @@ export function useProject() {
         const driveProject = await storage.loadFromDrive();
 
         if (driveProject && localData) {
-            setProjectData(sanitizeProjectData(localData.data)); 
+            const sanitizedLocal = sanitizeProjectData(localData.data);
+            setProjectData(sanitizedLocal); 
+            projectDataRef.current = sanitizedLocal;
             setProjectName(localData.name);
             setStatus('drive-conflict');
         } else if (driveProject) {
             handleDriveProject(driveProject);
         } else if (localData) {
-            setProjectData(sanitizeProjectData(localData.data));
+            const sanitizedLocal = sanitizeProjectData(localData.data);
+            setProjectData(sanitizedLocal);
+            projectDataRef.current = sanitizedLocal;
             setProjectName(localData.name);
             await storage.createOnDrive(localData.data);
             setStatus('ready');
@@ -345,6 +380,7 @@ export function useProject() {
         const { name } = await storage.createOnDrive(defaultProjectData);
         setProjectName(name);
         setProjectData(defaultProjectData);
+        projectDataRef.current = defaultProjectData;
         setStatus('ready');
     } catch (error) {
         alert("Failed to create project on Google Drive.");
@@ -391,7 +427,9 @@ export function useProject() {
 
     const localData = await getLocalProjectData();
     if (localData) {
-        setProjectData(sanitizeProjectData(localData.data));
+        const sanitizedData = sanitizeProjectData(localData.data);
+        setProjectData(sanitizedData);
+        projectDataRef.current = sanitizedData;
         setProjectName(localData.name);
         setStatus('ready');
         setStorageMode('local');
@@ -405,14 +443,20 @@ export function useProject() {
 
     const initializeApp = async () => {
         try {
-            await storage.initGapiClient();
+            // GAPI client is needed for manual sign-in later.
+            await storage.initGapiClient(); 
+
+            // Check for a local project first.
             const hasLocal = await checkForRecentLocalProject();
             if (!hasLocal) {
+                // If no local project, show the welcome screen.
                 console.log("No local project found. Displaying welcome screen.");
                 setStatus('welcome');
             }
+            // If hasLocal is true, checkForRecentLocalProject already set the state.
         } catch (error: any) {
             console.error("Initialization failed:", error);
+            // Fallback to welcome screen on error.
             alert(`There was a problem initializing the application:\n\n${error.message}\n\nPlease try again.`);
             setStatus('welcome');
         }
@@ -432,8 +476,10 @@ export function useProject() {
         const fileData = await storage.loadFromFileHandle(handle);
         if (fileData) {
             await storage.saveHandleToIdb(handle);
+            const sanitizedData = sanitizeProjectData(fileData.data);
             setProjectName(fileData.name);
-            setProjectData(sanitizeProjectData(fileData.data));
+            setProjectData(sanitizedData);
+            projectDataRef.current = sanitizedData;
             setStorageMode('local');
             setStatus('ready');
         } else {
@@ -460,6 +506,7 @@ export function useProject() {
         await storage.saveHandleToIdb(handle);
         setProjectName(handle.name);
         setProjectData(defaultProjectData);
+        projectDataRef.current = defaultProjectData;
         await storage.saveToFileHandle(defaultProjectData);
         setStorageMode('local');
         setStatus('ready');
