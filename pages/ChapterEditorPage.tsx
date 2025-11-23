@@ -1,3 +1,4 @@
+
 import * as React from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
@@ -78,13 +79,11 @@ const ChapterListModal = ({ isOpen, onClose, novel, currentChapterId, themeClass
     );
 };
 
-// FIX: Moved ToolbarDropdownProps and ToolbarDropdown outside of the ChapterEditorPage component.
-// This prevents the component from being redefined on every render, which can cause state issues and confuse TypeScript's type inference.
 interface ToolbarDropdownProps {
     label: string;
     value: string;
     onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
-    children: React.ReactNode;
+    children?: React.ReactNode;
 }
 
 const ToolbarDropdown = ({ label, value, onChange, children }: ToolbarDropdownProps) => {
@@ -1282,17 +1281,14 @@ const ChapterEditorPage = () => {
                                 className="absolute bottom-full mb-2 p-4 rounded-lg shadow-lg bg-stone-900/80 border border-white/10 backdrop-blur-sm w-[320px]"
                             >
                                 <div className="space-y-4">
-                                    {/* FIX: Added missing children props to ToolbarDropdown components. */}
                                     <ToolbarDropdown label="Paragraph Style" value={currentFormat.paragraphStyle} onChange={(e) => applyParagraphStyle(e.target.value)}>
                                         <option value="p">Paragraph</option>
                                         <option value="blockquote">Blockquote</option>
                                     </ToolbarDropdown>
-                                    {/* FIX: Added missing children props to ToolbarDropdown components. */}
                                     <ToolbarDropdown label="Font" value={currentFormat.font} onChange={(e) => applyFont(e.target.value)}>
                                         {fontOptions.map(font => <option key={font.name} value={font.value}>{font.name}</option>)}
                                     </ToolbarDropdown>
                                     <div className="grid grid-cols-2 gap-4">
-                                        {/* FIX: Added missing children props to ToolbarDropdown components. */}
                                         <ToolbarDropdown label="Size" value={currentFormat.size} onChange={(e) => applyFontSize(e.target.value)}>
                                             <option value="14px">14</option>
                                             <option value="16px">16</option>
@@ -1300,7 +1296,6 @@ const ChapterEditorPage = () => {
                                             <option value="20px">20</option>
                                             <option value="24px">24</option>
                                         </ToolbarDropdown>
-                                        {/* FIX: Added missing children props to ToolbarDropdown components. */}
                                         <ToolbarDropdown label="Paragraph Spacing" value={currentFormat.paragraphSpacing} onChange={(e) => applyParagraphSpacing(e.target.value)}>
                                             <option value="0.5em">0.5</option>
                                             <option value="1em">1.0</option>

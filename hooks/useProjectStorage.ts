@@ -41,40 +41,6 @@ export function useProjectStorage() {
     const driveFileIdRef = React.useRef<string | null>(null);
     const projectFileHandleRef = React.useRef<FileSystemFileHandle | null>(null);
 
-    const createOnDrive = React.useCallback(async (data: ProjectData): Promise<{ fileId: string, name: string }> => {
-        console.log("Creating new file on Google Drive via gapi.client.request...");
-        
-        // Step 1: Create the file with metadata only.
-        const createResponse = await gapi.client.request({
-            path: '/drive/v3/files',
-            method: 'POST',
-            body: {
-                name: DRIVE_PROJECT_FILENAME,
-                mimeType: 'application/json',
-            }
-        });
-
-        const fileId = createResponse.result.id;
-        if (!fileId) {
-            console.error("Drive API Error on create:", createResponse.result);
-            throw new Error("File creation failed: No ID returned from Drive API.");
-        }
-        console.log(`File metadata created with ID: ${fileId}`);
-        
-        // Step 2: Upload the content to the newly created file.
-        await gapi.client.request({
-            path: `/upload/drive/v3/files/${fileId}`,
-            method: 'PATCH',
-            params: { uploadType: 'media' },
-            body: JSON.stringify(data)
-        });
-        
-        console.log("File content uploaded successfully.");
-        driveFileIdRef.current = fileId;
-        await idbSet(DRIVE_FILE_ID_KEY, fileId);
-        return { fileId: fileId, name: createResponse.result.name };
-    }, []);
-
     const signOut = React.useCallback(async () => {
         if (gapi.client) {
             gapi.client.setToken('');
@@ -104,8 +70,18 @@ export function useProjectStorage() {
                             await idbSet(GAPI_AUTH_TOKEN_KEY, storedToken);
 
                             gapi.client.setToken(tokenResponse);
-                            const userInfo = await gapi.client.request({ path: 'https://www.googleapis.com/oauth2/v3/userinfo' });
-                            const profile: UserProfile = { name: userInfo.result.name, email: userInfo.result.email, picture: userInfo.result.picture };
+                            
+                            const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                                headers: { 'Authorization': `Bearer ${tokenResponse.access_token}` }
+                            });
+
+                            if (!userInfoRes.ok) {
+                                console.error("Could not fetch user info after token refresh.");
+                                resolve(null);
+                                return;
+                            }
+                            const userInfo = await userInfoRes.json();
+                            const profile: UserProfile = { name: userInfo.name, email: userInfo.email, picture: userInfo.picture };
                             await idbSet(USER_PROFILE_KEY, profile);
                             resolve(profile);
                         } else {
@@ -126,71 +102,109 @@ export function useProjectStorage() {
         });
     }, []);
 
-    const saveToDrive = React.useCallback(async (data: ProjectData) => {
-        // Proactive token check to prevent save failures from expired tokens,
-        // which can happen if the computer was asleep. We refresh if the token
-        // is missing, expired, or will expire in the next 5 minutes.
-        const token = await idbGet<StoredToken>(GAPI_AUTH_TOKEN_KEY);
+    const getAccessToken = React.useCallback(async (): Promise<string> => {
+        let token = await idbGet<StoredToken>(GAPI_AUTH_TOKEN_KEY);
         const FIVE_MINUTES_IN_MS = 5 * 60 * 1000;
+    
         if (!token || !token.access_token || Date.now() >= (token.expires_at - FIVE_MINUTES_IN_MS)) {
             console.log("Token is missing, expired, or expiring soon. Refreshing proactively.");
             const newProfile = await refreshTokenAndGetProfile();
             if (!newProfile) {
-                // If proactive refresh fails, we can't save. This is a permanent error.
                 throw new PermanentAuthError("Could not refresh your Google session. Please sign in again to continue saving.");
             }
+            token = await idbGet<StoredToken>(GAPI_AUTH_TOKEN_KEY); // Re-fetch the token
+        }
+    
+        if (!token || !token.access_token) {
+            throw new PermanentAuthError("No valid auth token available.");
+        }
+    
+        return token.access_token;
+    }, [refreshTokenAndGetProfile]);
+
+    const createOnDrive = React.useCallback(async (data: ProjectData): Promise<{ fileId: string, name: string }> => {
+        console.log("Creating new file on Google Drive via fetch...");
+        const accessToken = await getAccessToken();
+
+        // Step 1: Create file metadata
+        const createResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                name: DRIVE_PROJECT_FILENAME,
+                mimeType: 'application/json',
+                parents: ['appDataFolder']
+            })
+        });
+
+        if (!createResponse.ok) {
+            const errorBody = await createResponse.json().catch(() => ({}));
+            throw new Error(`File metadata creation failed: ${errorBody?.error?.message || createResponse.statusText}`);
+        }
+
+        const createResult = await createResponse.json();
+        const fileId = createResult.id;
+        if (!fileId) {
+            throw new Error("File creation failed: No ID returned from Drive API.");
+        }
+        console.log(`File metadata created with ID: ${fileId}`);
+        
+        // Step 2: Upload content
+        const uploadResponse = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+
+        if (!uploadResponse.ok) {
+            const errorBody = await uploadResponse.json().catch(() => ({}));
+            throw new Error(`File content upload failed: ${errorBody?.error?.message || uploadResponse.statusText}`);
         }
         
+        console.log("File content uploaded successfully.");
+        driveFileIdRef.current = fileId;
+        await idbSet(DRIVE_FILE_ID_KEY, fileId);
+        return { fileId: fileId, name: createResult.name };
+    }, [getAccessToken]);
+    
+    const saveToDrive = React.useCallback(async (data: ProjectData) => {
         let fileId = driveFileIdRef.current || await idbGet<string>(DRIVE_FILE_ID_KEY);
     
         if (!fileId) {
             console.log("No Drive file ID found, creating a new file...");
             const { fileId: newFileId } = await createOnDrive(data);
-            driveFileIdRef.current = newFileId;
             console.log(`New file created on Drive with ID: ${newFileId}.`);
             return;
         }
         
         driveFileIdRef.current = fileId;
-
-        const doSaveRequest = () => gapi.client.request({
-            path: `/upload/drive/v3/files/${fileId}`,
-            method: 'PATCH',
-            params: { uploadType: 'media' },
-            body: JSON.stringify(data)
-        });
     
         try {
-            console.log(`Initiating upload for Drive file: ${fileId} via gapi.client.request`);
-            await doSaveRequest();
-            console.log("File updated successfully.");
-        } catch (error: any) {
-            console.error("Failed to update Drive file:", error);
+            const accessToken = await getAccessToken();
+            console.log(`Initiating upload for Drive file: ${fileId} via fetch`);
+            const response = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
     
-            // If it's an auth error, try to refresh the token and retry once. This is a fallback
-            // in case the token was invalidated on the server-side before its expiry time.
-            if (error.status === 401 || error.status === 403) {
-                console.log("Save failed due to auth error. Refreshing token...");
-                const newProfile = await refreshTokenAndGetProfile();
-                if (newProfile) {
-                    console.log("Token refreshed. Retrying save...");
-                    try {
-                        await doSaveRequest();
-                        console.log("File updated successfully on retry.");
-                        return; // Success!
-                    } catch (retryError: any) {
-                        console.error("Save failed even after token refresh.", retryError);
-                        // If retry fails, it's a more serious problem. Throw a permanent error.
-                        throw new PermanentAuthError("Could not save to Google Drive after refreshing session. Your permissions might have changed.");
-                    }
-                } else {
-                    console.error("Token refresh failed. This is a permanent auth error.");
-                    throw new PermanentAuthError("Could not refresh your Google session. Please sign in again to continue saving.");
-                }
+            if (response.ok) {
+                console.log("File updated successfully using fetch.");
+                return; // Success
             }
-            
-            // Handle cases where the file might have been deleted on Drive.
-            if (error.status === 404) {
+    
+            const errorBody = await response.json().catch(() => ({}));
+    
+            if (response.status === 404) {
                  console.log("File not found on Drive. Creating a new one.");
                  await idbDel(DRIVE_FILE_ID_KEY);
                  driveFileIdRef.current = null;
@@ -198,10 +212,16 @@ export function useProjectStorage() {
                  return;
             }
     
-            // Re-throw other errors (like network errors) so the calling hook can handle retries.
+            if (response.status === 401 || response.status === 403) {
+                throw new PermanentAuthError(errorBody?.error?.message || "Google Drive authentication failed.");
+            }
+    
+            throw new Error(errorBody?.error?.message || `HTTP error! status: ${response.status}`);
+        } catch (error) {
+            console.error("Failed to update Drive file with fetch:", error);
             throw error;
         }
-    }, [createOnDrive, refreshTokenAndGetProfile]);
+    }, [getAccessToken, createOnDrive]);
 
     const loadFromDrive = React.useCallback(async (): Promise<{ name: string, data: ProjectData } | null> => {
         const storedFileId = await idbGet<string>(DRIVE_FILE_ID_KEY);

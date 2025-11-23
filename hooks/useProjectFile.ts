@@ -1,3 +1,4 @@
+
 import * as React from 'react';
 import { ProjectData, StorageStatus, Theme, StoryIdeaStatus, NovelSketch, UserProfile, SaveStatus, Language } from '../types';
 import { get, set, del } from 'idb-keyval';
@@ -189,73 +190,97 @@ export function useProject() {
   }, [status, storageMode, resetInactivityTimer]);
 
   const saveProject = React.useCallback(async () => {
-    if (isSavingRef.current || !isDirtyRef.current) {
+    // If a save cycle is already running, it will pick up the latest changes
+    // because of the while(isDirtyRef.current) loop.
+    if (isSavingRef.current) {
+        return;
+    }
+
+    // If nothing to save, ignore.
+    if (!isDirtyRef.current) {
         return;
     }
 
     isSavingRef.current = true;
-    isDirtyRef.current = false;
     setSaveStatus('saving');
 
-    const dataToSave = projectDataRef.current;
-    if (!dataToSave) {
-        console.error("Attempted to save but no project data was available.");
-        setSaveStatus('error');
-        isSavingRef.current = false;
-        isDirtyRef.current = true;
-        return;
-    }
-
-    const MAX_RETRIES = 3;
-    const INITIAL_DELAY_MS = 1500;
-
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-        try {
-            if (storageMode === 'drive') {
-                await storage.saveToDrive(dataToSave);
-            } else if (storageMode === 'local') {
-                await set(LOCAL_BACKUP_KEY, dataToSave);
-                await storage.saveToFileHandle(dataToSave);
+    try {
+        // Keep saving as long as there are dirty changes.
+        // This ensures that if the user types *during* a save, those changes
+        // get saved immediately after the current operation finishes.
+        while (isDirtyRef.current) {
+            const dataToSave = projectDataRef.current;
+            if (!dataToSave) {
+                 isDirtyRef.current = false;
+                 break;
             }
-            localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
-            isSavingRef.current = false;
+
+            // We mark as not dirty *before* the async operation.
+            // If user types during await, isDirtyRef becomes true again, causing another loop iteration.
+            isDirtyRef.current = false;
+
+            const MAX_RETRIES = 3;
+            const INITIAL_DELAY_MS = 1500;
+            let success = false;
+
+            for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+                try {
+                    if (storageMode === 'drive') {
+                        await storage.saveToDrive(dataToSave);
+                    } else if (storageMode === 'local') {
+                        await set(LOCAL_BACKUP_KEY, dataToSave);
+                        await storage.saveToFileHandle(dataToSave);
+                    }
+                    success = true;
+                    break;
+                } catch (error: any) {
+                    console.error(`Save attempt ${attempt}/${MAX_RETRIES} failed for storage mode '${storageMode}':`, error);
+
+                    if (error instanceof PermanentAuthError) {
+                        console.error("Permanent Authentication Error:", error.message, "Signing out.");
+                        await signOut({ flush: false });
+                        // We throw to exit the save loop immediately
+                        throw error; 
+                    }
+
+                    if (attempt === MAX_RETRIES) {
+                        throw error; // Throw to hit the outer catch block
+                    }
+
+                    const delay = INITIAL_DELAY_MS * Math.pow(2, attempt - 1);
+                    console.log(`Will retry in ${delay}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+            }
             
-            // If new changes have come in while the save was in progress,
-            // the state is already dirty. In this case, we should ensure the status
-            // is 'unsaved' and not flash a misleading 'saved' message which could
-            // trigger a re-render with stale data.
-            if (isDirtyRef.current) {
-                setSaveStatus('unsaved');
-            } else {
-                setSaveStatus('saved');
+            if (success) {
+                localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
             }
-            return;
-        } catch (error: any) {
-            console.error(`Save attempt ${attempt}/${MAX_RETRIES} failed for storage mode '${storageMode}':`, error);
-
-            if (error instanceof PermanentAuthError) {
-                setSaveStatus('error');
-                isDirtyRef.current = true;
-                isSavingRef.current = false;
-                // No alert needed. The user will be signed out and taken to the welcome screen.
-                // This prevents the UI from getting stuck on a blocking dialog.
-                console.error("Permanent Authentication Error:", error.message, "Signing out.");
-                await signOut({ flush: false });
-                return;
+        }
+        
+        // If we exit the loop normally, all data is saved.
+        setSaveStatus('saved');
+    } catch (error) {
+        console.error("Save failed after retries:", error);
+        setSaveStatus('error');
+        // Mark as dirty again so the user knows/we can retry
+        isDirtyRef.current = true;
+    } finally {
+        // Always release the lock
+        isSavingRef.current = false;
+        
+        // If we are still dirty (e.g. after an error, or a race condition at the very end), 
+        // schedule another check.
+        if (isDirtyRef.current) {
+            if (saveTimeoutRef.current) {
+                clearTimeout(saveTimeoutRef.current);
             }
-
-            if (attempt === MAX_RETRIES) {
-                setSaveStatus('error');
-                isDirtyRef.current = true;
-                isSavingRef.current = false;
-                return;
-            }
-
-            const delay = INITIAL_DELAY_MS * Math.pow(2, attempt - 1);
-            console.log(`Will retry in ${delay}ms...`);
-            await new Promise(resolve => setTimeout(resolve, delay));
+            saveTimeoutRef.current = window.setTimeout(() => {
+                saveProjectRef.current?.();
+            }, 2000); // Retry slightly slower if there was an issue
         }
     }
+
   }, [storage, storageMode, signOut]);
 
   // Keep the ref updated with the latest version of the save function

@@ -1,3 +1,4 @@
+
 import * as React from 'react';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { StoryIdea, StoryIdeaStatus } from '../types';
@@ -7,7 +8,7 @@ import { CloseIcon, BoldIcon, ItalicIcon, ListBulletIcon, OrderedListIcon, Block
 interface ToolbarButtonProps {
   onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
   isActive: boolean;
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }
 
 // FIX: Moved ToolbarButton outside of the StoryIdeaEditorModal component.
