@@ -109,7 +109,6 @@ export function useProject() {
   const storage = useProjectStorage();
   const saveProjectRef = React.useRef<() => Promise<void>>(async () => {});
   const saveTimeoutRef = React.useRef<number | null>(null);
-  const inactivityTimerRef = React.useRef<number | null>(null);
   const localStorageBackupTimeoutRef = React.useRef<number | null>(null);
   
   const resetState = React.useCallback(() => {
@@ -136,11 +135,6 @@ export function useProject() {
     const signOut = React.useCallback(async (options?: { flush?: boolean }) => {
         const shouldFlush = options?.flush ?? true;
         
-        // Clear the inactivity timer immediately to prevent it from re-firing during the sign-out process.
-        if (inactivityTimerRef.current) {
-            clearTimeout(inactivityTimerRef.current);
-        }
-        
         setStatus('loading');
         if (shouldFlush) {
             try {
@@ -159,35 +153,6 @@ export function useProject() {
         resetState();
         setStatus('welcome');
     }, [flushChanges, storage, resetState]);
-
-  const resetInactivityTimer = React.useCallback(() => {
-    if (inactivityTimerRef.current) {
-        clearTimeout(inactivityTimerRef.current);
-    }
-    inactivityTimerRef.current = window.setTimeout(async () => {
-        // No alert needed. Just sign the user out smoothly.
-        // Their work will be saved, and they will be at the welcome screen when they return.
-        await signOut({ flush: true });
-    }, 15 * 60 * 1000); // 15 minutes
-  }, [signOut]);
-
-  React.useEffect(() => {
-    // This effect sets up the inactivity timer only for Google Drive sessions.
-    if (status === 'ready' && storageMode === 'drive') {
-        const events: (keyof WindowEventMap)[] = ['mousemove', 'keydown', 'mousedown', 'touchstart'];
-        
-        resetInactivityTimer();
-
-        events.forEach(event => window.addEventListener(event, resetInactivityTimer));
-
-        return () => {
-            if (inactivityTimerRef.current) {
-                clearTimeout(inactivityTimerRef.current);
-            }
-            events.forEach(event => window.removeEventListener(event, resetInactivityTimer));
-        };
-    }
-  }, [status, storageMode, resetInactivityTimer]);
 
   const saveProject = React.useCallback(async () => {
     // If a save cycle is already running, it will pick up the latest changes
@@ -222,6 +187,7 @@ export function useProject() {
             const MAX_RETRIES = 3;
             const INITIAL_DELAY_MS = 1500;
             let success = false;
+            let lastError: any = null;
 
             for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
                 try {
@@ -230,31 +196,37 @@ export function useProject() {
                     } else if (storageMode === 'local') {
                         await set(LOCAL_BACKUP_KEY, dataToSave);
                         await storage.saveToFileHandle(dataToSave);
+                    } else {
+                        // CRITICAL FIX: If storageMode is lost or null, fail explicitly.
+                        // Do not simulate success.
+                        throw new Error("Storage mode not initialized or lost.");
                     }
                     success = true;
                     break;
                 } catch (error: any) {
+                    lastError = error;
                     console.error(`Save attempt ${attempt}/${MAX_RETRIES} failed for storage mode '${storageMode}':`, error);
 
                     if (error instanceof PermanentAuthError) {
                         console.error("Permanent Authentication Error:", error.message, "Signing out.");
                         await signOut({ flush: false });
-                        // We throw to exit the save loop immediately
                         throw error; 
                     }
 
-                    if (attempt === MAX_RETRIES) {
-                        throw error; // Throw to hit the outer catch block
+                    if (attempt < MAX_RETRIES) {
+                        const delay = INITIAL_DELAY_MS * Math.pow(2, attempt - 1);
+                        console.log(`Will retry in ${delay}ms...`);
+                        await new Promise(resolve => setTimeout(resolve, delay));
                     }
-
-                    const delay = INITIAL_DELAY_MS * Math.pow(2, attempt - 1);
-                    console.log(`Will retry in ${delay}ms...`);
-                    await new Promise(resolve => setTimeout(resolve, delay));
                 }
             }
             
             if (success) {
                 localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
+            } else {
+                // If we exhausted retries, we MUST throw so the outer catch block
+                // sets the status to 'error' and marks isDirty back to true.
+                throw lastError || new Error("Unknown save error");
             }
         }
         
@@ -324,7 +296,7 @@ export function useProject() {
         }
         saveTimeoutRef.current = window.setTimeout(() => {
             saveProjectRef.current?.();
-        }, 1000); // 1-second delay after the last change.
+        }, 500); // 0.5-second delay for faster saving response.
         
         return newData;
     });

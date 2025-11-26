@@ -1,3 +1,4 @@
+
 export const translations = {
   en: {
     // General
@@ -146,6 +147,11 @@ export const translations = {
     // Export Modal
     exportNovelTitle: 'Export Novel',
     exportNovelMessage: (title: string) => `Choose a format to download "${title}" as a single file.`,
+    exportScope: 'Export Scope',
+    fullNovel: 'Full Novel',
+    chapterRange: 'Chapter Range',
+    fromChapter: 'From Chapter',
+    toChapter: 'To Chapter',
     exportHtmlTitle: 'HTML Document (.html)',
     exportHtmlDesc: 'Best for quality and stability. Preserves all formatting. Can be opened in any browser and printed to a high-quality PDF.',
     exportTxtTitle: 'Plain Text (.txt)',
@@ -322,6 +328,11 @@ export const translations = {
     // Export Modal
     exportNovelTitle: 'Xuất tiểu thuyết',
     exportNovelMessage: (title: string) => `Chọn định dạng để tải xuống "${title}" dưới dạng một tệp duy nhất.`,
+    exportScope: 'Phạm vi xuất',
+    fullNovel: 'Toàn bộ tiểu thuyết',
+    chapterRange: 'Phạm vi chương',
+    fromChapter: 'Từ chương',
+    toChapter: 'Đến chương',
     exportHtmlTitle: 'Tài liệu HTML (.html)',
     exportHtmlDesc: 'Tốt nhất cho chất lượng và sự ổn định. Giữ lại tất cả định dạng. Có thể mở trong bất kỳ trình duyệt nào và in ra PDF chất lượng cao.',
     exportTxtTitle: 'Văn bản thuần túy (.txt)',
@@ -498,6 +509,11 @@ export const translations = {
     // Export Modal
     exportNovelTitle: 'Vie romaani',
     exportNovelMessage: (title: string) => `Valitse muoto ladataksesi "${title}" yhtenä tiedostona.`,
+    exportScope: 'Viennin laajuus',
+    fullNovel: 'Koko romaani',
+    chapterRange: 'Lukualue',
+    fromChapter: 'Luvusta',
+    toChapter: 'Lukuun',
     exportHtmlTitle: 'HTML-dokumentti (.html)',
     exportHtmlDesc: 'Paras laadun ja vakauden kannalta. Säilyttää kaiken muotoilun. Voidaan avata missä tahansa selaimessa ja tulostaa korkealaatuiseksi PDF:ksi.',
     exportTxtTitle: 'Pelkkä teksti (.txt)',
