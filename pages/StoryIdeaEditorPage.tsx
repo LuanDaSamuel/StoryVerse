@@ -1,11 +1,15 @@
+
+
 import * as React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
-import { BackIcon, ChevronLeftIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, TrashIcon, H1Icon, H2Icon, H3Icon, SearchIcon, LoadingIcon, CheckIcon, ExclamationTriangleIcon, CloseIcon } from '../components/Icons';
-import { enhanceHtml, enhancePlainText, SKETCH_TAG_OPTIONS } from '../constants';
+import { BackIcon, ChevronLeftIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, TrashIcon, H1Icon, H2Icon, H3Icon, SearchIcon, LoadingIcon, CheckIcon, ExclamationTriangleIcon, CloseIcon, ChevronDownIcon, TextIcon, ChevronRightIcon } from '../components/Icons';
+import { enhanceHtml, enhancePlainText, SKETCH_TAG_OPTIONS, THEME_CONFIG } from '../constants';
 import { StoryIdea, StoryIdeaStatus } from '../types';
 import ConfirmModal from '../components/ConfirmModal';
 import { useTranslations } from '../hooks/useTranslations';
+
+// --- Reusable Components (Matching ChapterEditorPage) ---
 
 const SaveStatusIndicator = () => {
     const { theme, saveStatus } = React.useContext(ProjectContext);
@@ -20,6 +24,38 @@ const SaveStatusIndicator = () => {
     }
 };
 
+interface ToolbarDropdownProps {
+    label: string;
+    value: string;
+    onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+    children?: React.ReactNode;
+}
+
+const ToolbarDropdown = ({ label, value, onChange, children }: ToolbarDropdownProps) => {
+    return (
+        <div>
+            <label className="block text-xs font-semibold mb-1 text-white/70">{label}</label>
+            <div className="relative">
+                <select
+                    value={value}
+                    onChange={onChange}
+                    className="w-full appearance-none px-3 py-2 text-sm rounded-md bg-white/10 text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-white/50"
+                >
+                    {children}
+                </select>
+                <ChevronDownIcon className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-white/70" />
+            </div>
+        </div>
+    );
+};
+
+const fontOptions = [
+    { name: 'Times New Roman', value: '"Times New Roman", Times, serif' },
+    { name: 'Arial', value: 'Arial, sans-serif' },
+    { name: 'Georgia', value: 'Georgia, serif' },
+    { name: 'Verdana', value: 'Verdana, sans-serif' },
+];
+
 const FindReplaceModal = ({ isOpen, onClose, editorRef }: { isOpen: boolean, onClose: () => void, editorRef: React.RefObject<HTMLDivElement> }) => {
     const { themeClasses } = React.useContext(ProjectContext);
     const [findText, setFindText] = React.useState('');
@@ -32,7 +68,8 @@ const FindReplaceModal = ({ isOpen, onClose, editorRef }: { isOpen: boolean, onC
 
     const clearHighlights = React.useCallback(() => {
         if (!editorRef.current) return;
-        editorRef.current.querySelectorAll('.search-highlight, .current-match').forEach(node => {
+        const highlights = Array.from(editorRef.current.querySelectorAll('.search-highlight, .current-match') as NodeListOf<HTMLElement>);
+        highlights.forEach(node => {
             const parent = node.parentNode;
             if (parent) {
                 while (node.firstChild) parent.insertBefore(node.firstChild, node);
@@ -173,29 +210,43 @@ const FindReplaceModal = ({ isOpen, onClose, editorRef }: { isOpen: boolean, onC
     );
 };
 
+// --- Main Page Component ---
 const StoryIdeaEditorPage = () => {
     const { ideaId } = useParams<{ ideaId: string }>();
     const navigate = useNavigate();
-    const { projectData, setProjectData, themeClasses } = React.useContext(ProjectContext);
+    const { projectData, setProjectData, themeClasses, theme } = React.useContext(ProjectContext);
     const t = useTranslations();
     
     const editorRef = React.useRef<HTMLDivElement>(null);
     const editorContentRef = React.useRef<string>("");
+    const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+    const toolbarRef = React.useRef<HTMLDivElement>(null);
 
     const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = React.useState(false);
     const [isFindReplaceOpen, setIsFindReplaceOpen] = React.useState(false);
-    const [activeFormats, setActiveFormats] = React.useState({ isBold: false, isItalic: false, isUL: false, isOL: false, currentBlock: 'p' });
+    const [isFormatPanelOpen, setIsFormatPanelOpen] = React.useState(false);
 
-    const { idea, ideaIndex } = React.useMemo(() => {
-        if (!projectData?.storyIdeas || !ideaId) return { idea: null, ideaIndex: -1 };
+    const [activeFormats, setActiveFormats] = React.useState({ isBold: false, isItalic: false, isUL: false, isOL: false });
+    const [currentFormat, setCurrentFormat] = React.useState({
+        paragraphStyle: 'p',
+        font: fontOptions[0].value,
+        size: '18px',
+        paragraphSpacing: '1em',
+        lineHeight: '1.6',
+        textIndent: '2em',
+    });
+
+    const { idea, ideaIndex, folders } = React.useMemo(() => {
+        if (!projectData?.storyIdeas || !ideaId) return { idea: null, ideaIndex: -1, folders: [] };
         
         const index = projectData.storyIdeas.findIndex(i => i.id === ideaId);
-        if (index === -1) return { idea: null, ideaIndex: -1 };
+        if (index === -1) return { idea: null, ideaIndex: -1, folders: [] };
 
         return {
             idea: projectData.storyIdeas[index],
             ideaIndex: index,
+            folders: projectData.ideaFolders || []
         };
     }, [projectData, ideaId]);
 
@@ -227,17 +278,407 @@ const StoryIdeaEditorPage = () => {
         });
     }, [ideaIndex, setProjectData]);
 
+    const cleanupEditor = React.useCallback(() => {
+        if (!editorRef.current) return;
+        const editor = editorRef.current;
+    
+        // 1. Remove empty inline elements.
+        for (let i = 0; i < 3; i++) {
+            let changed = false;
+            editor.querySelectorAll('span, strong, em, i, b').forEach(el => {
+                if (!el.hasChildNodes() || el.textContent === '\u200B') {
+                    el.remove();
+                    changed = true;
+                }
+            });
+            if (!changed) break;
+        }
+    
+        // 2. Merge adjacent sibling elements.
+        const mergeAdjacentSiblings = (parent: HTMLElement) => {
+            let child = parent.firstChild;
+            while (child) {
+                const next = child.nextSibling;
+                if (next && child.nodeType === Node.ELEMENT_NODE && next.nodeType === Node.ELEMENT_NODE) {
+                    const el1 = child as HTMLElement;
+                    const el2 = next as HTMLElement;
+    
+                    const areMergable = 
+                        el1.tagName === el2.tagName &&
+                        el1.className === el2.className &&
+                        el1.style.cssText === el2.style.cssText;
+    
+                    if (areMergable) {
+                        while (el2.firstChild) {
+                            el1.appendChild(el2.firstChild);
+                        }
+                        parent.removeChild(el2);
+                        continue;
+                    }
+                }
+                child = next;
+            }
+        };
+    
+        editor.querySelectorAll('p, h1, h2, h3, blockquote, li, div').forEach(block => {
+            mergeAdjacentSiblings(block as HTMLElement);
+        });
+    
+        editor.normalize();
+    }, []);
+
+    const updateActiveFormats = React.useCallback(() => {
+        setActiveFormats({
+            isBold: document.queryCommandState('bold'),
+            isItalic: document.queryCommandState('italic'),
+            isUL: document.queryCommandState('insertUnorderedList'),
+            isOL: document.queryCommandState('insertOrderedList'),
+        });
+    }, []);
+
+    const updateCurrentFormat = React.useCallback(() => {
+        if (!editorRef.current) return;
+        const selection = window.getSelection();
+        if (!selection?.rangeCount || !editorRef.current.contains(selection.anchorNode)) {
+            return;
+        }
+
+        let element = selection.anchorNode;
+        if (element.nodeType === 3) {
+            element = element.parentNode!;
+        }
+
+        if (!(element instanceof HTMLElement)) return;
+
+        let detectedParagraphStyle = 'p';
+        let detectedParagraphSpacing = '1em';
+        let detectedLineHeight = '1.6';
+        let detectedTextIndent = '2em';
+        
+        let blockElement: HTMLElement | null = element;
+        while (blockElement && blockElement !== editorRef.current) {
+            const tagName = blockElement.tagName.toLowerCase();
+            if (['p', 'h1', 'h2', 'h3', 'blockquote'].includes(tagName)) {
+                detectedParagraphStyle = tagName;
+                const styles = window.getComputedStyle(blockElement);
+
+                if (styles.marginBottom) {
+                    const mbPx = parseFloat(styles.marginBottom);
+                    const fontPx = parseFloat(styles.fontSize);
+                    if (fontPx > 0) {
+                        const mbEm = mbPx / fontPx;
+                        if (mbEm < 0.75) detectedParagraphSpacing = '0.5em';
+                        else if (mbEm < 1.25) detectedParagraphSpacing = '1em';
+                        else if (mbEm < 1.75) detectedParagraphSpacing = '1.5em';
+                        else detectedParagraphSpacing = '2em';
+                    }
+                }
+                
+                if (styles.lineHeight) {
+                    const lh = styles.lineHeight;
+                    if (lh === 'normal') detectedLineHeight = '1.6';
+                    else if (!isNaN(parseFloat(lh)) && styles.fontSize) {
+                         const ratio = parseFloat(lh) / parseFloat(styles.fontSize);
+                         if (Math.abs(ratio - 1.0) < 0.1) detectedLineHeight = '1.0';
+                         else if (Math.abs(ratio - 1.15) < 0.1) detectedLineHeight = '1.15';
+                         else if (Math.abs(ratio - 1.5) < 0.1) detectedLineHeight = '1.5';
+                         else if (Math.abs(ratio - 2.0) < 0.1) detectedLineHeight = '2.0';
+                    }
+                }
+                
+                if (styles.textIndent) {
+                     const indent = parseFloat(styles.textIndent);
+                     if (indent < 1) detectedTextIndent = '0px';
+                     else detectedTextIndent = '2em';
+                }
+                break;
+            }
+            blockElement = blockElement.parentElement;
+        }
+
+        const inlineStyles = window.getComputedStyle(element);
+        const detectedSize = inlineStyles.fontSize;
+        
+        const family = inlineStyles.fontFamily;
+        const matchedFont = fontOptions.find(f => family.includes(f.name))?.value || fontOptions[0].value;
+
+        setCurrentFormat({
+            paragraphStyle: detectedParagraphStyle,
+            font: matchedFont,
+            size: detectedSize,
+            paragraphSpacing: detectedParagraphSpacing,
+            lineHeight: detectedLineHeight,
+            textIndent: detectedTextIndent,
+        });
+    }, []);
+
+    const handleSelectionChange = React.useCallback(() => {
+        updateActiveFormats();
+        updateCurrentFormat();
+    }, [updateActiveFormats, updateCurrentFormat]);
+
+    const applyAndSaveFormat = React.useCallback((formatAction: () => void) => {
+        if (!editorRef.current) return;
+        formatAction();
+        cleanupEditor();
+        const event = new Event('input', { bubbles: true, cancelable: true });
+        editorRef.current.dispatchEvent(event);
+        editorRef.current.focus();
+        handleSelectionChange();
+    }, [handleSelectionChange, cleanupEditor]);
+
+    const applyCommand = (command: string, value?: string) => {
+        applyAndSaveFormat(() => document.execCommand(command, false, value));
+    };
+    
+    const applyParagraphStyle = (style: string) => {
+        applyAndSaveFormat(() => document.execCommand('formatBlock', false, style));
+    };
+    
+    const applyFont = (fontValue: string) => {
+        const fontName = fontOptions.find(f => f.value === fontValue)?.name || 'serif';
+        applyAndSaveFormat(() => document.execCommand('fontName', false, fontName));
+    };
+
+    const applyColor = (color: string) => {
+        applyAndSaveFormat(() => document.execCommand('foreColor', false, color));
+    };
+
+    const applyFontSize = (size: string) => {
+        applyAndSaveFormat(() => {
+            if (!editorRef.current) return;
+            editorRef.current.focus();
+            const selection = window.getSelection();
+            if (!selection?.rangeCount) return;
+
+            if (selection.isCollapsed) {
+                const range = selection.getRangeAt(0);
+                const span = document.createElement('span');
+                span.style.fontSize = size;
+                span.textContent = '\u200B';
+                range.insertNode(span);
+                range.selectNodeContents(span);
+                range.collapse(false);
+                selection.removeAllRanges();
+                selection.addRange(range);
+                return;
+            }
+
+            const DUMMY_COLOR_RGB = 'rgb(1, 2, 3)';
+            document.execCommand('styleWithCSS', false, 'true');
+            document.execCommand('hiliteColor', false, DUMMY_COLOR_RGB);
+
+            const tempSpans = Array.from(editorRef.current.querySelectorAll(`span[style*="background-color: ${DUMMY_COLOR_RGB}"]`) as NodeListOf<HTMLElement>);
+            
+            const parentsToClean = new Set<Node>();
+
+            tempSpans.forEach(span => {
+                if (span.parentElement) parentsToClean.add(span.parentElement);
+                span.style.backgroundColor = '';
+                span.style.fontSize = size;
+                if (!span.getAttribute('style')?.trim()) {
+                    const parent = span.parentNode;
+                    if (parent) {
+                        while (span.firstChild) parent.insertBefore(span.firstChild, span);
+                        parent.removeChild(span);
+                    }
+                }
+            });
+
+            parentsToClean.forEach(parent => {
+                let child = parent.firstChild;
+                while (child) {
+                    const next = child.nextSibling;
+                    if (next && child instanceof HTMLSpanElement && next instanceof HTMLSpanElement && child.style.cssText === next.style.cssText) {
+                        while (next.firstChild) child.appendChild(next.firstChild);
+                        parent.removeChild(next);
+                    } else {
+                        child = next;
+                    }
+                }
+                parent.normalize();
+            });
+        });
+    };
+    
+    const applyParagraphSpacing = (spacing: string) => {
+        applyAndSaveFormat(() => {
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0) return;
+            let node = selection.getRangeAt(0).startContainer;
+            if (node.nodeType === 3) node = node.parentNode!;
+            while(node && node !== editorRef.current) {
+                if(node instanceof HTMLElement && ['P', 'H1', 'H2', 'DIV', 'BLOCKQUOTE'].includes(node.tagName)) {
+                    node.style.marginBottom = spacing;
+                    return;
+                }
+                node = node.parentNode!;
+            }
+        });
+    };
+    
+    const applyLineHeight = (height: string) => {
+        applyAndSaveFormat(() => {
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0) return;
+            let node = selection.getRangeAt(0).startContainer;
+            if (node.nodeType === 3) node = node.parentNode!;
+            while(node && node !== editorRef.current) {
+                if(node instanceof HTMLElement && ['P', 'H1', 'H2', 'DIV', 'BLOCKQUOTE'].includes(node.tagName)) {
+                    node.style.lineHeight = height;
+                    return;
+                }
+                node = node.parentNode!;
+            }
+        });
+    };
+
+    const applyTextIndent = (indent: string) => {
+        applyAndSaveFormat(() => {
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0) return;
+            let node = selection.getRangeAt(0).startContainer;
+            if (node.nodeType === 3) node = node.parentNode!;
+            while(node && node !== editorRef.current) {
+                if(node instanceof HTMLElement && ['P', 'H1', 'H2', 'DIV', 'BLOCKQUOTE'].includes(node.tagName)) {
+                    node.style.textIndent = indent;
+                    return;
+                }
+                node = node.parentNode!;
+            }
+        });
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+        const selection = window.getSelection();
+        if (!selection || !selection.rangeCount) return;
+
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            document.execCommand('insertText', false, '    ');
+            return;
+        }
+
+        if (e.key === '"' || e.key === "'") {
+            e.preventDefault();
+            const range = selection.getRangeAt(0);
+            const openQuote = e.key === '"' ? '“' : '‘';
+            const closeQuote = e.key === '"' ? '”' : '’';
+
+            if (!range.collapsed) {
+                const selectedContent = range.extractContents();
+                const fragment = document.createDocumentFragment();
+                fragment.appendChild(document.createTextNode(openQuote));
+                fragment.appendChild(selectedContent);
+                fragment.appendChild(document.createTextNode(closeQuote));
+                range.insertNode(fragment);
+                range.collapse(false);
+                selection.removeAllRanges();
+                selection.addRange(range);
+            } else {
+                const { startContainer, startOffset } = range;
+                if (!editorRef.current) return;
+
+                // 1. Determine if the cursor is at the beginning of a block-level element.
+                let isAtStartOfBlock = false;
+                let node: Node | null = startContainer;
+                // Find the nearest ancestor element that is a direct child of the editor. This is our block.
+                while (node && node.parentNode !== editorRef.current) {
+                    node = node.parentNode;
+                }
+                
+                // If we are at the very start of the editor, consider it the start of a block.
+                if (editorRef.current.contains(startContainer) && startContainer === editorRef.current && startOffset === 0) {
+                     isAtStartOfBlock = true;
+                } else if (node && node.nodeType === Node.ELEMENT_NODE) {
+                    const rangeToCheck = document.createRange();
+                    rangeToCheck.selectNodeContents(node);
+                    rangeToCheck.setEnd(startContainer, startOffset);
+                    // If the text content from the start of the block to the cursor is empty, it's the start.
+                    if (rangeToCheck.toString().trim() === '') {
+                        isAtStartOfBlock = true;
+                    }
+                }
+
+                // Get text before the cursor for context.
+                const precedingRange = document.createRange();
+                precedingRange.setStart(editorRef.current, 0);
+                precedingRange.setEnd(startContainer, startOffset);
+                const textBeforeCursor = precedingRange.toString();
+                const lastChar = textBeforeCursor.slice(-1);
+
+                if (isAtStartOfBlock) {
+                    // Always use an opening quote at the start of a block.
+                    document.execCommand('insertText', false, e.key === '"' ? '“' : '‘');
+                } else if (e.key === "'") {
+                    // Heuristic for apostrophe vs. single quote.
+                    if (/\w/.test(lastChar)) {
+                        document.execCommand('insertText', false, '’'); // Apostrophe
+                    } else {
+                        // Balance single quotes.
+                        const openSingleCount = (textBeforeCursor.match(/‘/g) || []).length;
+                        const closeSingleCount = (textBeforeCursor.match(/’/g) || []).length;
+                        document.execCommand('insertText', false, openSingleCount > closeSingleCount ? '’' : '‘');
+                    }
+                } else { // e.key === '"'
+                    // Balance double quotes.
+                    const openDoubleCount = (textBeforeCursor.match(/“/g) || []).length;
+                    const closeDoubleCount = (textBeforeCursor.match(/”/g) || []).length;
+                    document.execCommand('insertText', false, openDoubleCount > closeDoubleCount ? '”' : '“');
+                }
+            }
+            editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+            return;
+        }
+        
+        if (e.key === 'Enter') {
+            setTimeout(() => {
+                // Scroll into view logic same as chapter editor
+                 if (!editorRef.current) return;
+                 const newSelection = window.getSelection();
+                 if(!newSelection?.rangeCount) return;
+
+                 let element = newSelection.getRangeAt(0).startContainer;
+                 if (element.nodeType === Node.TEXT_NODE) element = element.parentElement!;
+                 if (!(element instanceof HTMLElement)) return;
+
+                 const toolbarEl = toolbarRef.current;
+                 const scrollContainerEl = scrollContainerRef.current;
+                 if (!toolbarEl || !scrollContainerEl) return;
+                 
+                 const elementRect = element.getBoundingClientRect();
+                 const toolbarRect = toolbarEl.getBoundingClientRect();
+                 const buffer = 20; 
+
+                 if (elementRect.bottom > toolbarRect.top - buffer) {
+                     const scrollAmount = elementRect.bottom - (toolbarRect.top - buffer);
+                     scrollContainerEl.scrollBy({ top: scrollAmount, behavior: 'smooth' });
+                 }
+                 
+                 // Apply existing block styles to new block
+                 let currentBlock = newSelection.getRangeAt(0).startContainer;
+                 while (currentBlock && currentBlock.parentNode !== editorRef.current) {
+                    currentBlock = currentBlock.parentNode;
+                 }
+                 if (currentBlock instanceof HTMLElement) {
+                    const previousBlock = currentBlock.previousElementSibling;
+                    if (previousBlock instanceof HTMLElement) {
+                         const prevStyles = window.getComputedStyle(previousBlock);
+                         currentBlock.style.marginBottom = prevStyles.marginBottom;
+                         currentBlock.style.lineHeight = prevStyles.lineHeight;
+                         currentBlock.style.textIndent = prevStyles.textIndent;
+                    }
+                 }
+                 
+                 cleanupEditor();
+            }, 0);
+        }
+    };
+
     const handleEditorInput = (e: React.FormEvent<HTMLDivElement>) => {
         const newHTML = e.currentTarget.innerHTML;
         editorContentRef.current = newHTML;
         updateStoryIdea({ synopsis: newHTML });
-    };
-    
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-        if (e.key === 'Tab') {
-            e.preventDefault();
-            document.execCommand('insertText', false, '    ');
-        }
     };
 
     const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
@@ -251,70 +692,54 @@ const StoryIdeaEditorPage = () => {
             .join('');
 
         document.execCommand('insertHTML', false, htmlToInsert);
+        cleanupEditor();
     };
 
+    // --- Effects ---
     React.useEffect(() => {
-        if (editorRef.current && idea && idea.synopsis !== editorContentRef.current) {
+        if (editorRef.current && idea) {
             const initialContent = idea.synopsis || '<p><br></p>';
-            editorRef.current.innerHTML = enhanceHtml(initialContent);
-            editorContentRef.current = initialContent;
-        }
-    }, [idea]);
-    
-    const updateActiveFormats = React.useCallback(() => {
-        const selection = window.getSelection();
-        if (!selection?.rangeCount) return;
-        let element = selection.anchorNode;
-        if (element?.nodeType === 3) element = element.parentNode;
-        let blockType = 'p';
-        let parent = element as HTMLElement | null;
-        while(parent && parent !== editorRef.current) {
-            const tag = parent.tagName.toLowerCase();
-            if(['h1','h2','h3','blockquote'].includes(tag)) {
-                blockType = tag;
-                break;
+            // Only update if significantly different to avoid cursor jumps
+            if (editorRef.current.innerHTML !== enhanceHtml(initialContent)) {
+                 editorRef.current.innerHTML = enhanceHtml(initialContent);
+                 editorContentRef.current = initialContent;
             }
-            parent = parent.parentElement;
         }
-        setActiveFormats({
-            isBold: document.queryCommandState('bold'),
-            isItalic: document.queryCommandState('italic'),
-            isUL: document.queryCommandState('insertUnorderedList'),
-            isOL: document.queryCommandState('insertOrderedList'),
-            currentBlock: blockType,
-        });
-    }, []);
+    }, [idea?.id]); // Re-run when idea ID changes (loading new idea)
 
     React.useEffect(() => {
         const editorEl = editorRef.current;
-        document.addEventListener('selectionchange', updateActiveFormats);
-        editorEl?.addEventListener('keyup', updateActiveFormats);
-        editorEl?.addEventListener('mouseup', updateActiveFormats);
-        editorEl?.addEventListener('focus', updateActiveFormats);
-        return () => {
-            document.removeEventListener('selectionchange', updateActiveFormats);
-            editorEl?.removeEventListener('keyup', updateActiveFormats);
-            editorEl?.removeEventListener('mouseup', updateActiveFormats);
-            editorEl?.removeEventListener('focus', updateActiveFormats);
+        document.addEventListener('selectionchange', handleSelectionChange);
+        if (editorEl) {
+            editorEl.addEventListener('keyup', handleSelectionChange);
+            editorEl.addEventListener('mouseup', handleSelectionChange);
+            editorEl.addEventListener('focus', handleSelectionChange);
+        }
+        window.addEventListener('resize', handleSelectionChange);
+        
+        const handleClickOutside = (event: MouseEvent) => {
+            if (toolbarRef.current && !toolbarRef.current.contains(event.target as Node)) {
+                setIsFormatPanelOpen(false);
+            }
         };
-    }, [updateActiveFormats]);
 
-    const applyCommand = (e: React.MouseEvent<HTMLButtonElement>, command: string, value?: string) => {
-        e.preventDefault();
-        document.execCommand(command, false, value);
-        editorRef.current?.focus();
-        updateActiveFormats();
-    };
+        if (isFormatPanelOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
 
-    const applyBlockFormat = (e: React.MouseEvent<HTMLButtonElement>, format: string) => {
-        e.preventDefault();
-        const currentBlock = activeFormats.currentBlock;
-        const formatToApply = currentBlock === format ? 'p' : format;
-        document.execCommand('formatBlock', false, formatToApply);
-        editorRef.current?.focus();
-        updateActiveFormats();
-    };
-    
+        return () => {
+            document.removeEventListener('selectionchange', handleSelectionChange);
+            if(editorEl) {
+                editorEl.removeEventListener('keyup', handleSelectionChange);
+                editorEl.removeEventListener('mouseup', handleSelectionChange);
+                editorEl.removeEventListener('focus', handleSelectionChange);
+            }
+            window.removeEventListener('resize', handleSelectionChange);
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [handleSelectionChange, isFormatPanelOpen]);
+
+
     const handleTagClick = (tag: string) => {
         if (!idea) return;
         const currentTags = idea.tags || [];
@@ -334,6 +759,28 @@ const StoryIdeaEditorPage = () => {
         navigate('/demos');
     };
 
+    const editorStyle = React.useMemo(() => {
+        const baseFontSize = projectData?.settings?.baseFontSize || 18;
+        const style: React.CSSProperties = {
+            fontSize: `${baseFontSize}px`
+        };
+
+        if (theme === 'book') {
+            const colorClass = THEME_CONFIG.book.text;
+            const colorValue = colorClass.match(/\[(.*?)\]/)?.[1] || '#F5EADD';
+            style.color = colorValue;
+        }
+        return style;
+    }, [theme, projectData?.settings?.baseFontSize]);
+    
+    const colorPalette = React.useMemo(() => {
+        if (theme === 'book') {
+            const textColor = THEME_CONFIG.book.text.match(/\[(.*?)\]/)?.[1] || '#F5EADD';
+            return [textColor, '#3B82F6', '#FBBF24', '#22C55E', '#EC4899'];
+        }
+        return ['#3B2F27', '#3B82F6', '#FBBF24', '#22C55E', '#EC4899'];
+    }, [theme]);
+
     if (!idea) {
         return (
             <div className={`flex h-screen items-center justify-center ${themeClasses.bg}`}>
@@ -346,23 +793,65 @@ const StoryIdeaEditorPage = () => {
     return (
         <>
             <div className={`flex h-screen font-serif ${themeClasses.bg} ${themeClasses.text}`}>
-                {isSidebarOpen && <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-black/50 z-30" />}
-                <div className="flex-1 overflow-y-auto relative">
-                    <div className={`sticky top-0 z-10 px-8 md:px-16 lg:px-24 pt-6 pb-4 ${themeClasses.bg} bg-opacity-80 backdrop-blur-sm border-b ${themeClasses.border} flex justify-between items-center`}>
-                        <button onClick={() => navigate('/demos')} className={`flex items-center space-x-2 ${themeClasses.text} opacity-70 hover:opacity-100`}><BackIcon className="w-5 h-5" /><span className="font-sans">Return to Idea Box</span></button>
+                {/* Backdrop for sidebar */}
+                {isSidebarOpen && (
+                    <div
+                        onClick={() => setIsSidebarOpen(false)}
+                        className="fixed inset-0 bg-black/50 z-30"
+                        aria-hidden="true"
+                    />
+                )}
+                
+                <div ref={scrollContainerRef} className="flex-1 overflow-y-auto relative">
+                     <div className={`sticky top-0 z-10 px-8 md:px-16 lg:px-24 pt-6 pb-4 ${themeClasses.bg} bg-opacity-80 backdrop-blur-sm border-b ${themeClasses.border} flex justify-between items-center`}>
+                        <button onClick={() => navigate('/demos')} className={`flex items-center space-x-2 ${themeClasses.text} opacity-70 hover:opacity-100`}>
+                            <BackIcon className="w-5 h-5" />
+                            <span className="font-sans">Return to Idea Box</span>
+                        </button>
                         <SaveStatusIndicator />
                     </div>
+                    
                     <div className="px-8 md:px-16 lg:px-24 pt-8 pb-48">
-                        <input type="text" value={idea.title} onChange={e => updateStoryIdea({ title: e.target.value })} onBlur={(e) => updateStoryIdea({ title: enhancePlainText(e.target.value) })} placeholder="Idea Title" className="text-4xl font-bold bg-transparent outline-none w-full mb-8" />
-                        <div ref={editorRef} contentEditable spellCheck={true} suppressContentEditableWarning onInput={handleEditorInput} onKeyDown={handleKeyDown} onPaste={handlePaste} className="w-full leading-relaxed outline-none story-content" style={{ fontSize: `${projectData?.settings?.baseFontSize || 18}px` }}/>
+                        <input
+                            type="text"
+                            value={idea.title}
+                            onChange={(e) => updateStoryIdea({ title: e.target.value })}
+                            onBlur={(e) => updateStoryIdea({ title: enhancePlainText(e.target.value) })}
+                            placeholder="Idea Title"
+                            className="text-4xl font-bold bg-transparent outline-none w-full mb-8"
+                        />
+                        <div
+                            ref={editorRef}
+                            contentEditable
+                            spellCheck={true}
+                            suppressContentEditableWarning
+                            onInput={handleEditorInput}
+                            onKeyDown={handleKeyDown}
+                            onPaste={handlePaste}
+                            onBlur={cleanupEditor}
+                            className="w-full leading-relaxed outline-none story-content"
+                            style={editorStyle}
+                        />
                     </div>
                 </div>
-                <div className={`fixed top-0 right-0 h-full z-40 transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+                
+                {/* Editor Tools Sidebar (Right) */}
+                <div
+                    className={`
+                        fixed top-0 right-0 h-full z-40 transition-transform duration-300 ease-in-out
+                        ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}
+                    `}
+                >
                     <div className={`w-80 h-full ${themeClasses.bgSecondary} ${themeClasses.accentText} text-sm font-sans border-l ${themeClasses.border} flex flex-col`}>
-                        <div className={`px-4 py-3 flex justify-between items-center border-b ${themeClasses.border}`}><span className="font-bold text-base">IDEA DETAILS</span><button onClick={() => setIsSidebarOpen(false)}><ChevronLeftIcon className="w-5 h-5"/></button></div>
-                        
-                        <div className="flex-1 p-4 space-y-6 overflow-y-auto">
-                           <div>
+                        <div className={`px-4 py-3 flex justify-between items-center border-b ${themeClasses.border}`}>
+                            <span className="font-bold text-base">IDEA DETAILS</span>
+                            <button onClick={() => setIsSidebarOpen(false)}>
+                                <ChevronRightIcon className="w-5 h-5"/>
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                            <div>
                                 <h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Status</h3>
                                 <div className={`flex rounded-md overflow-hidden border ${themeClasses.border}`}>
                                     {statusOptions.map(option => (
@@ -370,30 +859,117 @@ const StoryIdeaEditorPage = () => {
                                     ))}
                                 </div>
                            </div>
-                           <div><h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Tags</h3><div className="flex flex-wrap gap-1.5">{SKETCH_TAG_OPTIONS.map(t => <button key={t} onClick={() => handleTagClick(t)} className={`px-2 py-1 text-xs rounded-full font-semibold ${idea.tags.includes(t) ? `${themeClasses.accent} ${themeClasses.accentText}` : `${themeClasses.bgTertiary} hover:opacity-80`}`}>{t}</button>)}</div></div>
-                           <div><h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Actions</h3><button onClick={() => setIsDeleteConfirmOpen(true)} className="w-full flex items-center space-x-3 text-left px-4 py-3 rounded-lg font-semibold bg-red-700 text-red-100 hover:bg-red-800"><TrashIcon className="w-5 h-5"/><span>Delete Idea</span></button></div>
+                           
+                           {/* Folder Selection */}
+                           {folders.length > 0 && (
+                               <div>
+                                    <h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>{t.folder}</h3>
+                                    <select
+                                        value={idea.folderId || ''}
+                                        onChange={(e) => updateStoryIdea({ folderId: e.target.value || undefined })}
+                                        className={`w-full p-2 rounded-md ${themeClasses.input} border ${themeClasses.border}`}
+                                    >
+                                        <option value="">{t.noFolder}</option>
+                                        {folders.map(f => (
+                                            <option key={f.id} value={f.id}>{enhancePlainText(f.name)}</option>
+                                        ))}
+                                    </select>
+                               </div>
+                           )}
+
+                           <div>
+                                <h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Tags</h3>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {SKETCH_TAG_OPTIONS.map(t => (
+                                        <button 
+                                            key={t} 
+                                            onClick={() => handleTagClick(t)} 
+                                            className={`px-2 py-1 text-xs rounded-full font-semibold ${idea.tags.includes(t) ? `${themeClasses.accent} ${themeClasses.accentText}` : `${themeClasses.bgTertiary} hover:opacity-80`}`}
+                                        >
+                                            {t}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                           <div>
+                                <h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Actions</h3>
+                                <button onClick={() => setIsDeleteConfirmOpen(true)} className="w-full flex items-center space-x-3 text-left px-4 py-3 rounded-lg font-semibold bg-red-700 text-red-100 hover:bg-red-800">
+                                    <TrashIcon className="w-5 h-5"/>
+                                    <span>Delete Idea</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
+
+                {/* Pinned Toolbar */}
                 <div className="absolute bottom-0 left-0 w-full flex justify-center pb-4 z-20 pointer-events-none">
-                    <div className="relative pointer-events-auto">
-                        <div className="flex items-center space-x-1 p-1 rounded-full shadow-lg bg-stone-900/70 border border-white/10 backdrop-blur-sm" onMouseDown={e => e.preventDefault()}>
-                            <button onClick={(e) => applyCommand(e, 'bold')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors ${activeFormats.isBold ? 'text-white bg-white/10' : ''}`}><BoldIcon className="w-5 h-5"/></button>
-                            <button onClick={(e) => applyCommand(e, 'italic')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors ${activeFormats.isItalic ? 'text-white bg-white/10' : ''}`}><ItalicIcon className="w-5 h-5"/></button>
-                            <div className="w-px h-5 bg-white/20 mx-1" />
-                            <button onClick={(e) => applyBlockFormat(e, 'h1')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors ${activeFormats.currentBlock === 'h1' ? 'text-white bg-white/10' : ''}`}><H1Icon className="w-5 h-5"/></button>
-                            <button onClick={(e) => applyBlockFormat(e, 'h2')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors ${activeFormats.currentBlock === 'h2' ? 'text-white bg-white/10' : ''}`}><H2Icon className="w-5 h-5"/></button>
-                            <button onClick={(e) => applyBlockFormat(e, 'h3')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors ${activeFormats.currentBlock === 'h3' ? 'text-white bg-white/10' : ''}`}><H3Icon className="w-5 h-5"/></button>
-                            <div className="w-px h-5 bg-white/20 mx-1" />
-                            <button onClick={(e) => applyCommand(e, 'insertUnorderedList')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors ${activeFormats.isUL ? 'text-white bg-white/10' : ''}`}><ListBulletIcon className="w-5 h-5"/></button>
-                            <button onClick={(e) => applyCommand(e, 'insertOrderedList')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors ${activeFormats.isOL ? 'text-white bg-white/10' : ''}`}><OrderedListIcon className="w-5 h-5"/></button>
-                            <button onClick={(e) => applyBlockFormat(e, 'blockquote')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors ${activeFormats.currentBlock === 'blockquote' ? 'text-white bg-white/10' : ''}`}><BlockquoteIcon className="w-5 h-5"/></button>
-                            <div className="w-px h-5 bg-white/20 mx-1" />
+                    <div ref={toolbarRef} className="relative pointer-events-auto">
+                        {isFormatPanelOpen && (
+                            <div
+                                className="absolute bottom-full mb-2 p-4 rounded-lg shadow-lg bg-stone-900/80 border border-white/10 backdrop-blur-sm w-[320px]"
+                            >
+                                <div className="space-y-4">
+                                    <ToolbarDropdown label="Paragraph Style" value={currentFormat.paragraphStyle} onChange={(e) => applyParagraphStyle(e.target.value)}>
+                                        <option value="p">Paragraph</option>
+                                        <option value="blockquote">Blockquote</option>
+                                    </ToolbarDropdown>
+                                    <ToolbarDropdown label="Font" value={currentFormat.font} onChange={(e) => applyFont(e.target.value)}>
+                                        {fontOptions.map(font => <option key={font.name} value={font.value}>{font.name}</option>)}
+                                    </ToolbarDropdown>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <ToolbarDropdown label="Size" value={currentFormat.size} onChange={(e) => applyFontSize(e.target.value)}>
+                                            <option value="14px">14</option>
+                                            <option value="16px">16</option>
+                                            <option value="18px">18</option>
+                                            <option value="20px">20</option>
+                                            <option value="24px">24</option>
+                                        </ToolbarDropdown>
+                                        <ToolbarDropdown label="Paragraph Spacing" value={currentFormat.paragraphSpacing} onChange={(e) => applyParagraphSpacing(e.target.value)}>
+                                            <option value="0.5em">0.5</option>
+                                            <option value="1em">1.0</option>
+                                            <option value="1.5em">1.5</option>
+                                            <option value="2em">2.0</option>
+                                        </ToolbarDropdown>
+                                        <ToolbarDropdown label="Line Height" value={currentFormat.lineHeight} onChange={(e) => applyLineHeight(e.target.value)}>
+                                            <option value="1.0">1.0</option>
+                                            <option value="1.15">1.15</option>
+                                            <option value="1.5">1.5</option>
+                                            <option value="2.0">2.0</option>
+                                        </ToolbarDropdown>
+                                        <ToolbarDropdown label="Indentation" value={currentFormat.textIndent} onChange={(e) => applyTextIndent(e.target.value)}>
+                                            <option value="2em">Standard (2em)</option>
+                                            <option value="0px">None (Block)</option>
+                                        </ToolbarDropdown>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold mb-2 text-white/70">Color</label>
+                                        <div className="flex space-x-2">
+                                            {colorPalette.map(color => (
+                                                <button key={color} onClick={() => applyColor(color)} className="w-6 h-6 rounded-full border border-gray-400" style={{backgroundColor: color}}></button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        <div
+                            className="flex items-center space-x-1 p-1 rounded-full shadow-lg bg-stone-900/70 border border-white/10 backdrop-blur-sm"
+                            onMouseDown={(e) => e.preventDefault()}
+                        >
+                            <button onClick={() => setIsFormatPanelOpen(p => !p)} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors ${isFormatPanelOpen ? 'text-white bg-white/10' : ''}`}><TextIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyCommand('bold')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors ${activeFormats.isBold ? 'text-white bg-white/10' : ''}`}><BoldIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyCommand('italic')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors ${activeFormats.isItalic ? 'text-white bg-white/10' : ''}`}><ItalicIcon className="w-5 h-5"/></button>
+                            <div className="w-px h-5 bg-white/20 mx-1"></div>
+                            <button onClick={() => applyCommand('insertUnorderedList')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors ${activeFormats.isUL ? 'text-white bg-white/10' : ''}`}><ListBulletIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyCommand('insertOrderedList')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors ${activeFormats.isOL ? 'text-white bg-white/10' : ''}`}><OrderedListIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyParagraphStyle('blockquote')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors ${currentFormat.paragraphStyle === 'blockquote' ? 'text-white bg-white/10' : ''}`}><BlockquoteIcon className="w-5 h-5"/></button>
+                            <div className="w-px h-5 bg-white/20 mx-1"></div>
                             <button onClick={() => setIsFindReplaceOpen(true)} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors`}><SearchIcon className="w-5 h-5"/></button>
-                            <div className="w-px h-5 bg-white/20 mx-1" />
-                            <button onClick={(e) => applyCommand(e, 'undo')} className="p-2 rounded-full text-white/70 hover:text-white transition-colors"><UndoIcon className="w-5 h-5"/></button>
-                            <button onClick={(e) => applyCommand(e, 'redo')} className="p-2 rounded-full text-white/70 hover:text-white transition-colors"><RedoIcon className="w-5 h-5"/></button>
-                            <div className="w-px h-5 bg-white/20 mx-1" />
+                            <div className="w-px h-5 bg-white/20 mx-1"></div>
+                            <button onClick={() => applyCommand('undo')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors`}><UndoIcon className="w-5 h-5"/></button>
+                            <button onClick={() => applyCommand('redo')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors`}><RedoIcon className="w-5 h-5"/></button>
+                            <div className="w-px h-5 bg-white/20 mx-1"></div>
                             <div className="px-3 text-sm text-white/70 font-sans" aria-live="polite">
                                 {(idea.wordCount || 0).toLocaleString()} {t.wordsCount}
                             </div>
@@ -401,9 +977,34 @@ const StoryIdeaEditorPage = () => {
                     </div>
                 </div>
             </div>
-            {!isSidebarOpen && <button onClick={() => setIsSidebarOpen(true)} className={`fixed top-4 right-4 z-30 p-2 rounded-md ${themeClasses.bgSecondary} ${themeClasses.accentText} hover:opacity-80 shadow-lg border ${themeClasses.border}`}><ChevronLeftIcon className="w-5 h-5" /></button>}
-            <FindReplaceModal isOpen={isFindReplaceOpen} onClose={() => setIsFindReplaceOpen(false)} editorRef={editorRef} />
-            <ConfirmModal isOpen={isDeleteConfirmOpen} onClose={() => setIsDeleteConfirmOpen(false)} onConfirm={handleDelete} title={`Delete "${idea.title}"?`} message="Are you sure you want to delete this idea? This action is permanent." />
+
+            {!isSidebarOpen && (
+                <button
+                    onClick={() => setIsSidebarOpen(true)}
+                    className={`
+                        fixed top-4 right-4 z-30 p-2 rounded-md
+                        ${themeClasses.bgSecondary} ${themeClasses.accentText}
+                        hover:opacity-80 shadow-lg border ${themeClasses.border}
+                    `}
+                    aria-label="Open editor tools"
+                >
+                    <ChevronLeftIcon className="w-5 h-5" />
+                </button>
+            )}
+
+            <FindReplaceModal 
+                isOpen={isFindReplaceOpen}
+                onClose={() => setIsFindReplaceOpen(false)}
+                editorRef={editorRef}
+            />
+            
+            <ConfirmModal 
+                isOpen={isDeleteConfirmOpen} 
+                onClose={() => setIsDeleteConfirmOpen(false)} 
+                onConfirm={handleDelete} 
+                title={`Delete "${idea.title}"?`} 
+                message="Are you sure you want to delete this idea? This action is permanent." 
+            />
         </>
     );
 };

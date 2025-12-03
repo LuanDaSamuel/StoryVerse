@@ -46,6 +46,12 @@ export interface AggregatedSketch extends NovelSketch {
 
 export type StoryIdeaStatus = 'Seedling' | 'Developing' | 'Archived';
 
+export interface IdeaFolder {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
 export interface StoryIdea {
   id: string;
   title: string;
@@ -53,8 +59,15 @@ export interface StoryIdea {
   wordCount: number;
   tags: string[];
   status: StoryIdeaStatus;
+  folderId?: string; // Optional: if undefined/null, it's in the root
   createdAt: string;
   updatedAt: string;
+}
+
+export interface DailyGoal {
+  target: number;
+  current: number;
+  lastUpdated: string; // ISO Date string (YYYY-MM-DD)
 }
 
 export interface ProjectData {
@@ -63,7 +76,10 @@ export interface ProjectData {
     baseFontSize: number;
     language: Language;
   };
+  dailyGoal: DailyGoal;
+  userDictionary: string[];
   novels: Novel[];
+  ideaFolders: IdeaFolder[];
   storyIdeas: StoryIdea[];
 }
 

@@ -363,6 +363,8 @@ const ChapterEditorPage = () => {
         font: fontOptions[0].value,
         size: '18px',
         paragraphSpacing: '1em',
+        lineHeight: '1.6',
+        textIndent: '2em',
     });
 
     const cleanupEditor = React.useCallback(() => {
@@ -530,6 +532,8 @@ const ChapterEditorPage = () => {
 
         let detectedParagraphStyle = 'p';
         let detectedParagraphSpacing = '1em';
+        let detectedLineHeight = '1.6';
+        let detectedTextIndent = '2em';
         
         let blockElement: HTMLElement | null = element;
         while (blockElement && blockElement !== editorRef.current) {
@@ -549,6 +553,24 @@ const ChapterEditorPage = () => {
                         else detectedParagraphSpacing = '2em';
                     }
                 }
+                
+                if (styles.lineHeight) {
+                    const lh = styles.lineHeight;
+                    if (lh === 'normal') detectedLineHeight = '1.6';
+                    else if (!isNaN(parseFloat(lh)) && styles.fontSize) {
+                         const ratio = parseFloat(lh) / parseFloat(styles.fontSize);
+                         if (Math.abs(ratio - 1.0) < 0.1) detectedLineHeight = '1.0';
+                         else if (Math.abs(ratio - 1.15) < 0.1) detectedLineHeight = '1.15';
+                         else if (Math.abs(ratio - 1.5) < 0.1) detectedLineHeight = '1.5';
+                         else if (Math.abs(ratio - 2.0) < 0.1) detectedLineHeight = '2.0';
+                    }
+                }
+                
+                if (styles.textIndent) {
+                     const indent = parseFloat(styles.textIndent);
+                     if (indent < 1) detectedTextIndent = '0px';
+                     else detectedTextIndent = '2em';
+                }
                 break;
             }
             blockElement = blockElement.parentElement;
@@ -565,6 +587,8 @@ const ChapterEditorPage = () => {
             font: matchedFont,
             size: detectedSize,
             paragraphSpacing: detectedParagraphSpacing,
+            lineHeight: detectedLineHeight,
+            textIndent: detectedTextIndent,
         });
     }, []);
 
@@ -693,8 +717,40 @@ const ChapterEditorPage = () => {
             let node = selection.getRangeAt(0).startContainer;
             if (node.nodeType === 3) node = node.parentNode!;
             while(node && node !== editorRef.current) {
-                if(node instanceof HTMLElement && ['P', 'H1', 'H2', 'DIV'].includes(node.tagName)) {
+                if(node instanceof HTMLElement && ['P', 'H1', 'H2', 'DIV', 'BLOCKQUOTE'].includes(node.tagName)) {
                     node.style.marginBottom = spacing;
+                    return;
+                }
+                node = node.parentNode!;
+            }
+        });
+    };
+
+    const applyLineHeight = (height: string) => {
+        applyAndSaveFormat(() => {
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0) return;
+            let node = selection.getRangeAt(0).startContainer;
+            if (node.nodeType === 3) node = node.parentNode!;
+            while(node && node !== editorRef.current) {
+                if(node instanceof HTMLElement && ['P', 'H1', 'H2', 'DIV', 'BLOCKQUOTE'].includes(node.tagName)) {
+                    node.style.lineHeight = height;
+                    return;
+                }
+                node = node.parentNode!;
+            }
+        });
+    };
+
+    const applyTextIndent = (indent: string) => {
+        applyAndSaveFormat(() => {
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0) return;
+            let node = selection.getRangeAt(0).startContainer;
+            if (node.nodeType === 3) node = node.parentNode!;
+            while(node && node !== editorRef.current) {
+                if(node instanceof HTMLElement && ['P', 'H1', 'H2', 'DIV', 'BLOCKQUOTE'].includes(node.tagName)) {
+                    node.style.textIndent = indent;
                     return;
                 }
                 node = node.parentNode!;
@@ -875,6 +931,9 @@ const ChapterEditorPage = () => {
                                 fontSize: computedStyle.fontSize,
                                 fontFamily: computedStyle.fontFamily,
                                 color: computedStyle.color,
+                                marginBottom: computedStyle.marginBottom,
+                                lineHeight: computedStyle.lineHeight,
+                                textIndent: computedStyle.textIndent,
                             };
                             
                             const editorStyles = window.getComputedStyle(editorRef.current!);
@@ -893,6 +952,11 @@ const ChapterEditorPage = () => {
                                 styleCarrier.style.color = stylesToCopy.color;
                                 styleApplied = true;
                             }
+                            
+                            // Copy block level styles
+                            if (stylesToCopy.marginBottom !== editorStyles.marginBottom) currentBlock.style.marginBottom = stylesToCopy.marginBottom;
+                            if (stylesToCopy.lineHeight !== editorStyles.lineHeight) currentBlock.style.lineHeight = stylesToCopy.lineHeight;
+                            if (stylesToCopy.textIndent !== editorStyles.textIndent) currentBlock.style.textIndent = stylesToCopy.textIndent;
                             
                             if (styleApplied) {
                                 currentBlock.innerHTML = '';
@@ -1301,6 +1365,16 @@ const ChapterEditorPage = () => {
                                             <option value="1em">1.0</option>
                                             <option value="1.5em">1.5</option>
                                             <option value="2em">2.0</option>
+                                        </ToolbarDropdown>
+                                        <ToolbarDropdown label="Line Height" value={currentFormat.lineHeight} onChange={(e) => applyLineHeight(e.target.value)}>
+                                            <option value="1.0">1.0</option>
+                                            <option value="1.15">1.15</option>
+                                            <option value="1.5">1.5</option>
+                                            <option value="2.0">2.0</option>
+                                        </ToolbarDropdown>
+                                        <ToolbarDropdown label="Indentation" value={currentFormat.textIndent} onChange={(e) => applyTextIndent(e.target.value)}>
+                                            <option value="2em">Standard (2em)</option>
+                                            <option value="0px">None (Block)</option>
                                         </ToolbarDropdown>
                                     </div>
                                     <div>

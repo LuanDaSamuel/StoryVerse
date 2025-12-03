@@ -11,7 +11,10 @@ const isFileSystemAccessAPISupported = 'showOpenFilePicker' in window;
 
 const defaultProjectData: ProjectData = {
   settings: { theme: 'book', baseFontSize: 18, language: 'en' },
+  dailyGoal: { target: 500, current: 0, lastUpdated: new Date().toISOString().split('T')[0] },
+  userDictionary: [],
   novels: [],
+  ideaFolders: [],
   storyIdeas: [],
 };
 
@@ -31,6 +34,18 @@ const sanitizeProjectData = (data: any): ProjectData => {
     if (['en', 'vi', 'fi'].includes(data.settings.language)) {
         sanitized.settings.language = data.settings.language as Language;
     }
+  }
+
+  if (data?.dailyGoal) {
+      sanitized.dailyGoal = {
+          target: typeof data.dailyGoal.target === 'number' ? data.dailyGoal.target : 500,
+          current: typeof data.dailyGoal.current === 'number' ? data.dailyGoal.current : 0,
+          lastUpdated: typeof data.dailyGoal.lastUpdated === 'string' ? data.dailyGoal.lastUpdated : new Date().toISOString().split('T')[0]
+      };
+  }
+
+  if (Array.isArray(data?.userDictionary)) {
+      sanitized.userDictionary = data.userDictionary.filter((w: any) => typeof w === 'string');
   }
 
   // Safely merge novels and their nested structures
@@ -67,6 +82,15 @@ const sanitizeProjectData = (data: any): ProjectData => {
     }));
   }
 
+  // Safely merge folders
+  if (Array.isArray(data?.ideaFolders)) {
+    sanitized.ideaFolders = data.ideaFolders.map((folder: any) => ({
+        id: folder.id || crypto.randomUUID(),
+        name: folder.name || 'Untitled Folder',
+        createdAt: folder.createdAt || new Date().toISOString(),
+    }));
+  }
+
   // Safely merge story ideas
   if (Array.isArray(data?.storyIdeas)) {
     sanitized.storyIdeas = data.storyIdeas.map((idea: any) => {
@@ -79,6 +103,7 @@ const sanitizeProjectData = (data: any): ProjectData => {
         wordCount: typeof idea.wordCount === 'number' ? idea.wordCount : 0,
         tags: Array.isArray(idea.tags) ? idea.tags : [],
         status: status,
+        folderId: idea.folderId || null,
         createdAt: idea.createdAt || new Date().toISOString(),
         updatedAt: idea.updatedAt || new Date().toISOString(),
       };
@@ -141,27 +166,18 @@ export function useProject() {
                 await flushChanges();
             } catch (error) {
                 console.error("Failed to flush changes during sign out:", error);
-                // Proceed with sign out anyway, but don't remove the unload backup
-                // as changes were not successfully saved.
             }
         }
         await storage.signOut();
-        // CRITICAL FIX: Do not remove the unload backup here.
-        // It should only be removed on a *successful* save (handled by `saveProject`)
-        // or on a clean `closeProject`. Removing it here when signOut is called
-        // from an error state would cause data loss.
         resetState();
         setStatus('welcome');
     }, [flushChanges, storage, resetState]);
 
   const saveProject = React.useCallback(async () => {
-    // If a save cycle is already running, it will pick up the latest changes
-    // because of the while(isDirtyRef.current) loop.
     if (isSavingRef.current) {
         return;
     }
 
-    // If nothing to save, ignore.
     if (!isDirtyRef.current) {
         return;
     }
@@ -170,9 +186,6 @@ export function useProject() {
     setSaveStatus('saving');
 
     try {
-        // Keep saving as long as there are dirty changes.
-        // This ensures that if the user types *during* a save, those changes
-        // get saved immediately after the current operation finishes.
         while (isDirtyRef.current) {
             const dataToSave = projectDataRef.current;
             if (!dataToSave) {
@@ -180,8 +193,6 @@ export function useProject() {
                  break;
             }
 
-            // We mark as not dirty *before* the async operation.
-            // If user types during await, isDirtyRef becomes true again, causing another loop iteration.
             isDirtyRef.current = false;
 
             const MAX_RETRIES = 3;
@@ -197,8 +208,6 @@ export function useProject() {
                         await set(LOCAL_BACKUP_KEY, dataToSave);
                         await storage.saveToFileHandle(dataToSave);
                     } else {
-                        // CRITICAL FIX: If storageMode is lost or null, fail explicitly.
-                        // Do not simulate success.
                         throw new Error("Storage mode not initialized or lost.");
                     }
                     success = true;
@@ -208,8 +217,7 @@ export function useProject() {
                     console.error(`Save attempt ${attempt}/${MAX_RETRIES} failed for storage mode '${storageMode}':`, error);
 
                     if (error instanceof PermanentAuthError) {
-                        console.error("Permanent Authentication Error:", error.message, "Signing out.");
-                        await signOut({ flush: false });
+                        console.error("Permanent Authentication Error:", error.message, "Sign out required.");
                         throw error; 
                     }
 
@@ -224,82 +232,113 @@ export function useProject() {
             if (success) {
                 localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
             } else {
-                // If we exhausted retries, we MUST throw so the outer catch block
-                // sets the status to 'error' and marks isDirty back to true.
                 throw lastError || new Error("Unknown save error");
             }
         }
         
-        // If we exit the loop normally, all data is saved.
         setSaveStatus('saved');
     } catch (error) {
         console.error("Save failed after retries:", error);
         setSaveStatus('error');
-        // Mark as dirty again so the user knows/we can retry
         isDirtyRef.current = true;
     } finally {
-        // Always release the lock
         isSavingRef.current = false;
         
-        // If we are still dirty (e.g. after an error, or a race condition at the very end), 
-        // schedule another check.
         if (isDirtyRef.current) {
             if (saveTimeoutRef.current) {
                 clearTimeout(saveTimeoutRef.current);
             }
             saveTimeoutRef.current = window.setTimeout(() => {
                 saveProjectRef.current?.();
-            }, 2000); // Retry slightly slower if there was an issue
+            }, 2000); 
         }
     }
 
-  }, [storage, storageMode, signOut]);
+  }, [storage, storageMode]); // Removed signOut from dependencies to prevent circular dependency/auto-signout on error
 
   // Keep the ref updated with the latest version of the save function
   React.useEffect(() => {
     saveProjectRef.current = saveProject;
   }, [saveProject]);
 
+  const updateDailyWordCount = React.useCallback((wordCountDelta: number) => {
+    setProjectData((prevData) => {
+      if (!prevData) return null;
+      
+      const today = new Date().toISOString().split('T')[0];
+      const lastUpdated = prevData.dailyGoal.lastUpdated;
+      
+      let newCurrent = prevData.dailyGoal.current;
+      
+      // Reset if it's a new day
+      if (today !== lastUpdated) {
+        newCurrent = 0;
+      }
+      
+      // Prevent negative current if deleting words from a previous session, 
+      // but allow negative delta to reduce today's count if deleting words written today.
+      newCurrent = Math.max(0, newCurrent + wordCountDelta);
+
+      const newData = {
+        ...prevData,
+        dailyGoal: {
+          ...prevData.dailyGoal,
+          current: newCurrent,
+          lastUpdated: today
+        }
+      };
+      
+      // Manually trigger dirty state/save logic since we are bypassing the main setProjectDataAndMarkDirty wrapper for this internal update
+      projectDataRef.current = newData;
+      isDirtyRef.current = true;
+      if (!isSavingRef.current) setSaveStatus('unsaved');
+      
+      // Debounce save
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = window.setTimeout(() => {
+          saveProjectRef.current?.();
+      }, 500);
+
+      return newData;
+    });
+  }, []);
+
   const setProjectDataAndMarkDirty = React.useCallback((updater: React.SetStateAction<ProjectData | null>) => {
     setProjectData(prevData => {
         const newData = typeof updater === 'function' ? updater(prevData) : updater;
-
-        // PERFORMANCE FIX: The previous JSON.stringify comparison on every keystroke was the
-        // primary cause of typing lag. It has been removed. We now assume any call to this
-        // function implies a change that needs to be persisted.
         
+        // Update Ref immediately
         projectDataRef.current = newData;
         isDirtyRef.current = true;
 
-        if (!isSavingRef.current) {
-            setSaveStatus('unsaved');
-        }
-
-        // PERFORMANCE FIX: Throttle the synchronous localStorage backup. Writing to localStorage on
-        // every keystroke is slow and blocks the main thread. This ensures it only happens
-        // periodically during rapid typing.
-        if (localStorageBackupTimeoutRef.current) {
-            clearTimeout(localStorageBackupTimeoutRef.current);
-        }
-        localStorageBackupTimeoutRef.current = window.setTimeout(() => {
-            try {
-                // This stringify is still expensive, but now it only runs periodically, not on every input event.
-                localStorage.setItem(LOCAL_UNLOAD_BACKUP_KEY, JSON.stringify(newData));
-            } catch (e) {
-                console.error("Failed to write to localStorage backup", e);
-            }
-        }, 500); // Backup at most every 500ms.
-
-        // Debounce the actual save operation. This is correct.
-        if (saveTimeoutRef.current) {
-            clearTimeout(saveTimeoutRef.current);
-        }
-        saveTimeoutRef.current = window.setTimeout(() => {
-            saveProjectRef.current?.();
-        }, 500); // 0.5-second delay for faster saving response.
-        
         return newData;
     });
+
+    // Handle side effects outside of the state setter to ensure React purity
+    if (!isSavingRef.current) {
+        setSaveStatus('unsaved');
+    }
+
+    if (localStorageBackupTimeoutRef.current) {
+        clearTimeout(localStorageBackupTimeoutRef.current);
+    }
+    localStorageBackupTimeoutRef.current = window.setTimeout(() => {
+        try {
+            if (projectDataRef.current) {
+                 localStorage.setItem(LOCAL_UNLOAD_BACKUP_KEY, JSON.stringify(projectDataRef.current));
+            }
+        } catch (e) {
+            console.error("Failed to write to localStorage backup", e);
+        }
+    }, 3000); 
+
+    if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+    }
+    saveTimeoutRef.current = window.setTimeout(() => {
+        saveProjectRef.current?.();
+    }, 500); 
+
   }, []);
 
   // Effect to revert 'saved' status to 'idle'.
@@ -310,7 +349,7 @@ export function useProject() {
             if (!isDirtyRef.current) {
                 setSaveStatus('idle');
             }
-        }, 1500); // Duration to display the "Saved!" message.
+        }, 1500); 
         return () => clearTimeout(timeoutId);
     }
   }, [saveStatus]);
@@ -445,20 +484,14 @@ export function useProject() {
 
     const initializeApp = async () => {
         try {
-            // GAPI client is needed for manual sign-in later.
             await storage.initGapiClient(); 
-
-            // Check for a local project first.
             const hasLocal = await checkForRecentLocalProject();
             if (!hasLocal) {
-                // If no local project, show the welcome screen.
                 console.log("No local project found. Displaying welcome screen.");
                 setStatus('welcome');
             }
-            // If hasLocal is true, checkForRecentLocalProject already set the state.
         } catch (error: any) {
             console.error("Initialization failed:", error);
-            // Fallback to welcome screen on error.
             alert(`There was a problem initializing the application:\n\n${error.message}\n\nPlease try again.`);
             setStatus('welcome');
         }
@@ -583,6 +616,7 @@ export function useProject() {
   return { 
     projectData, 
     setProjectData: setProjectDataAndMarkDirty, 
+    updateDailyWordCount,
     status, 
     projectName,
     storageMode,

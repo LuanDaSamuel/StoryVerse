@@ -1,25 +1,143 @@
+
 import * as React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
-import { StoryIdea } from '../types';
-import { PlusIcon, UploadIcon, BackIcon, TrashIcon } from '../components/Icons';
+import { StoryIdea, IdeaFolder } from '../types';
+import { PlusIcon, UploadIcon, BackIcon, TrashIcon, FolderIcon, PencilIcon, ChevronLeftIcon } from '../components/Icons';
 import ConfirmModal from '../components/ConfirmModal';
 import { enhancePlainText } from '../constants';
 import * as mammoth from 'mammoth';
 import { useTranslations } from '../hooks/useTranslations';
 
+const CreateFolderModal = ({ isOpen, onClose, onConfirm }: { isOpen: boolean, onClose: () => void, onConfirm: (name: string) => void }) => {
+    const { themeClasses } = React.useContext(ProjectContext);
+    const t = useTranslations();
+    const [name, setName] = React.useState('');
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4" onClick={onClose}>
+            <div className={`p-6 rounded-lg shadow-xl w-full max-w-sm ${themeClasses.bgSecondary} ${themeClasses.text} border ${themeClasses.border}`} onClick={e => e.stopPropagation()}>
+                <h2 className="text-xl font-bold mb-4">{t.createFolder}</h2>
+                <input
+                    type="text"
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    placeholder={t.folderName}
+                    autoFocus
+                    className={`w-full p-2 rounded-md mb-6 ${themeClasses.input} border ${themeClasses.border}`}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) onConfirm(name.trim()); }}
+                />
+                <div className="flex justify-end space-x-3">
+                    <button onClick={onClose} className={`px-4 py-2 rounded-lg font-semibold ${themeClasses.bgTertiary} hover:opacity-80`}>{t.cancel}</button>
+                    <button onClick={() => name.trim() && onConfirm(name.trim())} disabled={!name.trim()} className={`px-4 py-2 rounded-lg font-semibold ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90 disabled:opacity-50`}>{t.confirm}</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const RenameFolderModal = ({ isOpen, onClose, onConfirm, initialName }: { isOpen: boolean, onClose: () => void, onConfirm: (name: string) => void, initialName: string }) => {
+    const { themeClasses } = React.useContext(ProjectContext);
+    const t = useTranslations();
+    const [name, setName] = React.useState(initialName);
+
+    React.useEffect(() => setName(initialName), [initialName]);
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4" onClick={onClose}>
+            <div className={`p-6 rounded-lg shadow-xl w-full max-w-sm ${themeClasses.bgSecondary} ${themeClasses.text} border ${themeClasses.border}`} onClick={e => e.stopPropagation()}>
+                <h2 className="text-xl font-bold mb-4">{t.renameFolder}</h2>
+                <input
+                    type="text"
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    placeholder={t.folderName}
+                    autoFocus
+                    className={`w-full p-2 rounded-md mb-6 ${themeClasses.input} border ${themeClasses.border}`}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) onConfirm(name.trim()); }}
+                />
+                <div className="flex justify-end space-x-3">
+                    <button onClick={onClose} className={`px-4 py-2 rounded-lg font-semibold ${themeClasses.bgTertiary} hover:opacity-80`}>{t.cancel}</button>
+                    <button onClick={() => name.trim() && onConfirm(name.trim())} disabled={!name.trim()} className={`px-4 py-2 rounded-lg font-semibold ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90 disabled:opacity-50`}>{t.confirm}</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const MoveIdeaModal = ({ isOpen, onClose, onConfirm, folders }: { isOpen: boolean, onClose: () => void, onConfirm: (folderId: string | null) => void, folders: IdeaFolder[] }) => {
+    const { themeClasses } = React.useContext(ProjectContext);
+    const t = useTranslations();
+    const [selectedFolderId, setSelectedFolderId] = React.useState<string>('root');
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4" onClick={onClose}>
+            <div className={`p-6 rounded-lg shadow-xl w-full max-w-sm ${themeClasses.bgSecondary} ${themeClasses.text} border ${themeClasses.border}`} onClick={e => e.stopPropagation()}>
+                <h2 className="text-xl font-bold mb-4">{t.moveIdea}</h2>
+                <div className="mb-6">
+                    <label className="block text-sm font-semibold mb-2">{t.selectFolder}</label>
+                    <select
+                        value={selectedFolderId}
+                        onChange={(e) => setSelectedFolderId(e.target.value)}
+                        className={`w-full p-2 rounded-md ${themeClasses.input} border ${themeClasses.border}`}
+                    >
+                        <option value="root">{t.noFolder}</option>
+                        {folders.map(f => (
+                            <option key={f.id} value={f.id}>{enhancePlainText(f.name)}</option>
+                        ))}
+                    </select>
+                </div>
+                <div className="flex justify-end space-x-3">
+                    <button onClick={onClose} className={`px-4 py-2 rounded-lg font-semibold ${themeClasses.bgTertiary} hover:opacity-80`}>{t.cancel}</button>
+                    <button onClick={() => onConfirm(selectedFolderId === 'root' ? null : selectedFolderId)} className={`px-4 py-2 rounded-lg font-semibold ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}>{t.move}</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const DemosPage = () => {
-    const { projectData, setProjectData, themeClasses } = React.useContext(ProjectContext);
+    const { projectData, setProjectData, themeClasses, theme } = React.useContext(ProjectContext);
     const t = useTranslations();
     const navigate = useNavigate();
     const [isDocxConfirmOpen, setIsDocxConfirmOpen] = React.useState(false);
     const [pendingImportData, setPendingImportData] = React.useState<{ title: string; synopsisHtml: string; originalFilename: string } | null>(null);
     const docxInputRef = React.useRef<HTMLInputElement>(null);
     const [ideaToDelete, setIdeaToDelete] = React.useState<StoryIdea | null>(null);
+    const [viewFolderId, setViewFolderId] = React.useState<string | null>(null);
+    
+    // Folder Management State
+    const [isCreateFolderOpen, setIsCreateFolderOpen] = React.useState(false);
+    const [folderToRename, setFolderToRename] = React.useState<IdeaFolder | null>(null);
+    const [folderToDelete, setFolderToDelete] = React.useState<IdeaFolder | null>(null);
+    const [ideaToMove, setIdeaToMove] = React.useState<StoryIdea | null>(null);
+
+    // Drag and Drop State
+    const [draggedIdeaId, setDraggedIdeaId] = React.useState<string | null>(null);
+    const [dragOverFolderId, setDragOverFolderId] = React.useState<string | null>(null);
+
+    const folders = React.useMemo(() => {
+        return [...(projectData?.ideaFolders || [])].sort((a, b) => a.name.localeCompare(b.name));
+    }, [projectData?.ideaFolders]);
+
+    const currentFolder = folders.find(f => f.id === viewFolderId);
 
     const storyIdeas = React.useMemo(() => {
-        return [...(projectData?.storyIdeas || [])].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-    }, [projectData?.storyIdeas]);
+        const allIdeas = [...(projectData?.storyIdeas || [])];
+        return allIdeas.filter(idea => {
+            if (viewFolderId === null) {
+                // In root view, show ideas with no folderId
+                return !idea.folderId;
+            }
+            return idea.folderId === viewFolderId;
+        }).sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    }, [projectData?.storyIdeas, viewFolderId]);
 
     const handleNewIdea = () => {
         const now = new Date().toISOString();
@@ -30,6 +148,7 @@ const DemosPage = () => {
             wordCount: 0,
             tags: [],
             status: 'Seedling',
+            folderId: viewFolderId || undefined, // Assign to current folder
             createdAt: now,
             updatedAt: now,
         };
@@ -97,6 +216,7 @@ const DemosPage = () => {
                 wordCount: 0, 
                 tags: [],
                 status: 'Seedling',
+                folderId: viewFolderId || undefined, // Import into current folder
                 createdAt: now,
                 updatedAt: now,
             };
@@ -126,6 +246,108 @@ const DemosPage = () => {
         setIdeaToDelete(null);
     };
 
+    const handleCreateFolder = (name: string) => {
+        const newFolder: IdeaFolder = {
+            id: crypto.randomUUID(),
+            name,
+            createdAt: new Date().toISOString()
+        };
+        setProjectData(data => {
+            if (!data) return null;
+            return {
+                ...data,
+                ideaFolders: [...(data.ideaFolders || []), newFolder]
+            };
+        });
+        setIsCreateFolderOpen(false);
+    };
+
+    const handleRenameFolder = (name: string) => {
+        if (!folderToRename) return;
+        setProjectData(data => {
+            if (!data) return null;
+            return {
+                ...data,
+                ideaFolders: data.ideaFolders.map(f => f.id === folderToRename.id ? { ...f, name } : f)
+            };
+        });
+        setFolderToRename(null);
+    };
+
+    const handleDeleteFolder = () => {
+        if (!folderToDelete) return;
+        setProjectData(data => {
+            if (!data) return null;
+            // Move ideas in this folder to root
+            const updatedIdeas = data.storyIdeas.map(idea => 
+                idea.folderId === folderToDelete.id ? { ...idea, folderId: undefined } : idea
+            );
+            const updatedFolders = data.ideaFolders.filter(f => f.id !== folderToDelete.id);
+            return {
+                ...data,
+                storyIdeas: updatedIdeas,
+                ideaFolders: updatedFolders
+            };
+        });
+        setFolderToDelete(null);
+    };
+
+    const handleMoveIdea = (folderId: string | null) => {
+        if (!ideaToMove) return;
+        setProjectData(data => {
+            if (!data) return null;
+            return {
+                ...data,
+                storyIdeas: data.storyIdeas.map(i => i.id === ideaToMove.id ? { ...i, folderId: folderId || undefined } : i)
+            };
+        });
+        setIdeaToMove(null);
+    };
+
+    // --- Drag and Drop Logic ---
+
+    const handleDragStart = (e: React.DragEvent, ideaId: string) => {
+        e.dataTransfer.effectAllowed = 'move';
+        // Set drag image optionally, or let browser handle it
+        setDraggedIdeaId(ideaId);
+    };
+
+    const handleDragOverFolder = (e: React.DragEvent, folderId: string) => {
+        e.preventDefault(); // Necessary to allow dropping
+        e.dataTransfer.dropEffect = 'move';
+        if (dragOverFolderId !== folderId) {
+            setDragOverFolderId(folderId);
+        }
+    };
+
+    const handleDragLeaveFolder = (e: React.DragEvent) => {
+        setDragOverFolderId(null);
+    };
+
+    const handleDropOnFolder = (e: React.DragEvent, folderId: string) => {
+        e.preventDefault();
+        setDragOverFolderId(null);
+        
+        if (draggedIdeaId) {
+            setProjectData(data => {
+                if (!data) return null;
+                return {
+                    ...data,
+                    storyIdeas: data.storyIdeas.map(i => 
+                        i.id === draggedIdeaId ? { ...i, folderId: folderId } : i
+                    )
+                };
+            });
+            setDraggedIdeaId(null);
+        }
+    };
+
+    const handleDragEnd = () => {
+        setDraggedIdeaId(null);
+        setDragOverFolderId(null);
+    };
+
+
     const getSnippet = (html: string) => {
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = html;
@@ -140,11 +362,23 @@ const DemosPage = () => {
         Archived: 'bg-gray-300 text-gray-700',
     };
 
+    const isEmpty = storyIdeas.length === 0 && (viewFolderId !== null || folders.length === 0);
+
     return (
         <div className={`p-4 sm:p-8 md:p-12 ${themeClasses.bg} h-full overflow-y-auto`}>
-            <div className="flex justify-between items-center mb-8">
-                <h1 className={`text-3xl font-bold ${themeClasses.text}`}>{t.ideaBox}</h1>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
                 <div className="flex items-center space-x-2">
+                    {viewFolderId ? (
+                         <button onClick={() => setViewFolderId(null)} className={`p-2 rounded-full hover:${themeClasses.bgTertiary} transition-colors ${themeClasses.text}`}>
+                            <ChevronLeftIcon className="w-6 h-6" />
+                        </button>
+                    ) : null}
+                    <h1 className={`text-3xl font-bold ${themeClasses.text}`}>
+                        {viewFolderId && currentFolder ? enhancePlainText(currentFolder.name) : t.ideaBox}
+                    </h1>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
                     <input
                         type="file"
                         ref={docxInputRef}
@@ -152,6 +386,18 @@ const DemosPage = () => {
                         className="hidden"
                         accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     />
+                    
+                    {/* Only show New Folder in root view */}
+                    {!viewFolderId && (
+                        <button
+                            onClick={() => setIsCreateFolderOpen(true)}
+                            className={`flex items-center space-x-2 px-4 py-2 font-semibold rounded-lg ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-90`}
+                        >
+                            <PlusIcon className="w-5 h-5" />
+                            <span>{t.newFolder}</span>
+                        </button>
+                    )}
+
                     <button
                         onClick={() => docxInputRef.current?.click()}
                         className={`flex items-center space-x-2 px-4 py-2 font-semibold rounded-lg ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-90`}
@@ -169,7 +415,61 @@ const DemosPage = () => {
                 </div>
             </div>
 
-            {storyIdeas.length === 0 ? (
+            {/* FOLDERS GRID (Only in Root) */}
+            {!viewFolderId && folders.length > 0 && (
+                <div className="mb-8">
+                     <h2 className={`text-sm font-bold uppercase tracking-wider mb-4 ${themeClasses.textSecondary}`}>{t.folders}</h2>
+                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        {folders.map(folder => {
+                            const count = (projectData?.storyIdeas || []).filter(i => i.folderId === folder.id).length;
+                            const isDragOver = dragOverFolderId === folder.id;
+                            
+                            // Determine folder style based on drag state
+                            let containerClass = `${themeClasses.bgSecondary}`;
+                            if (isDragOver) {
+                                containerClass = theme === 'dark' ? 'bg-indigo-900 ring-2 ring-indigo-500 scale-[1.02]' : 'bg-amber-100 ring-2 ring-amber-500 scale-[1.02]';
+                            } else {
+                                containerClass += ` hover:${themeClasses.bgTertiary}`;
+                            }
+
+                            return (
+                                <div 
+                                    key={folder.id}
+                                    className={`group flex items-center justify-between p-4 rounded-lg cursor-pointer transition-all duration-200 ${containerClass}`}
+                                    onClick={() => setViewFolderId(folder.id)}
+                                    onDragOver={(e) => handleDragOverFolder(e, folder.id)}
+                                    onDragLeave={handleDragLeaveFolder}
+                                    onDrop={(e) => handleDropOnFolder(e, folder.id)}
+                                >
+                                    <div className="flex items-center space-x-3 overflow-hidden pointer-events-none">
+                                        <FolderIcon className={`w-8 h-8 flex-shrink-0 ${isDragOver ? 'text-white' : 'text-amber-500'}`} />
+                                        <div className="overflow-hidden">
+                                            <p className={`font-semibold truncate ${themeClasses.accentText}`}>{enhancePlainText(folder.name)}</p>
+                                            <p className={`text-xs ${themeClasses.textSecondary}`}>{count} ideas</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+                                        <button 
+                                            onClick={() => setFolderToRename(folder)}
+                                            className={`p-1.5 rounded-full hover:bg-black/10 ${themeClasses.textSecondary}`}
+                                        >
+                                            <PencilIcon className="w-4 h-4" />
+                                        </button>
+                                        <button 
+                                            onClick={() => setFolderToDelete(folder)}
+                                            className={`p-1.5 rounded-full hover:bg-red-500/10 text-red-500`}
+                                        >
+                                            <TrashIcon className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            )
+                        })}
+                     </div>
+                </div>
+            )}
+
+            {isEmpty ? (
                 <div className={`p-8 md:p-12 h-full flex flex-col items-center justify-center -mt-16`}>
                     <div className={`w-full max-w-3xl p-8 text-center rounded-lg ${themeClasses.bgSecondary}`}>
                         <h2 className={`text-2xl font-bold mb-2 ${themeClasses.accentText}`}>{t.emptyIdeaBox}</h2>
@@ -183,12 +483,21 @@ const DemosPage = () => {
                     </div>
                 </div>
             ) : (
+                <>
+                {(viewFolderId || folders.length > 0) && storyIdeas.length > 0 && (
+                    <h2 className={`text-sm font-bold uppercase tracking-wider mb-4 ${themeClasses.textSecondary}`}>
+                        {viewFolderId ? 'Ideas' : 'Unsorted Ideas'}
+                    </h2>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {storyIdeas.map(idea => (
                         <div
                             key={idea.id}
-                            className={`group relative p-5 rounded-lg flex flex-col cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-1 ${themeClasses.bgSecondary}`}
+                            className={`group relative p-5 rounded-lg flex flex-col cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-1 ${themeClasses.bgSecondary} ${draggedIdeaId === idea.id ? 'opacity-50' : ''}`}
                             onClick={() => navigate(`/idea/${idea.id}/edit`)}
+                            draggable={true}
+                            onDragStart={(e) => handleDragStart(e, idea.id)}
+                            onDragEnd={handleDragEnd}
                         >
                             <div className="flex-grow">
                                 <div className="flex justify-between items-start mb-2">
@@ -204,10 +513,19 @@ const DemosPage = () => {
                                     {getSnippet(idea.synopsis)}
                                 </p>
                             </div>
-                             <div className="mt-4 pt-3 border-t border-inherit">
+                             <div className="mt-4 pt-3 border-t border-inherit flex justify-between items-center">
                                 <span className={`text-xs font-semibold ${themeClasses.textSecondary}`}>
                                     {(idea.wordCount || 0).toLocaleString()} {t.wordsCount}
                                 </span>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setIdeaToMove(idea);
+                                    }}
+                                    className={`p-1 rounded text-xs font-semibold ${themeClasses.bgTertiary} hover:opacity-80 opacity-0 group-hover:opacity-100 transition-opacity`}
+                                >
+                                    {t.move}
+                                </button>
                             </div>
                             <button
                                 onClick={(e) => {
@@ -222,7 +540,21 @@ const DemosPage = () => {
                         </div>
                     ))}
                 </div>
+                </>
             )}
+
+            {/* Modals */}
+            <CreateFolderModal isOpen={isCreateFolderOpen} onClose={() => setIsCreateFolderOpen(false)} onConfirm={handleCreateFolder} />
+            <RenameFolderModal isOpen={!!folderToRename} onClose={() => setFolderToRename(null)} initialName={folderToRename?.name || ''} onConfirm={handleRenameFolder} />
+            <MoveIdeaModal isOpen={!!ideaToMove} onClose={() => setIdeaToMove(null)} folders={folders} onConfirm={handleMoveIdea} />
+
+            <ConfirmModal
+                isOpen={!!folderToDelete}
+                onClose={() => setFolderToDelete(null)}
+                onConfirm={handleDeleteFolder}
+                title={t.deleteFolder}
+                message={t.deleteFolderConfirm}
+            />
 
             <ConfirmModal
                 isOpen={isDocxConfirmOpen}

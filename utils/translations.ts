@@ -1,4 +1,5 @@
 
+
 export const translations = {
   en: {
     // General
@@ -12,6 +13,18 @@ export const translations = {
     loading: 'Loading...',
     words: 'WORDS',
     wordsCount: 'words',
+    rename: 'Rename',
+    move: 'Move',
+
+    // Spell Check
+    addToLibrary: 'Add to Dictionary',
+    ignore: 'Ignore',
+
+    // Daily Goal
+    dailyGoal: 'Daily Goal',
+    wordsWrittenToday: 'Words written today',
+    target: 'Target',
+    setDailyGoal: 'Set Daily Word Goal',
 
     // Welcome Screen
     welcomeCreator: 'Welcome, Creator!',
@@ -101,6 +114,10 @@ export const translations = {
     size: 'Size',
     paragraphSpacing: 'Paragraph Spacing',
     color: 'Color',
+    spellCheck: 'AI Spell Check',
+    spellCheckAnalyzing: 'Analyzing...',
+    spellCheckComplete: 'Spell Check Complete',
+    noErrorsFound: 'No issues found.',
     
     // Idea Box (Demos) Page
     newIdea: 'New Idea',
@@ -116,12 +133,24 @@ export const translations = {
     proceed: 'Do you want to proceed?',
     deleteIdeaConfirmTitle: (title: string) => `Delete "${title}"?`,
     deleteIdeaMessage: 'Are you sure you want to delete this story idea? This action is permanent and cannot be undone.',
+    folders: 'Folders',
+    newFolder: 'New Folder',
+    createFolder: 'Create Folder',
+    folderName: 'Folder Name',
+    renameFolder: 'Rename Folder',
+    deleteFolder: 'Delete Folder',
+    deleteFolderConfirm: 'Delete this folder? Ideas inside will be moved to the root.',
+    moveToFolder: 'Move to Folder',
+    selectFolder: 'Select Folder',
+    noFolder: 'No Folder (Root)',
+    moveIdea: 'Move Idea',
     
     // Story Idea Editor
     returnToIdeaBox: 'Return to Idea Box',
     ideaTitlePlaceholder: 'Idea Title',
     ideaDetails: 'IDEA DETAILS',
     status: 'Status',
+    folder: 'Folder',
     
     // Sketches Page
     newSketch: 'New Sketch',
@@ -193,6 +222,18 @@ export const translations = {
     loading: 'Đang tải...',
     words: 'TỪ',
     wordsCount: 'từ',
+    rename: 'Đổi tên',
+    move: 'Di chuyển',
+
+    // Spell Check
+    addToLibrary: 'Thêm vào từ điển',
+    ignore: 'Bỏ qua',
+
+    // Daily Goal
+    dailyGoal: 'Mục tiêu hàng ngày',
+    wordsWrittenToday: 'Từ đã viết hôm nay',
+    target: 'Mục tiêu',
+    setDailyGoal: 'Đặt mục tiêu từ',
 
     // Welcome Screen
     welcomeCreator: 'Chào mừng, Người sáng tạo!',
@@ -282,6 +323,10 @@ export const translations = {
     size: 'Cỡ chữ',
     paragraphSpacing: 'Giãn cách đoạn',
     color: 'Màu sắc',
+    spellCheck: 'Kiểm tra chính tả AI',
+    spellCheckAnalyzing: 'Đang phân tích...',
+    spellCheckComplete: 'Kiểm tra hoàn tất',
+    noErrorsFound: 'Không tìm thấy lỗi.',
     
     // Idea Box (Demos) Page
     newIdea: 'Ý tưởng mới',
@@ -297,12 +342,24 @@ export const translations = {
     proceed: 'Bạn có muốn tiếp tục không?',
     deleteIdeaConfirmTitle: (title: string) => `Xóa "${title}"?`,
     deleteIdeaMessage: 'Bạn có chắc chắn muốn xóa ý tưởng câu chuyện này không? Hành động này là vĩnh viễn và không thể hoàn tác.',
+    folders: 'Thư mục',
+    newFolder: 'Thư mục mới',
+    createFolder: 'Tạo thư mục',
+    folderName: 'Tên thư mục',
+    renameFolder: 'Đổi tên thư mục',
+    deleteFolder: 'Xóa thư mục',
+    deleteFolderConfirm: 'Xóa thư mục này? Các ý tưởng bên trong sẽ được chuyển ra ngoài.',
+    moveToFolder: 'Chuyển đến thư mục',
+    selectFolder: 'Chọn thư mục',
+    noFolder: 'Không có thư mục',
+    moveIdea: 'Di chuyển ý tưởng',
     
     // Story Idea Editor
     returnToIdeaBox: 'Quay lại Hộp ý tưởng',
     ideaTitlePlaceholder: 'Tiêu đề ý tưởng',
     ideaDetails: 'CHI TIẾT Ý TƯỞNG',
     status: 'Trạng thái',
+    folder: 'Thư mục',
     
     // Sketches Page
     newSketch: 'Bản nháp mới',
@@ -374,6 +431,18 @@ export const translations = {
     loading: 'Ladataan...',
     words: 'SANAA',
     wordsCount: 'sanaa',
+    rename: 'Nimeä uudelleen',
+    move: 'Siirrä',
+
+    // Spell Check
+    addToLibrary: 'Lisää sanakirjaan',
+    ignore: 'Ohita',
+
+    // Daily Goal
+    dailyGoal: 'Päivittäinen tavoite',
+    wordsWrittenToday: 'Sanoja kirjoitettu tänään',
+    target: 'Tavoite',
+    setDailyGoal: 'Aseta sanavoite',
 
     // Welcome Screen
     welcomeCreator: 'Tervetuloa, luoja!',
@@ -463,6 +532,10 @@ export const translations = {
     size: 'Koko',
     paragraphSpacing: 'Kappaleväli',
     color: 'Väri',
+    spellCheck: 'Oikeinkirjoituksen tarkistus',
+    spellCheckAnalyzing: 'Analysoidaan...',
+    spellCheckComplete: 'Tarkistus valmis',
+    noErrorsFound: 'Virheitä ei löytynyt.',
     
     // Idea Box (Demos) Page
     newIdea: 'Uusi idea',
@@ -478,12 +551,24 @@ export const translations = {
     proceed: 'Haluatko jatkaa?',
     deleteIdeaConfirmTitle: (title: string) => `Poistetaanko "${title}"?`,
     deleteIdeaMessage: 'Haluatko varmasti poistaa tämän tarinaidean? Toiminto on pysyvä, eikä sitä voi kumota.',
+    folders: 'Kansiot',
+    newFolder: 'Uusi kansio',
+    createFolder: 'Luo kansio',
+    folderName: 'Kansion nimi',
+    renameFolder: 'Nimeä kansio uudelleen',
+    deleteFolder: 'Poista kansio',
+    deleteFolderConfirm: 'Poistetaanko tämä kansio? Sisällä olevat ideat siirretään juureen.',
+    moveToFolder: 'Siirrä kansioon',
+    selectFolder: 'Valitse kansio',
+    noFolder: 'Ei kansiota (Juuri)',
+    moveIdea: 'Siirrä idea',
     
     // Story Idea Editor
     returnToIdeaBox: 'Palaa idealaatikkoon',
     ideaTitlePlaceholder: 'Idean otsikko',
     ideaDetails: 'IDEAN TIEDOT',
     status: 'Tila',
+    folder: 'Kansio',
     
     // Sketches Page
     newSketch: 'Uusi luonnos',
