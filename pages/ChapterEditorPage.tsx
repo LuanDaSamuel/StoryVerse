@@ -879,10 +879,14 @@ const ChapterEditorPage = () => {
                     e.preventDefault();
                     range.setStart(textNode, offset - 2);
                     range.deleteContents();
-                    range.insertNode(document.createTextNode('…'));
-                    range.collapse(false);
+                    const ellipsis = document.createTextNode('…');
+                    range.insertNode(ellipsis);
+                    // Explicitly move cursor after the inserted ellipsis
+                    range.setStartAfter(ellipsis);
+                    range.collapse(true);
                     selection.removeAllRanges();
                     selection.addRange(range);
+                    
                     editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
                     return;
                 }
@@ -891,10 +895,14 @@ const ChapterEditorPage = () => {
                     e.preventDefault();
                     range.setStart(textNode, offset - 1);
                     range.deleteContents();
-                    range.insertNode(document.createTextNode('—'));
-                    range.collapse(false);
+                    const emDash = document.createTextNode('—');
+                    range.insertNode(emDash);
+                    // Explicitly move cursor after the inserted em-dash
+                    range.setStartAfter(emDash);
+                    range.collapse(true);
                     selection.removeAllRanges();
                     selection.addRange(range);
+                    
                     editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
                     return;
                 }

@@ -1,5 +1,3 @@
-
-
 import * as React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
@@ -559,9 +557,10 @@ const StoryIdeaEditorPage = () => {
             return;
         }
 
+        const range = selection.getRangeAt(0);
+
         if (e.key === '"' || e.key === "'") {
             e.preventDefault();
-            const range = selection.getRangeAt(0);
             const openQuote = e.key === '"' ? '“' : '‘';
             const closeQuote = e.key === '"' ? '”' : '’';
 
@@ -629,6 +628,45 @@ const StoryIdeaEditorPage = () => {
             }
             editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
             return;
+        }
+
+        if (['.', '-'].includes(e.key)) {
+            if (range.collapsed && range.startContainer.nodeType === Node.TEXT_NODE) {
+                const textNode = range.startContainer as Text;
+                const offset = range.startOffset;
+
+                if (e.key === '.' && textNode.textContent?.substring(offset - 2, offset) === '..') {
+                    e.preventDefault();
+                    range.setStart(textNode, offset - 2);
+                    range.deleteContents();
+                    const ellipsis = document.createTextNode('…');
+                    range.insertNode(ellipsis);
+                    // Explicitly move cursor after the inserted ellipsis
+                    range.setStartAfter(ellipsis);
+                    range.collapse(true);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                    
+                    editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+                    return;
+                }
+
+                if (e.key === '-' && textNode.textContent?.substring(offset - 1, offset) === '-') {
+                    e.preventDefault();
+                    range.setStart(textNode, offset - 1);
+                    range.deleteContents();
+                    const emDash = document.createTextNode('—');
+                    range.insertNode(emDash);
+                    // Explicitly move cursor after the inserted em-dash
+                    range.setStartAfter(emDash);
+                    range.collapse(true);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                    
+                    editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+                    return;
+                }
+            }
         }
         
         if (e.key === 'Enter') {
