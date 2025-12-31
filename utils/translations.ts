@@ -1,5 +1,3 @@
-
-
 export const translations = {
   en: {
     // General
@@ -20,6 +18,11 @@ export const translations = {
     addToLibrary: 'Add to Dictionary',
     ignore: 'Ignore',
 
+    // Writing Mode
+    writingMode: 'Writing Mode',
+    standardMode: 'Single Chapter',
+    bookNoteMode: 'Book Note (A5)',
+
     // Daily Goal
     dailyGoal: 'Daily Goal',
     wordsWrittenToday: 'Words written today',
@@ -39,7 +42,6 @@ export const translations = {
     createNovel: 'Create Novel',
     ideaBox: 'Idea Box',
     sketches: 'Sketches',
-    whatsNew: "What's New",
     settings: 'Settings',
     signOut: 'Sign Out',
     saveStatusUnsaved: 'Unsaved changes',
@@ -202,13 +204,12 @@ export const translations = {
     signOutAndClose: 'Sign Out & Close',
     signOutTitle: 'Sign Out?',
     signOutMessage: "Are you sure you want to sign out? Your project is saved on Google Drive. You can sign back in to access it again.",
-    closeProjectTitle: 'Close Project?',
     closeProjectMessage: "Are you sure you want to close this project? Any unsaved changes will be saved before closing. You can reopen it later from your files.",
-    
-    // What's New Modal
-    whatsNewTitle: "What's New",
-    proTip: 'Pro Tip:',
-    proTipMessage: "If you see an 'Error saving' message, a quick reload of the app usually fixes the issue.",
+
+    // Whats New Modal
+    whatsNewTitle: "What's New in StoryVerse",
+    proTip: 'PRO TIP',
+    proTipMessage: 'You can switch back to the classic single-chapter view anytime in Settings.',
   },
   vi: {
     // General
@@ -229,6 +230,11 @@ export const translations = {
     addToLibrary: 'Thêm vào từ điển',
     ignore: 'Bỏ qua',
 
+    // Writing Mode
+    writingMode: 'Chế độ viết',
+    standardMode: 'Từng chương',
+    bookNoteMode: 'Sổ tay (A5)',
+
     // Daily Goal
     dailyGoal: 'Mục tiêu hàng ngày',
     wordsWrittenToday: 'Từ đã viết hôm nay',
@@ -248,7 +254,6 @@ export const translations = {
     createNovel: 'Tạo tiểu thuyết',
     ideaBox: 'Hộp ý tưởng',
     sketches: 'Bản nháp',
-    whatsNew: "Có gì mới",
     settings: 'Cài đặt',
     signOut: 'Đăng xuất',
     saveStatusUnsaved: 'Thay đổi chưa được lưu',
@@ -413,11 +418,11 @@ export const translations = {
     signOutMessage: 'Bạn có chắc chắn muốn đăng xuất không? Dự án của bạn được lưu trên Google Drive. Bạn có thể đăng nhập lại để truy cập.',
     closeProjectTitle: 'Đóng dự án?',
     closeProjectMessage: 'Bạn có chắc chắn muốn đóng dự án này không? Mọi thay đổi chưa được lưu sẽ được lưu trước khi đóng. Bạn có thể mở lại sau từ các tệp của mình.',
-    
-    // What's New Modal
-    whatsNewTitle: 'Có gì mới',
-    proTip: 'Mẹo hay:',
-    proTipMessage: 'Nếu bạn thấy thông báo "Lỗi khi lưu", tải lại ứng dụng thường sẽ khắc phục được sự cố.',
+
+    // Whats New Modal
+    whatsNewTitle: "Có gì mới trong StoryVerse",
+    proTip: 'MẸO',
+    proTipMessage: 'Bạn có thể quay lại chế độ xem từng chương cổ điển bất cứ lúc nào trong Cài đặt.',
   },
   fi: {
     // General
@@ -438,6 +443,11 @@ export const translations = {
     addToLibrary: 'Lisää sanakirjaan',
     ignore: 'Ohita',
 
+    // Writing Mode
+    writingMode: 'Kirjoitustila',
+    standardMode: 'Yksittäinen luku',
+    bookNoteMode: 'Kirjamuistiinpano (A5)',
+
     // Daily Goal
     dailyGoal: 'Päivittäinen tavoite',
     wordsWrittenToday: 'Sanoja kirjoitettu tänään',
@@ -457,7 +467,6 @@ export const translations = {
     createNovel: 'Luo romaani',
     ideaBox: 'Idealaatikko',
     sketches: 'Luonnokset',
-    whatsNew: "Mitä uutta",
     settings: 'Asetukset',
     signOut: 'Kirjaudu ulos',
     saveStatusUnsaved: 'Tallentamattomia muutoksia',
@@ -579,7 +588,7 @@ export const translations = {
     deleteSketchTitle: (title: string) => `Poista luonnos "${title}"?`,
     deleteSketchMessage: 'Haluatko varmasti poistaa tämän luonnoksen? Toiminto on pysyvä, eikä sitä voi kumota.',
     createNovelFirst: 'Sinun on ensin luotava romaani',
-    createNewSketch: 'Luo uusi luonnos',
+    createNewSketch: 'Tạo bản nháp mới',
     
     // Sketch Editor Page
     returnToSketches: 'Palaa luonnoksiin',
@@ -622,10 +631,10 @@ export const translations = {
     signOutMessage: "Haluatko varmasti kirjautua ulos? Projektisi on tallennettu Google Driveen. Voit kirjautua takaisin sisään päästäksesi siihen uudelleen.",
     closeProjectTitle: 'Sulje projekti?',
     closeProjectMessage: "Oletko varma, että haluat sulkea tämän projektin? Kaikki tallentamattomat muutokset tallennetaan ennen sulkemista. Voit avata sen myöhemmin uudelleen tiedostoistasi.",
-    
-    // What's New Modal
-    whatsNewTitle: "Mitä uutta",
-    proTip: 'Ammattilaisvinkki:',
-    proTipMessage: "Jos näet 'Virhe tallennettaessa' -viestin, sovelluksen nopea uudelleenlataus yleensä korjaa ongelman.",
+
+    // Whats New Modal
+    whatsNewTitle: "Mitä uutta StoryVersessä",
+    proTip: 'VINKKI',
+    proTipMessage: 'Voit palata perinteiseen yhden luvun näkymään milloin tahansa asetuksista.',
   },
 };

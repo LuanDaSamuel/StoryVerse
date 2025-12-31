@@ -55,6 +55,10 @@ export function useProjectStorage() {
         console.log('User signed out. Local session data cleared.');
     }, []);
 
+    const getStoredProfile = React.useCallback(async (): Promise<UserProfile | null> => {
+        return await idbGet<UserProfile>(USER_PROFILE_KEY) || null;
+    }, []);
+
     const refreshTokenAndGetProfile = React.useCallback(async (): Promise<UserProfile | null> => {
         console.log("Attempting to refresh token silently...");
         return new Promise((resolve) => {
@@ -338,6 +342,13 @@ export function useProjectStorage() {
             console.error("GAPI client init failed:", err);
             throw new Error(`Initialization failed:\n${err.details || 'Unknown error.'}`);
         });
+
+        // Proactive token restoration
+        const storedToken = await idbGet<StoredToken>(GAPI_AUTH_TOKEN_KEY);
+        if (storedToken && storedToken.access_token) {
+            console.log("Restoring previous session token to GAPI client.");
+            gapi.client.setToken(storedToken);
+        }
     }, []);
 
     // --- Local File System Functions ---
@@ -374,6 +385,7 @@ export function useProjectStorage() {
     return {
         initGapiClient,
         refreshTokenAndGetProfile,
+        getStoredProfile,
         signIn,
         signOut,
         loadFromDrive,

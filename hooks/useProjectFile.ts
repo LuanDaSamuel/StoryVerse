@@ -1,6 +1,5 @@
-
 import * as React from 'react';
-import { ProjectData, StorageStatus, Theme, StoryIdeaStatus, NovelSketch, UserProfile, SaveStatus, Language } from '../types';
+import { ProjectData, StorageStatus, Theme, StoryIdeaStatus, NovelSketch, UserProfile, SaveStatus, Language, WritingMode } from '../types';
 import { get, set, del } from 'idb-keyval';
 import { useProjectStorage, PermanentAuthError } from './useProjectStorage';
 
@@ -10,7 +9,7 @@ const LOCAL_UNLOAD_BACKUP_KEY = 'storyverse-unload-backup';
 const isFileSystemAccessAPISupported = 'showOpenFilePicker' in window;
 
 const defaultProjectData: ProjectData = {
-  settings: { theme: 'book', baseFontSize: 18, language: 'en' },
+  settings: { theme: 'book', baseFontSize: 18, language: 'en', writingMode: 'standard' },
   dailyGoal: { target: 500, current: 0, lastUpdated: new Date().toISOString().split('T')[0] },
   userDictionary: [],
   novels: [],
@@ -33,6 +32,9 @@ const sanitizeProjectData = (data: any): ProjectData => {
     }
     if (['en', 'vi', 'fi'].includes(data.settings.language)) {
         sanitized.settings.language = data.settings.language as Language;
+    }
+    if (['standard', 'book-note'].includes(data.settings.writingMode)) {
+        sanitized.settings.writingMode = data.settings.writingMode as WritingMode;
     }
   }
 
@@ -472,11 +474,10 @@ export function useProject() {
         setProjectData(sanitizedData);
         projectDataRef.current = sanitizedData;
         setProjectName(localData.name);
-        setStatus('ready');
-        setStorageMode('local');
-        return true;
+        // We don't set status here anymore, let initializeApp decide
+        return sanitizedData;
     }
-    return false;
+    return null;
   }, [getLocalProjectData, storage]);
 
   React.useEffect(() => {
@@ -485,20 +486,54 @@ export function useProject() {
     const initializeApp = async () => {
         try {
             await storage.initGapiClient(); 
-            const hasLocal = await checkForRecentLocalProject();
-            if (!hasLocal) {
-                console.log("No local project found. Displaying welcome screen.");
+            const restoredLocalData = await checkForRecentLocalProject();
+            
+            // Check for existing Google session
+            const storedProfile = await storage.getStoredProfile();
+            if (storedProfile) {
+                console.log("Found existing Google session for:", storedProfile.email);
+                setUserProfile(storedProfile);
+                setStorageMode('drive');
+                
+                try {
+                    const driveProject = await storage.loadFromDrive();
+                    if (driveProject && restoredLocalData) {
+                        setProjectName(projectName || 'Local Project'); // Use name from IDB if possible
+                        setStatus('drive-conflict');
+                    } else if (driveProject) {
+                        handleDriveProject(driveProject);
+                    } else if (restoredLocalData) {
+                        // Signed in but no project on Drive yet
+                        setStorageMode('drive');
+                        setStatus('drive-no-project');
+                    } else {
+                        setStatus('welcome');
+                    }
+                } catch (error) {
+                    console.error("Auto-sign in Drive load failed:", error);
+                    // If auth refresh fails, revert to Welcome or Local mode if local data exists
+                    if (restoredLocalData) {
+                        setStorageMode('local');
+                        setStatus('ready');
+                    } else {
+                        setStatus('welcome');
+                    }
+                }
+            } else if (restoredLocalData) {
+                // No Drive session, but we have local data
+                setStorageMode('local');
+                setStatus('ready');
+            } else {
                 setStatus('welcome');
             }
         } catch (error: any) {
             console.error("Initialization failed:", error);
-            alert(`There was a problem initializing the application:\n\n${error.message}\n\nPlease try again.`);
             setStatus('welcome');
         }
     };
     initializeApp();
     isInitialLoadRef.current = false;
-  }, [storage, checkForRecentLocalProject]);
+  }, [storage, checkForRecentLocalProject, handleDriveProject, projectName]);
   
   const openLocalProject = React.useCallback(async () => {
     if (!isFileSystemAccessAPISupported) {

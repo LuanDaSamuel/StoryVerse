@@ -1,9 +1,8 @@
 import * as React from 'react';
 import { NavLink } from 'react-router-dom';
-import { AppLogoIcon, HomeIcon, PlusIcon, SettingsIcon, LightbulbIcon, QuillPenIcon, LoadingIcon, CheckIcon, ExclamationTriangleIcon, SparklesIcon } from './Icons';
+import { AppLogoIcon, HomeIcon, PlusIcon, SettingsIcon, LightbulbIcon, QuillPenIcon, LoadingIcon, CheckIcon, ExclamationTriangleIcon } from './Icons';
 import SettingsModal from './SettingsModal';
 import { ProjectContext } from '../contexts/ProjectContext';
-import WhatsNewModal from './WhatsNewModal';
 import { useTranslations } from '../hooks/useTranslations';
 
 interface SidebarProps {
@@ -36,7 +35,6 @@ const SaveStatusIndicator = () => {
 
 const Sidebar = ({ onLinkClick = () => {} }: SidebarProps) => {
     const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
-    const [isWhatsNewOpen, setIsWhatsNewOpen] = React.useState(false);
     const { theme, themeClasses, userProfile, signOut } = React.useContext(ProjectContext);
     const t = useTranslations();
 
@@ -60,7 +58,7 @@ const Sidebar = ({ onLinkClick = () => {} }: SidebarProps) => {
     return (
         <>
             <div className={`flex flex-col w-60 h-full ${themeClasses.bgSecondary} ${sidebarTextColor} border-r ${themeClasses.border}`}>
-                <div className="flex items-center justify-center h-16 px-6 border-b border-inherit">
+                <div className="flex items-center justify-center h-16 px-6 border-b border-inherit flex-shrink-0">
                     <AppLogoIcon className={`w-8 h-8 mr-3 ${themeClasses.logoColor}`} />
                     <span className="text-xl font-bold">StoryVerse</span>
                 </div>
@@ -102,11 +100,7 @@ const Sidebar = ({ onLinkClick = () => {} }: SidebarProps) => {
                     <div className="h-6 mb-2">
                         <SaveStatusIndicator />
                     </div>
-                    <button onClick={() => setIsWhatsNewOpen(true)} className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${sidebarTextColor} hover:${themeClasses.bgTertiary}`}>
-                        <SparklesIcon className="w-5 h-5" />
-                        <span>{t.whatsNew}</span>
-                    </button>
-                    <button onClick={() => setIsSettingsOpen(true)} className={`mt-2 w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${sidebarTextColor} hover:${themeClasses.bgTertiary}`}>
+                    <button onClick={() => setIsSettingsOpen(true)} className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${sidebarTextColor} hover:${themeClasses.bgTertiary}`}>
                         <SettingsIcon className="w-5 h-5" />
                         <span>{t.settings}</span>
                     </button>
@@ -116,7 +110,6 @@ const Sidebar = ({ onLinkClick = () => {} }: SidebarProps) => {
                 </div>
             </div>
             <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
-            <WhatsNewModal isOpen={isWhatsNewOpen} onClose={() => setIsWhatsNewOpen(false)} />
         </>
     );
 };
