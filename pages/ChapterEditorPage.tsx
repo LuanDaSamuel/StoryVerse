@@ -1131,7 +1131,7 @@ const ChapterEditorPage = () => {
                 editorEl.removeEventListener('keyup', handleSelectionChange);
                 editorEl.removeEventListener('mouseup', handleSelectionChange);
                 editorEl.removeEventListener('focus', handleSelectionChange);
-                editorEl.addEventListener('copy', handleCopy);
+                editorEl.removeEventListener('copy', handleCopy);
             }
             window.removeEventListener('resize', handleSelectionChange);
         };
@@ -1252,7 +1252,7 @@ const ChapterEditorPage = () => {
                         <div className="flex-1 flex items-center justify-between pl-8 md:pl-16 lg:pl-24">
                             <button onClick={() => navigate(`/novel/${novelId}`)} className={`flex items-center space-x-2 ${themeClasses.text} opacity-70 hover:opacity-100`}>
                                 <BackIcon className="w-5 h-5" />
-                                <span className="font-sans">Return to Details</span>
+                                <span className="font-sans">{t.returnToDetails}</span>
                             </button>
                             <SaveStatusIndicator />
                         </div>
@@ -1276,7 +1276,7 @@ const ChapterEditorPage = () => {
                             type="text"
                             value={chapter.title}
                             onChange={(e) => updateChapterField('title', e.target.value)}
-                            placeholder="Chapter Title"
+                            placeholder={t.chapterTitlePlaceholder}
                             className="text-4xl font-bold bg-transparent outline-none w-full mb-8"
                         />
                         <div
@@ -1304,7 +1304,7 @@ const ChapterEditorPage = () => {
                 >
                     <div className={`w-80 h-full ${themeClasses.bgSecondary} ${themeClasses.accentText} text-sm font-sans border-l ${themeClasses.border} flex flex-col`}>
                         <div className={`px-4 py-3 flex justify-between items-center border-b ${themeClasses.border}`}>
-                            <span className="font-bold text-base">EDITOR TOOLS</span>
+                            <span className="font-bold text-base">{t.editorTools}</span>
                             <button onClick={() => setIsSidebarOpen(false)}>
                                 <ChevronRightIcon className="w-5 h-5"/>
                             </button>
@@ -1318,7 +1318,7 @@ const ChapterEditorPage = () => {
                                 >
                                     <div className="flex items-center space-x-3">
                                         <Bars3Icon className="w-5 h-5" />
-                                        <span>Chapter Outline</span>
+                                        <span>{t.chapterOutline}</span>
                                     </div>
                                 </button>
                             </div>
@@ -1329,9 +1329,9 @@ const ChapterEditorPage = () => {
                                 >
                                     <div className="flex items-center space-x-3">
                                         <ClipboardIcon className="w-5 h-5" />
-                                        <span>Copy Chapter Text</span>
+                                        <span>{t.copyChapterText}</span>
                                     </div>
-                                    {isCopied && <span className="text-xs text-green-400 font-normal">Copied!</span>}
+                                    {isCopied && <span className="text-xs text-green-400 font-normal">{t.copied}</span>}
                                 </button>
                             </div>
                             <div className={`border-b ${themeClasses.border}`}>
@@ -1341,7 +1341,7 @@ const ChapterEditorPage = () => {
                                 >
                                     <div className="flex items-center space-x-3">
                                         <BookOpenIcon className="w-5 h-5" />
-                                        <span>Read Novel</span>
+                                        <span>{t.readNovel}</span>
                                     </div>
                                 </button>
                             </div>
@@ -1352,7 +1352,7 @@ const ChapterEditorPage = () => {
                                 >
                                     <div className="flex items-center space-x-3">
                                         <DownloadIcon className="w-5 h-5" />
-                                        <span>Export Novel</span>
+                                        <span>{t.exportNovel}</span>
                                     </div>
                                 </button>
                             </div>

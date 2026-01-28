@@ -1,3 +1,4 @@
+
 import * as React from 'react';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { Theme, Language } from '../types';
@@ -109,6 +110,7 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                 <option value="en">English</option>
                 <option value="vi">Tiếng Việt</option>
                 <option value="fi">Suomi</option>
+                <option value="sv">Svenska</option>
               </select>
             </div>
             

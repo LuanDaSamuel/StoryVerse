@@ -1,6 +1,6 @@
 
 export type Theme = 'dark' | 'book';
-export type Language = 'en' | 'vi' | 'fi';
+export type Language = 'en' | 'vi' | 'fi' | 'sv';
 // Added WritingMode type to support the new writing mode setting.
 export type WritingMode = 'standard' | 'book-note';
 

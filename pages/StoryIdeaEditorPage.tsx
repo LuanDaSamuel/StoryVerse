@@ -162,7 +162,7 @@ const FindReplaceModal = ({ isOpen, onClose, editorRef }: { isOpen: boolean, onC
         if (currentIndex === -1 || matches.length === 0) return;
         const match = matches[currentIndex];
         match.textContent = replaceText;
-        match.classList.remove('search-highlight', 'current-match');
+        match.classList.remove('search-highlight, .current-match');
         setTimeout(() => {
             const newMatches = matches.filter(m => m !== match);
             setMatches(newMatches);
@@ -868,7 +868,7 @@ const StoryIdeaEditorPage = () => {
                             <div className="flex items-center space-x-4">
                                 <button onClick={() => navigate('/demos')} className={`flex items-center space-x-2 ${themeClasses.text} opacity-70 hover:opacity-100`}>
                                     <BackIcon className="w-5 h-5" />
-                                    <span className="font-sans hidden sm:inline">Back</span>
+                                    <span className="font-sans hidden sm:inline">{t.returnToIdeaBox}</span>
                                 </button>
                                 {/* Outline Toggle - Adjusted to ghost style for better visibility */}
                                 <button 
@@ -905,7 +905,7 @@ const StoryIdeaEditorPage = () => {
                             value={idea.title}
                             onChange={(e) => updateStoryIdea({ title: e.target.value })}
                             onBlur={(e) => updateStoryIdea({ title: enhancePlainText(e.target.value) })}
-                            placeholder="Idea Title"
+                            placeholder={t.ideaTitlePlaceholder}
                             className="text-4xl font-bold bg-transparent outline-none w-full mb-8"
                         />
                         <div
@@ -932,7 +932,7 @@ const StoryIdeaEditorPage = () => {
                 >
                     <div className={`w-64 h-full ${themeClasses.bgSecondary} ${themeClasses.accentText} text-sm font-sans border-r ${themeClasses.border} flex flex-col shadow-xl`}>
                         <div className={`px-4 py-3 flex justify-between items-center border-b ${themeClasses.border}`}>
-                            <span className="font-bold text-base">OUTLINE</span>
+                            <span className="font-bold text-base">{t.chapterOutline}</span>
                             <button onClick={() => setIsOutlineOpen(false)}>
                                 <ChevronLeftIcon className="w-5 h-5"/>
                             </button>
@@ -973,7 +973,7 @@ const StoryIdeaEditorPage = () => {
                 >
                     <div className={`w-80 h-full ${themeClasses.bgSecondary} ${themeClasses.accentText} text-sm font-sans border-l ${themeClasses.border} flex flex-col`}>
                         <div className={`px-4 py-3 flex justify-between items-center border-b ${themeClasses.border}`}>
-                            <span className="font-bold text-base">IDEA DETAILS</span>
+                            <span className="font-bold text-base">{t.ideaDetails}</span>
                             <button onClick={() => setIsSidebarOpen(false)}>
                                 <ChevronRightIcon className="w-5 h-5"/>
                             </button>
@@ -981,7 +981,7 @@ const StoryIdeaEditorPage = () => {
 
                         <div className="flex-1 overflow-y-auto p-4 space-y-6">
                             <div>
-                                <h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Status</h3>
+                                <h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>{t.status}</h3>
                                 <div className={`flex rounded-md overflow-hidden border ${themeClasses.border}`}>
                                     {statusOptions.map(option => (
                                         <button key={option} onClick={() => updateStoryIdea({ status: option })} className={`flex-1 py-2 text-sm font-semibold transition-colors ${idea.status === option ? `${themeClasses.accent} ${themeClasses.accentText}` : `hover:${themeClasses.bgTertiary}`}`}>{option}</button>
@@ -1007,7 +1007,7 @@ const StoryIdeaEditorPage = () => {
                            )}
 
                            <div>
-                                <h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Tags</h3>
+                                <h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>{t.tags}</h3>
                                 <div className="flex flex-wrap gap-1.5">
                                     {SKETCH_TAG_OPTIONS.map(t => (
                                         <button 
@@ -1021,10 +1021,10 @@ const StoryIdeaEditorPage = () => {
                                 </div>
                             </div>
                            <div>
-                                <h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Actions</h3>
+                                <h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>{t.actions}</h3>
                                 <button onClick={() => setIsDeleteConfirmOpen(true)} className="w-full flex items-center space-x-3 text-left px-4 py-3 rounded-lg font-semibold bg-red-700 text-red-100 hover:bg-red-800">
                                     <TrashIcon className="w-5 h-5"/>
-                                    <span>Delete Idea</span>
+                                    <span>{t.deleteIdea}</span>
                                 </button>
                             </div>
                         </div>
