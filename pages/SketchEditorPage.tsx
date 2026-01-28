@@ -1,7 +1,8 @@
+
 import * as React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
-import { BackIcon, ChevronLeftIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, TrashIcon, H1Icon, H2Icon, H3Icon, SearchIcon, LoadingIcon, CheckIcon, ExclamationTriangleIcon, CloseIcon } from '../components/Icons';
+import { BackIcon, ChevronLeftIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, TrashIcon, H1Icon, H2Icon, H3Icon, SearchIcon, LoadingIcon, CheckIcon, ExclamationTriangleIcon, CloseIcon, ChevronRightIcon } from '../components/Icons';
 import { enhanceHtml, enhancePlainText, SKETCH_TAG_OPTIONS } from '../constants';
 import { NovelSketch } from '../types';
 import ConfirmModal from '../components/ConfirmModal';
@@ -178,9 +179,110 @@ const SketchEditorPage = () => {
     };
     
     const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+        const selection = window.getSelection();
+        if (!selection || !selection.rangeCount) return;
+        const range = selection.getRangeAt(0);
+
         if (e.key === 'Tab') {
             e.preventDefault();
             document.execCommand('insertText', false, '    ');
+            return;
+        }
+
+        if (e.key === '"' || e.key === "'") {
+            e.preventDefault();
+            const openQuote = e.key === '"' ? '“' : '‘';
+            const closeQuote = e.key === '"' ? '”' : '’';
+
+            if (!range.collapsed) {
+                const selectedContent = range.extractContents();
+                const fragment = document.createDocumentFragment();
+                fragment.appendChild(document.createTextNode(openQuote));
+                fragment.appendChild(selectedContent);
+                fragment.appendChild(document.createTextNode(closeQuote));
+                range.insertNode(fragment);
+                range.collapse(false);
+                selection.removeAllRanges();
+                selection.addRange(range);
+            } else {
+                const { startContainer, startOffset } = range;
+                if (!editorRef.current) return;
+
+                let isAtStartOfBlock = false;
+                let node: Node | null = startContainer;
+                while (node && node.parentNode !== editorRef.current) {
+                    node = node.parentNode;
+                }
+                
+                if (editorRef.current.contains(startContainer) && startContainer === editorRef.current && startOffset === 0) {
+                     isAtStartOfBlock = true;
+                } else if (node && node.nodeType === Node.ELEMENT_NODE) {
+                    const rangeToCheck = document.createRange();
+                    rangeToCheck.selectNodeContents(node);
+                    rangeToCheck.setEnd(startContainer, startOffset);
+                    if (rangeToCheck.toString().trim() === '') {
+                        isAtStartOfBlock = true;
+                    }
+                }
+
+                const precedingRange = document.createRange();
+                precedingRange.setStart(editorRef.current, 0);
+                precedingRange.setEnd(startContainer, startOffset);
+                const textBeforeCursor = precedingRange.toString();
+                const lastChar = textBeforeCursor.slice(-1);
+
+                // Precise heuristic for opening context (consistent with Chapter/Idea editors)
+                const isOpeningContext = isAtStartOfBlock || /[\s\[\(\{\u200B]/.test(lastChar);
+
+                if (e.key === '"') {
+                    document.execCommand('insertText', false, isOpeningContext ? '“' : '”');
+                } else { // e.key === "'"
+                    // Special case for apostrophe (follows a word character)
+                    const isApostrophe = !isAtStartOfBlock && /[a-zA-Z\u00C0-\u017F]/.test(lastChar);
+                    document.execCommand('insertText', false, (isOpeningContext && !isApostrophe) ? '‘' : '’');
+                }
+            }
+            editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+            return;
+        }
+
+        if (['.', '-'].includes(e.key)) {
+            if (range.collapsed && range.startContainer.nodeType === Node.TEXT_NODE) {
+                const textNode = range.startContainer as Text;
+                const offset = range.startOffset;
+
+                if (e.key === '.' && textNode.textContent?.substring(offset - 2, offset) === '..') {
+                    e.preventDefault();
+                    range.setStart(textNode, offset - 2);
+                    range.deleteContents();
+                    const ellipsis = document.createTextNode('…');
+                    range.insertNode(ellipsis);
+                    // Explicitly move cursor after the inserted ellipsis
+                    range.setStartAfter(ellipsis);
+                    range.collapse(true);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                    
+                    editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+                    return;
+                }
+
+                if (e.key === '-' && textNode.textContent?.substring(offset - 1, offset) === '-') {
+                    e.preventDefault();
+                    range.setStart(textNode, offset - 1);
+                    range.deleteContents();
+                    const emDash = document.createTextNode('—');
+                    range.insertNode(emDash);
+                    // Explicitly move cursor after the inserted em-dash
+                    range.setStartAfter(emDash);
+                    range.collapse(true);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                    
+                    editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+                    return;
+                }
+            }
         }
     };
 
@@ -294,9 +396,25 @@ const SketchEditorPage = () => {
             <div className={`flex h-screen font-serif ${themeClasses.bg} ${themeClasses.text}`}>
                 {isSidebarOpen && <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-black/50 z-30" />}
                 <div className="flex-1 overflow-y-auto relative">
-                    <div className={`sticky top-0 z-10 px-8 md:px-16 lg:px-24 pt-6 pb-4 ${themeClasses.bg} bg-opacity-80 backdrop-blur-sm border-b ${themeClasses.border} flex justify-between items-center`}>
-                        <button onClick={() => navigate('/sketches')} className={`flex items-center space-x-2 ${themeClasses.text} opacity-70 hover:opacity-100`}><BackIcon className="w-5 h-5" /><span className="font-sans">Return to Sketches</span></button>
-                        <SaveStatusIndicator />
+                    <div className={`sticky top-0 z-10 pt-6 pb-4 ${themeClasses.bg} bg-opacity-80 backdrop-blur-sm border-b ${themeClasses.border} flex items-center justify-between`}>
+                        <div className="flex-1 flex items-center justify-between pl-8 md:pl-16 lg:pl-24">
+                            <button onClick={() => navigate('/sketches')} className={`flex items-center space-x-2 ${themeClasses.text} opacity-70 hover:opacity-100`}><BackIcon className="w-5 h-5" /><span className="font-sans">Return to Sketches</span></button>
+                            <div className="flex items-center space-x-4">
+                                <SaveStatusIndicator />
+                            </div>
+                        </div>
+
+                        {/* Integrated Sidebar Toggle - Ghost style */}
+                        <div className="pr-2 ml-4">
+                            {!isSidebarOpen && (
+                                <button
+                                    onClick={() => setIsSidebarOpen(true)}
+                                    className={`p-2 rounded-md transition-colors text-inherit opacity-70 hover:opacity-100 hover:${themeClasses.bgTertiary}`}
+                                >
+                                    <ChevronLeftIcon className="w-5 h-5" />
+                                </button>
+                            )}
+                        </div>
                     </div>
                     <div className="px-8 md:px-16 lg:px-24 pt-8 pb-48">
                         <input type="text" value={sketch.title} onChange={e => updateSketch({ title: e.target.value })} onBlur={(e) => updateSketch({ title: enhancePlainText(e.target.value) })} placeholder="Sketch Title" className="text-4xl font-bold bg-transparent outline-none w-full mb-8" />
@@ -305,7 +423,7 @@ const SketchEditorPage = () => {
                 </div>
                 <div className={`fixed top-0 right-0 h-full z-40 transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
                     <div className={`w-80 h-full ${themeClasses.bgSecondary} ${themeClasses.accentText} text-sm font-sans border-l ${themeClasses.border} flex flex-col`}>
-                        <div className={`px-4 py-3 flex justify-between items-center border-b ${themeClasses.border}`}><span className="font-bold text-base">SKETCH DETAILS</span><button onClick={() => setIsSidebarOpen(false)}><ChevronLeftIcon className="w-5 h-5"/></button></div>
+                        <div className={`px-4 py-3 flex justify-between items-center border-b ${themeClasses.border}`}><span className="font-bold text-base">SKETCH DETAILS</span><button onClick={() => setIsSidebarOpen(false)}><ChevronRightIcon className="w-5 h-5"/></button></div>
                         <div className="flex-1 p-4 space-y-6 overflow-y-auto">
                            <div><h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Novel</h3><p className="px-3 py-2 rounded-md bg-black/10">{enhancePlainText(novel.title)}</p></div>
                            <div><h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Tags</h3><div className="flex flex-wrap gap-1.5">{SKETCH_TAG_OPTIONS.map(t => <button key={t} onClick={() => handleTagClick(t)} className={`px-2 py-1 text-xs rounded-full font-semibold ${sketch.tags.includes(t) ? `${themeClasses.accent} ${themeClasses.accentText}` : `${themeClasses.bgTertiary} hover:opacity-80`}`}>{t}</button>)}</div></div>
@@ -339,7 +457,6 @@ const SketchEditorPage = () => {
                     </div>
                 </div>
             </div>
-            {!isSidebarOpen && <button onClick={() => setIsSidebarOpen(true)} className={`fixed top-4 right-4 z-30 p-2 rounded-md ${themeClasses.bgSecondary} ${themeClasses.accentText} hover:opacity-80 shadow-lg border ${themeClasses.border}`}><ChevronLeftIcon className="w-5 h-5" /></button>}
             <FindReplaceModal isOpen={isFindReplaceOpen} onClose={() => setIsFindReplaceOpen(false)} editorRef={editorRef} />
             <ConfirmModal isOpen={isDeleteConfirmOpen} onClose={() => setIsDeleteConfirmOpen(false)} onConfirm={handleDelete} title={`Delete "${sketch.title}"?`} message="Are you sure you want to delete this sketch? This action is permanent." />
         </>

@@ -1,3 +1,4 @@
+
 import { Theme, ThemeConfig } from './types';
 
 export const THEME_CONFIG: Record<Theme, ThemeConfig> = {
@@ -34,10 +35,7 @@ export const SKETCH_TAG_OPTIONS: string[] = [
 ];
 
 /**
- * Core function to apply typographic replacements. This version is more robust
- * and handles common contractions and nested quotes more reliably.
- * @param text The input string.
- * @returns The typographically enhanced string.
+ * Core function to apply typographic replacements.
  */
 function applyTypographicReplacements(text: string): string {
     if (!text) return text;
@@ -45,27 +43,21 @@ function applyTypographicReplacements(text: string): string {
     return text
         .replace(/\.\.\./g, '…')
         .replace(/--/g, '—')
-        // Handle common English contractions and possessives first
-        .replace(/(\w)'t\b/g, '$1’t')
-        .replace(/(\w)'s\b/g, '$1’s')
-        .replace(/(\w)'re\b/g, '$1’re')
-        .replace(/(\w)'ll\b/g, '$1’ll')
-        .replace(/(\w)'ve\b/g, '$1’ve')
-        .replace(/(\w)'d\b/g, '$1’d')
-        // Handle opening quotes. A quote is considered "opening" if it's at the
-        // start of the string, or preceded by whitespace or certain punctuation.
-        .replace(/(^|\s|[[({“‘])"/g, '$1“') // Double quotes
-        .replace(/"/g, '”') // Any remaining double quotes are closing ones
-        .replace(/(^|\s|[[({“‘])'/g, '$1‘') // Single quotes
-        .replace(/'/g, '’'); // Any remaining single quotes are closing ones or apostrophes
+        // Handle common English contractions and possessives first to ensure apostrophes are curly.
+        // We use a broader range for word characters to support accented languages.
+        .replace(/([a-zA-Z\u00C0-\u017F])'([strmldv]\b)/gi, '$1’$2')
+        .replace(/([a-zA-Z\u00C0-\u017F])'(\s|$)/g, '$1’$2')
+        // Handle opening quotes. 
+        // A quote is "opening" if it follows whitespace, specific brackets, or start of string.
+        .replace(/(^|[\s\[\(\{\u200B])"/g, '$1“')
+        .replace(/"/g, '”')
+        .replace(/(^|[\s\[\(\{\u200B])'/g, '$1‘')
+        .replace(/'/g, '’');
 }
 
 
 /**
  * Applies typographic enhancements to a plain text string.
- * Replaces triple dots with ellipsis and straight quotes with curly "smart" quotes.
- * @param text The plain text to enhance.
- * @returns The enhanced text.
  */
 export function enhancePlainText(text: string): string {
     if (!text) return '';
@@ -74,18 +66,12 @@ export function enhancePlainText(text: string): string {
 
 /**
  * Applies typographic enhancements to an HTML string by walking the DOM.
- * This is safe and won't affect HTML tags or attributes.
- * @param htmlString The HTML string to enhance.
- * @returns The enhanced HTML string.
  */
 export function enhanceHtml(htmlString: string): string {
     if (!htmlString) return '';
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = htmlString;
     
-    // Normalize the DOM tree. This is the key fix: it merges adjacent text
-    // nodes, which prevents the smart quote logic from failing when the browser
-    // editor fragments text.
     tempDiv.normalize();
 
     const walk = (node: Node) => {

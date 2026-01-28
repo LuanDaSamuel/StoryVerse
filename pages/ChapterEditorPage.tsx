@@ -238,7 +238,7 @@ const FindReplaceModal = ({ isOpen, onClose, editorRef, onReplaceAllInNovel }: {
     if (currentIndex === -1 || matches.length === 0) return;
     const match = matches[currentIndex];
     match.textContent = replaceText;
-    match.classList.remove('search-highlight', 'current-match');
+    match.classList.remove('search-highlight, .current-match');
     
     // Defer DOM changes to allow state to update first
     setTimeout(() => {
@@ -1248,12 +1248,27 @@ const ChapterEditorPage = () => {
                 )}
                 
                 <div ref={scrollContainerRef} className="flex-1 overflow-y-auto relative">
-                     <div className={`sticky top-0 z-10 px-8 md:px-16 lg:px-24 pt-6 pb-4 ${themeClasses.bg} bg-opacity-80 backdrop-blur-sm border-b ${themeClasses.border} flex justify-between items-center`}>
-                        <button onClick={() => navigate(`/novel/${novelId}`)} className={`flex items-center space-x-2 ${themeClasses.text} opacity-70 hover:opacity-100`}>
-                            <BackIcon className="w-5 h-5" />
-                            <span className="font-sans">Return to Details</span>
-                        </button>
-                        <SaveStatusIndicator />
+                     <div className={`sticky top-0 z-10 pt-6 pb-4 ${themeClasses.bg} bg-opacity-80 backdrop-blur-sm border-b ${themeClasses.border} flex items-center justify-between`}>
+                        <div className="flex-1 flex items-center justify-between pl-8 md:pl-16 lg:pl-24">
+                            <button onClick={() => navigate(`/novel/${novelId}`)} className={`flex items-center space-x-2 ${themeClasses.text} opacity-70 hover:opacity-100`}>
+                                <BackIcon className="w-5 h-5" />
+                                <span className="font-sans">Return to Details</span>
+                            </button>
+                            <SaveStatusIndicator />
+                        </div>
+                        
+                        {/* Sidebar toggle pushed to far right edge - Ghost style */}
+                        <div className="pr-2 ml-4">
+                            {!isSidebarOpen && (
+                                <button
+                                    onClick={() => setIsSidebarOpen(true)}
+                                    className={`p-2 rounded-md transition-colors text-inherit opacity-70 hover:opacity-100 hover:${themeClasses.bgTertiary}`}
+                                    aria-label="Open editor tools"
+                                >
+                                    <ChevronLeftIcon className="w-5 h-5" />
+                                </button>
+                            )}
+                        </div>
                     </div>
                     
                     <div className="px-8 md:px-16 lg:px-24 pt-8 pb-48">
@@ -1420,20 +1435,6 @@ const ChapterEditorPage = () => {
                     </div>
                 </div>
             </div>
-
-            {!isSidebarOpen && (
-                <button
-                    onClick={() => setIsSidebarOpen(true)}
-                    className={`
-                        fixed top-4 right-4 z-30 p-2 rounded-md
-                        ${themeClasses.bgSecondary} ${themeClasses.accentText}
-                        hover:opacity-80 shadow-lg border ${themeClasses.border}
-                    `}
-                    aria-label="Open editor tools"
-                >
-                    <ChevronLeftIcon className="w-5 h-5" />
-                </button>
-            )}
 
             <FindReplaceModal 
                 isOpen={isFindReplaceOpen}

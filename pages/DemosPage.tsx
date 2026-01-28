@@ -169,25 +169,57 @@ const DemosPage = () => {
 
         try {
             const arrayBuffer = await file.arrayBuffer();
+            
+            // Safe Mammoth Resolution
+            // @ts-ignore
+            const mammothLib = mammoth.default || mammoth;
+             
+            if (!mammothLib || typeof mammothLib.convertToHtml !== 'function') {
+                 throw new Error("The DOCX processing library could not be loaded.");
+            }
+
             const styleMap = [
                 "p[style-name='Title'] => h1:fresh",
+                "p[style-name='Subtitle'] => h2:fresh",
                 "p[style-name='Heading 1'] => h2:fresh",
                 "p[style-name='Heading 2'] => h3:fresh",
-                "p[style-name='Heading 3'] => h3:fresh",
+                "p[style-name='Heading 3'] => h4:fresh",
+                "p[style-name='Heading 4'] => h5:fresh",
+                "p[style-name='Heading 5'] => h6:fresh",
             ];
-            const { value: html } = await mammoth.convertToHtml({ arrayBuffer }, { styleMap });
+            const { value: html } = await mammothLib.convertToHtml({ arrayBuffer }, { styleMap });
             
             const tempDiv = document.createElement('div');
+            // Clean up empty paragraphs
             tempDiv.innerHTML = html.replace(/<p>(\s|&nbsp;|<br\s*\/?>)*<\/p>/gi, '').trim();
             
-            let ideaTitle = file.name.replace(/\.docx$/, '');
-            const firstHeading = tempDiv.querySelector('h1, h2, h3');
+            // Use filename as title, replacing .docx case-insensitively
+            let ideaTitle = file.name.replace(/\.docx$/i, '');
             
-            if (firstHeading && firstHeading.textContent) {
-                ideaTitle = firstHeading.textContent.trim();
+            // Extract Outline from the generated HTML
+            const headings = Array.from(tempDiv.querySelectorAll('h1, h2, h3, h4, h5, h6'));
+            let outlineHtml = '';
+            
+            if (headings.length > 0) {
+                outlineHtml += '<p><strong>Outline:</strong></p><ul>';
+                headings.forEach(heading => {
+                    const text = heading.textContent?.trim();
+                    if (text) {
+                        const tagName = heading.tagName.toUpperCase();
+                        let indent = '0';
+                        if (tagName === 'H3') indent = '1.5em'; // H1(Title) -> H2(Heading1) -> H3(Heading2)
+                        if (tagName === 'H4') indent = '3em';
+                        if (tagName === 'H5') indent = '4.5em';
+                        if (tagName === 'H6') indent = '6em';
+                        
+                        outlineHtml += `<li style="margin-left: ${indent}; list-style-type: disc;">${text}</li>`;
+                    }
+                });
+                outlineHtml += '</ul><hr/><br/>';
             }
             
-            const synopsisHtml = tempDiv.innerHTML;
+            // Combine outline + content
+            const synopsisHtml = outlineHtml + tempDiv.innerHTML;
             
             setPendingImportData({
                 title: ideaTitle,
@@ -195,9 +227,9 @@ const DemosPage = () => {
                 originalFilename: file.name,
             });
             setIsDocxConfirmOpen(true);
-        } catch (error) {
+        } catch (error: any) {
             console.error(`Error processing file ${file.name}:`, error);
-            alert(`Failed to process ${file.name}. It might be corrupted or not a valid .docx file.`);
+            alert(`Failed to process ${file.name}. Error: ${error.message || 'Unknown error'}`);
         } finally {
             e.target.value = '';
         }

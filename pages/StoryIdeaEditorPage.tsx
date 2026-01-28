@@ -1,7 +1,8 @@
+
 import * as React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
-import { BackIcon, ChevronLeftIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, TrashIcon, H1Icon, H2Icon, H3Icon, SearchIcon, LoadingIcon, CheckIcon, ExclamationTriangleIcon, CloseIcon, ChevronDownIcon, TextIcon, ChevronRightIcon } from '../components/Icons';
+import { BackIcon, ChevronLeftIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, TrashIcon, H1Icon, H2Icon, H3Icon, SearchIcon, LoadingIcon, CheckIcon, ExclamationTriangleIcon, CloseIcon, ChevronDownIcon, TextIcon, ChevronRightIcon, Bars3Icon } from '../components/Icons';
 import { enhanceHtml, enhancePlainText, SKETCH_TAG_OPTIONS, THEME_CONFIG } from '../constants';
 import { StoryIdea, StoryIdeaStatus } from '../types';
 import ConfirmModal from '../components/ConfirmModal';
@@ -185,7 +186,7 @@ const FindReplaceModal = ({ isOpen, onClose, editorRef }: { isOpen: boolean, onC
 
     if (!isOpen) return null;
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 transition-opacity font-sans">
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 font-sans">
             <div className={`p-6 rounded-lg shadow-2xl w-full max-w-md m-4 ${themeClasses.bgSecondary} ${themeClasses.accentText} border ${themeClasses.border}`}>
                 <div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold">Find & Replace</h2><button onClick={handleClose} className={`p-1 rounded-full hover:${themeClasses.bgTertiary}`} aria-label="Close"><CloseIcon className="w-6 h-6" /></button></div>
                 <div className="space-y-4">
@@ -221,9 +222,11 @@ const StoryIdeaEditorPage = () => {
     const toolbarRef = React.useRef<HTMLDivElement>(null);
 
     const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+    const [isOutlineOpen, setIsOutlineOpen] = React.useState(false); // New State for Outline Sidebar
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = React.useState(false);
     const [isFindReplaceOpen, setIsFindReplaceOpen] = React.useState(false);
     const [isFormatPanelOpen, setIsFormatPanelOpen] = React.useState(false);
+    const [headings, setHeadings] = React.useState<{id: string, text: string, level: number}[]>([]); // Headings data
 
     const [activeFormats, setActiveFormats] = React.useState({ isBold: false, isItalic: false, isUL: false, isOL: false });
     const [currentFormat, setCurrentFormat] = React.useState({
@@ -247,6 +250,31 @@ const StoryIdeaEditorPage = () => {
             folders: projectData.ideaFolders || []
         };
     }, [projectData, ideaId]);
+
+    const updateHeadings = React.useCallback(() => {
+        if (!editorRef.current) return;
+        const elements = Array.from(editorRef.current.querySelectorAll('h1, h2, h3')) as HTMLElement[];
+        const newHeadings = elements
+            .map((el, index) => {
+                if (!el.id) el.id = `heading-${index}-${crypto.randomUUID().slice(0,4)}`;
+                return {
+                    id: el.id,
+                    text: (el.textContent || '').trim(), // Ensure text is trimmed
+                    level: parseInt(el.tagName.substring(1)),
+                };
+            })
+            .filter(heading => heading.text.length > 0); // Filter out empty headings
+        setHeadings(newHeadings);
+    }, []);
+
+    const scrollToHeading = (id: string) => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            // Close outline on mobile/smaller screens if needed, but keeping it open is fine for desktop
+            if (window.innerWidth < 1024) setIsOutlineOpen(false);
+        }
+    };
 
     const updateStoryIdea = React.useCallback((updates: Partial<Omit<StoryIdea, 'id' | 'createdAt'>>) => {
         if (ideaIndex === -1) return;
@@ -323,7 +351,8 @@ const StoryIdeaEditorPage = () => {
         });
     
         editor.normalize();
-    }, []);
+        updateHeadings(); // Update headings after cleanup
+    }, [updateHeadings]);
 
     const updateActiveFormats = React.useCallback(() => {
         setActiveFormats({
@@ -581,49 +610,38 @@ const StoryIdeaEditorPage = () => {
                 // 1. Determine if the cursor is at the beginning of a block-level element.
                 let isAtStartOfBlock = false;
                 let node: Node | null = startContainer;
-                // Find the nearest ancestor element that is a direct child of the editor. This is our block.
                 while (node && node.parentNode !== editorRef.current) {
                     node = node.parentNode;
                 }
                 
-                // If we are at the very start of the editor, consider it the start of a block.
                 if (editorRef.current.contains(startContainer) && startContainer === editorRef.current && startOffset === 0) {
                      isAtStartOfBlock = true;
                 } else if (node && node.nodeType === Node.ELEMENT_NODE) {
                     const rangeToCheck = document.createRange();
                     rangeToCheck.selectNodeContents(node);
                     rangeToCheck.setEnd(startContainer, startOffset);
-                    // If the text content from the start of the block to the cursor is empty, it's the start.
                     if (rangeToCheck.toString().trim() === '') {
                         isAtStartOfBlock = true;
                     }
                 }
 
-                // Get text before the cursor for context.
+                // 2. Balancing logic using context check
                 const precedingRange = document.createRange();
                 precedingRange.setStart(editorRef.current, 0);
                 precedingRange.setEnd(startContainer, startOffset);
                 const textBeforeCursor = precedingRange.toString();
                 const lastChar = textBeforeCursor.slice(-1);
 
-                if (isAtStartOfBlock) {
-                    // Always use an opening quote at the start of a block.
-                    document.execCommand('insertText', false, e.key === '"' ? '“' : '‘');
-                } else if (e.key === "'") {
-                    // Heuristic for apostrophe vs. single quote.
-                    if (/\w/.test(lastChar)) {
-                        document.execCommand('insertText', false, '’'); // Apostrophe
-                    } else {
-                        // Balance single quotes.
-                        const openSingleCount = (textBeforeCursor.match(/‘/g) || []).length;
-                        const closeSingleCount = (textBeforeCursor.match(/’/g) || []).length;
-                        document.execCommand('insertText', false, openSingleCount > closeSingleCount ? '’' : '‘');
-                    }
-                } else { // e.key === '"'
-                    // Balance double quotes.
-                    const openDoubleCount = (textBeforeCursor.match(/“/g) || []).length;
-                    const closeDoubleCount = (textBeforeCursor.match(/”/g) || []).length;
-                    document.execCommand('insertText', false, openDoubleCount > closeDoubleCount ? '”' : '“');
+                // Use the same robust logic from ChapterEditor for consistency.
+                const isOpeningContext = isAtStartOfBlock || /[\s\[\(\{\u200B]/.test(lastChar);
+
+                if (e.key === '"') {
+                    document.execCommand('insertText', false, isOpeningContext ? '“' : '”');
+                } else { // e.key === "'"
+                    // Special case for apostrophe (follows a word character like in "don't")
+                    // We use the same set from constants to support Vietnamese/Accented characters
+                    const isApostrophe = !isAtStartOfBlock && /[a-zA-Z\u00C0-\u017F]/.test(lastChar);
+                    document.execCommand('insertText', false, (isOpeningContext && !isApostrophe) ? '‘' : '’');
                 }
             }
             editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
@@ -741,6 +759,10 @@ const StoryIdeaEditorPage = () => {
             if (editorRef.current.innerHTML !== enhanceHtml(initialContent)) {
                  editorRef.current.innerHTML = enhanceHtml(initialContent);
                  editorContentRef.current = initialContent;
+                 updateHeadings();
+            } else if (headings.length === 0) {
+                // Ensure headings are populated on initial load even if content matches
+                updateHeadings();
             }
         }
     }, [idea?.id]); // Re-run when idea ID changes (loading new idea)
@@ -831,22 +853,50 @@ const StoryIdeaEditorPage = () => {
     return (
         <>
             <div className={`flex h-screen font-serif ${themeClasses.bg} ${themeClasses.text}`}>
-                {/* Backdrop for sidebar */}
-                {isSidebarOpen && (
+                {/* Backdrop for sidebars */}
+                {(isSidebarOpen || isOutlineOpen) && (
                     <div
-                        onClick={() => setIsSidebarOpen(false)}
+                        onClick={() => { setIsSidebarOpen(false); setIsOutlineOpen(false); }}
                         className="fixed inset-0 bg-black/50 z-30"
                         aria-hidden="true"
                     />
                 )}
                 
                 <div ref={scrollContainerRef} className="flex-1 overflow-y-auto relative">
-                     <div className={`sticky top-0 z-10 px-8 md:px-16 lg:px-24 pt-6 pb-4 ${themeClasses.bg} bg-opacity-80 backdrop-blur-sm border-b ${themeClasses.border} flex justify-between items-center`}>
-                        <button onClick={() => navigate('/demos')} className={`flex items-center space-x-2 ${themeClasses.text} opacity-70 hover:opacity-100`}>
-                            <BackIcon className="w-5 h-5" />
-                            <span className="font-sans">Return to Idea Box</span>
-                        </button>
-                        <SaveStatusIndicator />
+                     <div className={`sticky top-0 z-10 pt-6 pb-4 ${themeClasses.bg} bg-opacity-80 backdrop-blur-sm border-b ${themeClasses.border} flex items-center justify-between`}>
+                        <div className="flex-1 flex items-center justify-between pl-8 md:pl-16 lg:pl-24">
+                            <div className="flex items-center space-x-4">
+                                <button onClick={() => navigate('/demos')} className={`flex items-center space-x-2 ${themeClasses.text} opacity-70 hover:opacity-100`}>
+                                    <BackIcon className="w-5 h-5" />
+                                    <span className="font-sans hidden sm:inline">Back</span>
+                                </button>
+                                {/* Outline Toggle - Adjusted to ghost style for better visibility */}
+                                <button 
+                                    onClick={() => setIsOutlineOpen(true)}
+                                    className={`p-2 rounded-md transition-colors text-inherit opacity-70 hover:opacity-100 hover:${themeClasses.bgTertiary}`}
+                                    title="Outline"
+                                >
+                                    <Bars3Icon className="w-5 h-5" />
+                                </button>
+                            </div>
+                            
+                            <div className="flex items-center space-x-4">
+                                <SaveStatusIndicator />
+                            </div>
+                        </div>
+
+                        {/* Integrated Sidebar Toggle - Adjusted to ghost style for better visibility */}
+                        <div className="pr-2 ml-4">
+                            {!isSidebarOpen && (
+                                <button
+                                    onClick={() => setIsSidebarOpen(true)}
+                                    className={`p-2 rounded-md transition-colors text-inherit opacity-70 hover:opacity-100 hover:${themeClasses.bgTertiary}`}
+                                    aria-label="Open details"
+                                >
+                                    <ChevronLeftIcon className="w-5 h-5" />
+                                </button>
+                            )}
+                        </div>
                     </div>
                     
                     <div className="px-8 md:px-16 lg:px-24 pt-8 pb-48">
@@ -873,6 +923,47 @@ const StoryIdeaEditorPage = () => {
                     </div>
                 </div>
                 
+                {/* Left Outline Sidebar */}
+                <div
+                    className={`
+                        fixed top-0 left-0 h-full z-40 transition-transform duration-300 ease-in-out
+                        ${isOutlineOpen ? 'translate-x-0' : '-translate-x-full'}
+                    `}
+                >
+                    <div className={`w-64 h-full ${themeClasses.bgSecondary} ${themeClasses.accentText} text-sm font-sans border-r ${themeClasses.border} flex flex-col shadow-xl`}>
+                        <div className={`px-4 py-3 flex justify-between items-center border-b ${themeClasses.border}`}>
+                            <span className="font-bold text-base">OUTLINE</span>
+                            <button onClick={() => setIsOutlineOpen(false)}>
+                                <ChevronLeftIcon className="w-5 h-5"/>
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-2">
+                            {headings.length === 0 ? (
+                                <p className={`p-4 text-center ${themeClasses.textSecondary} italic`}>
+                                    No headings found. Add headings (H1-H3) to create an outline.
+                                </p>
+                            ) : (
+                                <ul className="space-y-1">
+                                    {headings.map((heading) => (
+                                        <li key={heading.id}>
+                                            <button
+                                                onClick={() => scrollToHeading(heading.id)}
+                                                className={`
+                                                    block w-full text-left px-3 py-2 rounded-md transition-colors
+                                                    hover:${themeClasses.bgTertiary} truncate
+                                                `}
+                                                style={{ paddingLeft: `${(heading.level - 1) * 0.75 + 0.75}rem` }}
+                                            >
+                                                {heading.text}
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
                 {/* Editor Tools Sidebar (Right) */}
                 <div
                     className={`
@@ -950,6 +1041,9 @@ const StoryIdeaEditorPage = () => {
                                 <div className="space-y-4">
                                     <ToolbarDropdown label="Paragraph Style" value={currentFormat.paragraphStyle} onChange={(e) => applyParagraphStyle(e.target.value)}>
                                         <option value="p">Paragraph</option>
+                                        <option value="h1">Heading 1</option>
+                                        <option value="h2">Heading 2</option>
+                                        <option value="h3">Heading 3</option>
                                         <option value="blockquote">Blockquote</option>
                                     </ToolbarDropdown>
                                     <ToolbarDropdown label="Font" value={currentFormat.font} onChange={(e) => applyFont(e.target.value)}>
@@ -1015,20 +1109,6 @@ const StoryIdeaEditorPage = () => {
                     </div>
                 </div>
             </div>
-
-            {!isSidebarOpen && (
-                <button
-                    onClick={() => setIsSidebarOpen(true)}
-                    className={`
-                        fixed top-4 right-4 z-30 p-2 rounded-md
-                        ${themeClasses.bgSecondary} ${themeClasses.accentText}
-                        hover:opacity-80 shadow-lg border ${themeClasses.border}
-                    `}
-                    aria-label="Open editor tools"
-                >
-                    <ChevronLeftIcon className="w-5 h-5" />
-                </button>
-            )}
 
             <FindReplaceModal 
                 isOpen={isFindReplaceOpen}
