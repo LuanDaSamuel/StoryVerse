@@ -269,8 +269,8 @@ const FindReplaceModal = ({ isOpen, onClose, editorRef, onReplaceAllInNovel }: {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 transition-opacity font-sans">
-      <div className={`p-6 rounded-lg shadow-2xl w-full max-w-md m-4 ${themeClasses.bgSecondary} ${themeClasses.accentText} border ${themeClasses.border}`}>
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 transition-opacity font-sans" onClick={handleClose}>
+      <div className={`p-6 rounded-lg shadow-2xl w-full max-w-md m-4 ${themeClasses.bgSecondary} ${themeClasses.accentText} border ${themeClasses.border}`} onClick={e => e.stopPropagation()}>
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">Find & Replace</h2>
           <button onClick={handleClose} className={`p-1 rounded-full hover:${themeClasses.bgTertiary}`} aria-label="Close">
@@ -1131,7 +1131,7 @@ const ChapterEditorPage = () => {
                 editorEl.removeEventListener('keyup', handleSelectionChange);
                 editorEl.removeEventListener('mouseup', handleSelectionChange);
                 editorEl.removeEventListener('focus', handleSelectionChange);
-                editorEl.removeEventListener('copy', handleCopy);
+                editorEl.addEventListener('copy', handleCopy);
             }
             window.removeEventListener('resize', handleSelectionChange);
         };
@@ -1262,7 +1262,7 @@ const ChapterEditorPage = () => {
                             {!isSidebarOpen && (
                                 <button
                                     onClick={() => setIsSidebarOpen(true)}
-                                    className={`p-2 rounded-md transition-colors text-inherit opacity-70 hover:opacity-100 hover:${themeClasses.bgTertiary}`}
+                                    className={`p-2 rounded-md transition-colors text-inherit opacity-70 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10`}
                                     aria-label="Open editor tools"
                                 >
                                     <ChevronLeftIcon className="w-5 h-5" />

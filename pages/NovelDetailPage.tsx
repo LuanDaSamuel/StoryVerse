@@ -4,14 +4,11 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { enhancePlainText } from '../constants';
 import { Novel, Chapter } from '../types';
-import { BackIcon, BookOpenIcon, DownloadIcon, TrashIcon, UploadIcon, PlusIcon, TextIcon, CloseIcon, LoadingIcon } from '../components/Icons';
+import { BackIcon, BookOpenIcon, DownloadIcon, TrashIcon, UploadIcon, PlusIcon, TextIcon, CloseIcon } from '../components/Icons';
 import ConfirmModal from '../components/ConfirmModal';
 import NovelHistoryPage from '../components/NovelHistoryPage';
 import ExportModal from '../components/ExportModal';
-import * as pdfjsLib from 'pdfjs-dist';
 import { useTranslations } from '../hooks/useTranslations';
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://aistudiocdn.com/pdfjs-dist@4.0.379/build/pdf.worker.min.mjs';
 
 const NovelDetailPage = () => {
     const { novelId } = useParams<{ novelId: string }>();
@@ -19,7 +16,6 @@ const NovelDetailPage = () => {
     const { projectData, setProjectData, themeClasses } = React.useContext(ProjectContext);
     const t = useTranslations();
     const coverImageInputRef = React.useRef<HTMLInputElement>(null);
-    const pdfInputRef = React.useRef<HTMLInputElement>(null);
     const descriptionTextareaRef = React.useRef<HTMLTextAreaElement>(null);
     const tagInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -27,9 +23,6 @@ const NovelDetailPage = () => {
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = React.useState(false);
     const [chapterToDelete, setChapterToDelete] = React.useState<Chapter | null>(null);
     const [activeTab, setActiveTab] = React.useState<'Details' | 'History'>('Details');
-    const [isPdfConfirmOpen, setIsPdfConfirmOpen] = React.useState(false);
-    const [pendingFiles, setPendingFiles] = React.useState<FileList | null>(null);
-    const [isImporting, setIsImporting] = React.useState(false);
     const [isAddingTag, setIsAddingTag] = React.useState(false);
     const [newTag, setNewTag] = React.useState('');
 
@@ -105,144 +98,6 @@ const NovelDetailPage = () => {
             tagInputRef.current?.focus();
         }
     }, [isAddingTag]);
-
-    const handleFileSelectForPdf = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = e.target.files;
-        if (files && files.length > 0) {
-            setPendingFiles(files);
-            setIsPdfConfirmOpen(true);
-        }
-        e.target.value = '';
-    };
-
-    const handlePdfImport = async () => {
-        if (!pendingFiles || novelIndex === -1) return;
-        setIsPdfConfirmOpen(false);
-        setIsImporting(true);
-
-        const sortedFiles: File[] = (Array.from(pendingFiles) as File[]).sort((a: File, b: File) =>
-            a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
-        );
-
-        let allNewChapters: Chapter[] = [];
-
-        const createChapter = (title: string, content: string): Chapter => {
-            const now = new Date().toISOString();
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = content;
-            const text = tempDiv.textContent || "";
-            const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
-
-            return {
-                id: crypto.randomUUID(),
-                title: enhancePlainText(title),
-                content: content,
-                wordCount: wordCount,
-                createdAt: now,
-                updatedAt: now,
-                history: [],
-            };
-        };
-
-        for (const file of sortedFiles) {
-            try {
-                const arrayBuffer = await file.arrayBuffer();
-                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
-                let fullText = '';
-
-                // Extract text from all pages
-                for (let i = 1; i <= pdf.numPages; i++) {
-                    const page = await pdf.getPage(i);
-                    const textContent = await page.getTextContent();
-                    
-                    // Simple text extraction: join items with space. 
-                    // To improve paragraph detection, we can check vertical position differences, 
-                    // but simple join is safer for now.
-                    const pageText = textContent.items
-                        .map((item: any) => item.str)
-                        .join(' ');
-                    
-                    fullText += pageText + '\n\n';
-                }
-
-                // Clean up text
-                fullText = fullText.replace(/\s+/g, ' ').trim();
-
-                // Split by regex for "Chapter X" or similar patterns.
-                // Regex looks for "Chapter" followed by numbers or roman numerals, case insensitive.
-                // It captures the title to use as heading.
-                const chapterSplitRegex = /(?:^|\s)(Chapter\s+(?:\d+|[IVX]+)|Prologue|Epilogue)(?:[:\.\s]|$)/gi;
-                
-                // We will use a simpler split strategy: 
-                // 1. Find all matches.
-                // 2. Slice text between matches.
-                
-                const matches = [...fullText.matchAll(chapterSplitRegex)];
-                
-                if (matches.length === 0) {
-                    // No chapters detected, treat whole file as one chapter
-                    const filenameTitle = file.name.replace(/\.pdf$/i, '');
-                    // Convert newlines to paragraphs for HTML content
-                    const htmlContent = `<p>${fullText.replace(/\n\n/g, '</p><p>')}</p>`;
-                    allNewChapters.push(createChapter(filenameTitle, htmlContent));
-                } else {
-                    let lastIndex = 0;
-                    // Handle preamble if any
-                    if (matches[0].index && matches[0].index > 0) {
-                        const preamble = fullText.slice(0, matches[0].index).trim();
-                        if (preamble.length > 50) { // arbitrary threshold to ignore noise
-                             const htmlContent = `<p>${preamble.replace(/\n\n/g, '</p><p>')}</p>`;
-                             allNewChapters.push(createChapter('Prologue', htmlContent));
-                        }
-                    }
-
-                    for (let i = 0; i < matches.length; i++) {
-                        const match = matches[i];
-                        const title = match[1]; // The captured group "Chapter 1"
-                        const startIndex = (match.index || 0) + match[0].length;
-                        const endIndex = (i + 1 < matches.length) ? matches[i + 1].index : fullText.length;
-                        
-                        const content = fullText.slice(startIndex, endIndex).trim();
-                        // Basic paragraph formation: treat double spaces/newlines as paragraph breaks?
-                        // Since we flattened newlines earlier, we rely on the extraction logic.
-                        // Actually, simplified extraction above just joins with space.
-                        // Let's assume the text is a blob and wrap it in a p.
-                        // Ideally, we'd preserve newlines from PDF, but PDF extraction is tricky.
-                        // For this implementation, we will just wrap the content.
-                        const htmlContent = `<p>${content}</p>`;
-                        
-                        allNewChapters.push(createChapter(title, htmlContent));
-                    }
-                }
-
-            } catch (error: any) {
-                console.error(`Error processing file ${file.name}:`, error);
-                alert(`Failed to process ${file.name}. Error: ${error.message || 'Unknown error'}`);
-            }
-        }
-
-        if (allNewChapters.length > 0) {
-            setProjectData(currentData => {
-                if (!currentData) return null;
-                const updatedNovels = [...currentData.novels];
-                if (novelIndex >= updatedNovels.length) return currentData;
-                
-                // Strictly REPLACE existing chapters with the imported ones
-                const updatedNovel = { 
-                    ...updatedNovels[novelIndex], 
-                    chapters: allNewChapters 
-                };
-                
-                updatedNovels[novelIndex] = updatedNovel;
-                return { ...currentData, novels: updatedNovels };
-            });
-        } else {
-            alert("No content could be extracted from the file(s). Please check the file formatting.");
-        }
-
-        setPendingFiles(null);
-        setIsImporting(false);
-    };
 
     if (!projectData || !novel) {
         return (
@@ -413,22 +268,6 @@ const NovelDetailPage = () => {
                 <div className={`p-6 -m-6 mt-8 rounded-lg ${themeClasses.bgSecondary}`}>
                     <div className="flex justify-between items-center mb-4">
                         <h2 className={`text-xl font-bold ${themeClasses.accentText}`}>{t.chapters}</h2>
-                        <input
-                            type="file"
-                            ref={pdfInputRef}
-                            onChange={handleFileSelectForPdf}
-                            className="hidden"
-                            accept=".pdf,application/pdf"
-                            multiple
-                        />
-                        <button
-                            onClick={() => pdfInputRef.current?.click()}
-                            className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-80 disabled:opacity-50`}
-                            disabled={isImporting}
-                        >
-                            {isImporting ? <LoadingIcon className="w-4 h-4 animate-spin" /> : null}
-                            {isImporting ? 'Importing...' : t.importFromDocx}
-                        </button>
                     </div>
                     
                     <button onClick={handleAddChapter} className={`w-full flex items-center justify-center space-x-2 p-4 rounded-lg border-2 border-dashed transition-colors ${themeClasses.border} ${themeClasses.textSecondary} hover:border-opacity-70 hover:text-opacity-70 mb-4`}>
@@ -593,14 +432,6 @@ const NovelDetailPage = () => {
                 onConfirm={handleDeleteChapter}
                 title={t.deleteChapterTitle(chapterToDelete?.title || '')}
                 message={t.deleteChapterMessage}
-            />
-            <ConfirmModal
-                isOpen={isPdfConfirmOpen}
-                onClose={() => { setIsPdfConfirmOpen(false); setPendingFiles(null); }}
-                onConfirm={handlePdfImport}
-                title={t.importDocxTitle(pendingFiles?.length || 0, pendingFiles?.item(0)?.name || '')}
-                message={t.importDocxMessage}
-                confirmButtonClass={`px-6 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}
             />
         </div>
     );
