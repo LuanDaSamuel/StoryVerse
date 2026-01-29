@@ -1,3 +1,4 @@
+
 import * as React from 'react';
 import { ProjectData, StorageStatus, Theme, StoryIdeaStatus, NovelSketch, UserProfile, SaveStatus, Language, WritingMode } from '../types';
 import { get, set, del } from 'idb-keyval';
@@ -30,7 +31,7 @@ const sanitizeProjectData = (data: any): ProjectData => {
     if (typeof data.settings.baseFontSize === 'number') {
       sanitized.settings.baseFontSize = data.settings.baseFontSize;
     }
-    if (['en', 'vi', 'fi'].includes(data.settings.language)) {
+    if (['en', 'vi', 'fi', 'sv'].includes(data.settings.language)) {
         sanitized.settings.language = data.settings.language as Language;
     }
     if (['standard', 'book-note'].includes(data.settings.writingMode)) {

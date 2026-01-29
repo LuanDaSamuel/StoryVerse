@@ -142,7 +142,7 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
               >
                 <option value="14">14px</option>
                 <option value="16">16px</option>
-                <option value="18">18px (Default)</option>
+                <option value="18px">18px (Default)</option>
                 <option value="20">20px</option>
                 <option value="22">22px</option>
               </select>
