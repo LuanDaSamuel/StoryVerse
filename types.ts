@@ -63,6 +63,7 @@ export interface StoryIdea {
   tags: string[];
   status: StoryIdeaStatus;
   folderId?: string; // Optional: if undefined/null, it's in the root
+  visitCount: number; // Track frequency of use
   createdAt: string;
   updatedAt: string;
 }

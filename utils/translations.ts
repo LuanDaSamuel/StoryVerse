@@ -14,6 +14,9 @@ export const translations = {
     wordsCount: 'words',
     rename: 'Rename',
     move: 'Move',
+    back: 'Back',
+    outline: 'Outline',
+    mostVisited: 'Most Visited',
 
     // Spell Check
     addToLibrary: 'Add to Dictionary',
@@ -121,6 +124,7 @@ export const translations = {
     spellCheckAnalyzing: 'Analyzing...',
     spellCheckComplete: 'Spell Check Complete',
     noErrorsFound: 'No issues found.',
+    copyChapterText: 'Copy Chapter Text',
     
     // Idea Box (Demos) Page
     newIdea: 'New Idea',
@@ -147,6 +151,7 @@ export const translations = {
     selectFolder: 'Select Folder',
     noFolder: 'No Folder (Root)',
     moveIdea: 'Move Idea',
+    deleteIdea: 'Delete Idea',
     
     // Story Idea Editor
     returnToIdeaBox: 'Return to Idea Box',
@@ -165,6 +170,7 @@ export const translations = {
     deleteSketchMessage: 'Are you sure you want to delete this sketch? This action is permanent and cannot be undone.',
     createNovelFirst: "You must create a novel first",
     createNewSketch: "Create a new sketch",
+    deleteSketch: 'Delete Sketch',
     
     // Sketch Editor Page
     returnToSketches: 'Return to Sketches',
@@ -227,6 +233,9 @@ export const translations = {
     wordsCount: 'ord',
     rename: 'Byt namn',
     move: 'Flytta',
+    back: 'Tillbaka',
+    outline: 'Översikt',
+    mostVisited: 'Mest besökta',
 
     // Spell Check
     addToLibrary: 'Lägg till i ordbok',
@@ -334,6 +343,7 @@ export const translations = {
     spellCheckAnalyzing: 'Analyserar...',
     spellCheckComplete: 'Stavningskontroll klar',
     noErrorsFound: 'Inga problem hittades.',
+    copyChapterText: 'Kopiera kapiteltext',
     
     // Idea Box (Demos) Page
     newIdea: 'Ny idé',
@@ -360,6 +370,7 @@ export const translations = {
     selectFolder: 'Välj mapp',
     noFolder: 'Ingen mapp (Rot)',
     moveIdea: 'Flytta idé',
+    deleteIdea: 'Radera idé',
     
     // Story Idea Editor
     returnToIdeaBox: 'Tillbaka till idélådan',
@@ -378,6 +389,7 @@ export const translations = {
     deleteSketchMessage: 'Är du säker på att du vill radera denna skiss? Denna åtgärd kan inte ångras.',
     createNovelFirst: "Du måste skapa en roman först",
     createNewSketch: "Skapa en ny skiss",
+    deleteSketch: 'Radera skiss',
     
     // Sketch Editor Page
     returnToSketches: 'Tillbaka till skisser',
@@ -440,6 +452,9 @@ export const translations = {
     wordsCount: 'từ',
     rename: 'Đổi tên',
     move: 'Di chuyển',
+    back: 'Quay lại',
+    outline: 'Dàn ý',
+    mostVisited: 'Xem nhiều nhất',
 
     // Spell Check
     addToLibrary: 'Thêm vào từ điển',
@@ -547,6 +562,7 @@ export const translations = {
     spellCheckAnalyzing: 'Đang phân tích...',
     spellCheckComplete: 'Kiểm tra hoàn tất',
     noErrorsFound: 'Không tìm thấy lỗi.',
+    copyChapterText: 'Sao chép văn bản chương',
     
     // Idea Box (Demos) Page
     newIdea: 'Ý tưởng mới',
@@ -573,6 +589,7 @@ export const translations = {
     selectFolder: 'Chọn thư mục',
     noFolder: 'Không có thư mục',
     moveIdea: 'Di chuyển ý tưởng',
+    deleteIdea: 'Xóa ý tưởng',
     
     // Story Idea Editor
     returnToIdeaBox: 'Quay lại Hộp ý tưởng',
@@ -591,6 +608,7 @@ export const translations = {
     deleteSketchMessage: 'Bạn có chắc chắn muốn xóa bản nháp này không? Hành động này là vĩnh viễn và không thể hoàn tác.',
     createNovelFirst: 'Bạn phải tạo một cuốn tiểu thuyết trước',
     createNewSketch: 'Tạo bản nháp mới',
+    deleteSketch: 'Xóa bản nháp',
     
     // Sketch Editor Page
     returnToSketches: 'Quay lại Bản nháp',
@@ -653,6 +671,9 @@ export const translations = {
     wordsCount: 'sanaa',
     rename: 'Nimeä uudelleen',
     move: 'Siirrä',
+    back: 'Takaisin',
+    outline: 'Jäsennys',
+    mostVisited: 'Suosituimmat',
 
     // Spell Check
     addToLibrary: 'Lisää sanakirjaan',
@@ -760,6 +781,7 @@ export const translations = {
     spellCheckAnalyzing: 'Analysoidaan...',
     spellCheckComplete: 'Tarkistus valmis',
     noErrorsFound: 'Virheitä ei löytynyt.',
+    copyChapterText: 'Kopioi luvun teksti',
     
     // Idea Box (Demos) Page
     newIdea: 'Uusi idea',
@@ -786,6 +808,7 @@ export const translations = {
     selectFolder: 'Valitse kansio',
     noFolder: 'Ei kansiota (Juuri)',
     moveIdea: 'Siirrä idea',
+    deleteIdea: 'Poista idea',
     
     // Story Idea Editor
     returnToIdeaBox: 'Palaa idealaatikkoon',
@@ -803,7 +826,8 @@ export const translations = {
     deleteSketchTitle: (title: string) => `Poista luonnos "${title}"?`,
     deleteSketchMessage: 'Haluatko varmasti poistaa tämän luonnoksen? Toiminto on pysyvä, eikä sitä voi kumota.',
     createNovelFirst: 'Sinun on ensin luotava romaani',
-    createNewSketch: 'Tạo bản nháp mới',
+    createNewSketch: 'Luo uusi luonnos',
+    deleteSketch: 'Poista luonnos',
     
     // Sketch Editor Page
     returnToSketches: 'Palaa luonnoksiin',

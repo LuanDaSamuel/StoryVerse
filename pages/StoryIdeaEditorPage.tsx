@@ -57,6 +57,7 @@ const fontOptions = [
 
 const FindReplaceModal = ({ isOpen, onClose, editorRef }: { isOpen: boolean, onClose: () => void, editorRef: React.RefObject<HTMLDivElement> }) => {
     const { themeClasses } = React.useContext(ProjectContext);
+    const t = useTranslations();
     const [findText, setFindText] = React.useState('');
     const [replaceText, setReplaceText] = React.useState('');
     const [matches, setMatches] = React.useState<HTMLElement[]>([]);
@@ -188,21 +189,21 @@ const FindReplaceModal = ({ isOpen, onClose, editorRef }: { isOpen: boolean, onC
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 font-sans" onClick={handleClose}>
             <div className={`p-6 rounded-lg shadow-2xl w-full max-w-md m-4 ${themeClasses.bgSecondary} ${themeClasses.accentText} border ${themeClasses.border}`} onClick={e => e.stopPropagation()}>
-                <div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold">Find & Replace</h2><button onClick={handleClose} className={`p-1 rounded-full hover:${themeClasses.bgTertiary}`} aria-label="Close"><CloseIcon className="w-6 h-6" /></button></div>
+                <div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold">{t.findAndReplace}</h2><button onClick={handleClose} className={`p-1 rounded-full hover:${themeClasses.bgTertiary}`} aria-label="Close"><CloseIcon className="w-6 h-6" /></button></div>
                 <div className="space-y-4">
                     <div className="relative">
-                        <input type="text" placeholder="Find..." value={findText} onChange={(e) => setFindText(e.target.value)} className={`w-full px-3 py-2 rounded-md ${themeClasses.input} border ${themeClasses.border}`} />
+                        <input type="text" placeholder={t.find} value={findText} onChange={(e) => setFindText(e.target.value)} className={`w-full px-3 py-2 rounded-md ${themeClasses.input} border ${themeClasses.border}`} />
                         {findText && <div className={`absolute right-3 top-1/2 -translate-y-1/2 text-xs ${themeClasses.textSecondary}`}>{matches.length > 0 ? `${currentIndex + 1} / ${matches.length}` : '0 matches'}</div>}
                     </div>
-                    <input type="text" placeholder="Replace with..." value={replaceText} onChange={(e) => setReplaceText(e.target.value)} className={`w-full px-3 py-2 rounded-md ${themeClasses.input} border ${themeClasses.border}`} />
+                    <input type="text" placeholder={t.replaceWith} value={replaceText} onChange={(e) => setReplaceText(e.target.value)} className={`w-full px-3 py-2 rounded-md ${themeClasses.input} border ${themeClasses.border}`} />
                 </div>
                 <div className="flex items-center space-x-4 mt-3">
-                    <button onClick={() => setCaseSensitive(p => !p)} className={`px-3 py-1 text-xs rounded-md font-semibold ${caseSensitive ? `${themeClasses.accent} ${themeClasses.accentText}` : themeClasses.bgTertiary}`}>Aa</button>
-                    <button onClick={() => setWholeWord(p => !p)} className={`px-3 py-1 text-xs rounded-md font-semibold ${wholeWord ? `${themeClasses.accent} ${themeClasses.accentText}` : themeClasses.bgTertiary}`}>Whole Word</button>
+                    <button onClick={() => setCaseSensitive(p => !p)} className={`px-3 py-1 text-xs rounded-md font-semibold ${caseSensitive ? `${themeClasses.accent} ${themeClasses.accentText}` : themeClasses.bgTertiary}`}>{t.caseSensitive}</button>
+                    <button onClick={() => setWholeWord(p => !p)} className={`px-3 py-1 text-xs rounded-md font-semibold ${wholeWord ? `${themeClasses.accent} ${themeClasses.accentText}` : themeClasses.bgTertiary}`}>{t.wholeWord}</button>
                 </div>
                 <div className="flex justify-between items-center mt-4">
-                    <div className="flex items-center space-x-2"><button onClick={() => handleNavigate('prev')} disabled={matches.length === 0} className={`px-3 py-1 rounded-md text-sm font-semibold ${themeClasses.bgTertiary} disabled:opacity-50`}>Previous</button><button onClick={() => handleNavigate('next')} disabled={matches.length === 0} className={`px-3 py-1 rounded-md text-sm font-semibold ${themeClasses.bgTertiary} disabled:opacity-50`}>Next</button></div>
-                    <div className="flex items-center space-x-2"><button onClick={handleReplace} disabled={currentIndex === -1} className={`px-4 py-2 font-semibold rounded-lg ${themeClasses.bgTertiary} disabled:opacity-50`}>Replace</button><button onClick={handleReplaceAll} disabled={!findText} className={`px-4 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} disabled:opacity-50`}>Replace All</button></div>
+                    <div className="flex items-center space-x-2"><button onClick={() => handleNavigate('prev')} disabled={matches.length === 0} className={`px-3 py-1 rounded-md text-sm font-semibold ${themeClasses.bgTertiary} disabled:opacity-50`}>{t.previous}</button><button onClick={() => handleNavigate('next')} disabled={matches.length === 0} className={`px-3 py-1 rounded-md text-sm font-semibold ${themeClasses.bgTertiary} disabled:opacity-50`}>{t.next}</button></div>
+                    <div className="flex items-center space-x-2"><button onClick={handleReplace} disabled={currentIndex === -1} className={`px-4 py-2 font-semibold rounded-lg ${themeClasses.bgTertiary} disabled:opacity-50`}>{t.replace}</button><button onClick={handleReplaceAll} disabled={!findText} className={`px-4 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} disabled:opacity-50`}>{t.replaceAll}</button></div>
                 </div>
             </div>
         </div>
@@ -250,6 +251,25 @@ const StoryIdeaEditorPage = () => {
             folders: projectData.ideaFolders || []
         };
     }, [projectData, ideaId]);
+
+    // Increment visit count on mount
+    React.useEffect(() => {
+        if (ideaId && projectData) {
+            setProjectData(currentData => {
+                if (!currentData) return null;
+                const idx = currentData.storyIdeas.findIndex(i => i.id === ideaId);
+                if (idx === -1) return currentData;
+                
+                const updatedIdeas = [...currentData.storyIdeas];
+                updatedIdeas[idx] = {
+                    ...updatedIdeas[idx],
+                    visitCount: (updatedIdeas[idx].visitCount || 0) + 1,
+                    updatedAt: new Date().toISOString()
+                };
+                return { ...currentData, storyIdeas: updatedIdeas };
+            });
+        }
+    }, [ideaId]);
 
     const updateHeadings = React.useCallback(() => {
         if (!editorRef.current) return;
@@ -844,7 +864,7 @@ const StoryIdeaEditorPage = () => {
     if (!idea) {
         return (
             <div className={`flex h-screen items-center justify-center ${themeClasses.bg}`}>
-                <p>Loading idea...</p>
+                <p>{t.loading}...</p>
             </div>
         );
     }
@@ -868,13 +888,13 @@ const StoryIdeaEditorPage = () => {
                             <div className="flex items-center space-x-4">
                                 <button onClick={() => navigate('/demos')} className={`flex items-center space-x-2 ${themeClasses.text} opacity-70 hover:opacity-100`}>
                                     <BackIcon className="w-5 h-5" />
-                                    <span className="font-sans hidden sm:inline">Back</span>
+                                    <span className="font-sans hidden sm:inline">{t.back}</span>
                                 </button>
                                 {/* Outline Toggle - Adjusted to ghost style for better visibility */}
                                 <button 
                                     onClick={() => setIsOutlineOpen(true)}
                                     className={`p-2 rounded-md transition-colors text-inherit opacity-70 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10`}
-                                    title="Outline"
+                                    title={t.outline}
                                 >
                                     <Bars3Icon className="w-5 h-5" />
                                 </button>
@@ -891,7 +911,7 @@ const StoryIdeaEditorPage = () => {
                                 <button
                                     onClick={() => setIsSidebarOpen(true)}
                                     className={`p-2 rounded-md transition-colors text-inherit opacity-70 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10`}
-                                    aria-label="Open details"
+                                    aria-label={t.ideaDetails}
                                 >
                                     <ChevronLeftIcon className="w-5 h-5" />
                                 </button>
@@ -905,7 +925,7 @@ const StoryIdeaEditorPage = () => {
                             value={idea.title}
                             onChange={(e) => updateStoryIdea({ title: e.target.value })}
                             onBlur={(e) => updateStoryIdea({ title: enhancePlainText(e.target.value) })}
-                            placeholder="Idea Title"
+                            placeholder={t.ideaTitlePlaceholder}
                             className="text-4xl font-bold bg-transparent outline-none w-full mb-8"
                         />
                         <div
@@ -932,7 +952,7 @@ const StoryIdeaEditorPage = () => {
                 >
                     <div className={`w-64 h-full ${themeClasses.bgSecondary} ${themeClasses.accentText} text-sm font-sans border-r ${themeClasses.border} flex flex-col shadow-xl`}>
                         <div className={`px-4 py-3 flex justify-between items-center border-b ${themeClasses.border}`}>
-                            <span className="font-bold text-base">OUTLINE</span>
+                            <span className="font-bold text-base uppercase tracking-widest">{t.outline}</span>
                             <button onClick={() => setIsOutlineOpen(false)}>
                                 <ChevronLeftIcon className="w-5 h-5"/>
                             </button>
@@ -973,7 +993,7 @@ const StoryIdeaEditorPage = () => {
                 >
                     <div className={`w-80 h-full ${themeClasses.bgSecondary} ${themeClasses.accentText} text-sm font-sans border-l ${themeClasses.border} flex flex-col`}>
                         <div className={`px-4 py-3 flex justify-between items-center border-b ${themeClasses.border}`}>
-                            <span className="font-bold text-base">IDEA DETAILS</span>
+                            <span className="font-bold text-base uppercase tracking-widest">{t.ideaDetails}</span>
                             <button onClick={() => setIsSidebarOpen(false)}>
                                 <ChevronRightIcon className="w-5 h-5"/>
                             </button>
@@ -981,7 +1001,7 @@ const StoryIdeaEditorPage = () => {
 
                         <div className="flex-1 overflow-y-auto p-4 space-y-6">
                             <div>
-                                <h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Status</h3>
+                                <h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>{t.status}</h3>
                                 <div className={`flex rounded-md overflow-hidden border ${themeClasses.border}`}>
                                     {statusOptions.map(option => (
                                         <button key={option} onClick={() => updateStoryIdea({ status: option })} className={`flex-1 py-2 text-sm font-semibold transition-colors ${idea.status === option ? `${themeClasses.accent} ${themeClasses.accentText}` : `hover:${themeClasses.bgTertiary}`}`}>{option}</button>
@@ -1007,24 +1027,24 @@ const StoryIdeaEditorPage = () => {
                            )}
 
                            <div>
-                                <h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Tags</h3>
+                                <h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>{t.tags}</h3>
                                 <div className="flex flex-wrap gap-1.5">
-                                    {SKETCH_TAG_OPTIONS.map(t => (
+                                    {SKETCH_TAG_OPTIONS.map(t_tag => (
                                         <button 
-                                            key={t} 
-                                            onClick={() => handleTagClick(t)} 
-                                            className={`px-2 py-1 text-xs rounded-full font-semibold ${idea.tags.includes(t) ? `${themeClasses.accent} ${themeClasses.accentText}` : `${themeClasses.bgTertiary} hover:opacity-80`}`}
+                                            key={t_tag} 
+                                            onClick={() => handleTagClick(t_tag)} 
+                                            className={`px-2 py-1 text-xs rounded-full font-semibold ${idea.tags.includes(t_tag) ? `${themeClasses.accent} ${themeClasses.accentText}` : `${themeClasses.bgTertiary} hover:opacity-80`}`}
                                         >
-                                            {t}
+                                            {t_tag}
                                         </button>
                                     ))}
                                 </div>
                             </div>
                            <div>
-                                <h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Actions</h3>
+                                <h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>{t.actions}</h3>
                                 <button onClick={() => setIsDeleteConfirmOpen(true)} className="w-full flex items-center space-x-3 text-left px-4 py-3 rounded-lg font-semibold bg-red-700 text-red-100 hover:bg-red-800">
                                     <TrashIcon className="w-5 h-5"/>
-                                    <span>Delete Idea</span>
+                                    <span>{t.deleteIdea}</span>
                                 </button>
                             </div>
                         </div>
@@ -1039,25 +1059,25 @@ const StoryIdeaEditorPage = () => {
                                 className="absolute bottom-full mb-2 p-4 rounded-lg shadow-lg bg-stone-900/80 border border-white/10 backdrop-blur-sm w-[320px]"
                             >
                                 <div className="space-y-4">
-                                    <ToolbarDropdown label="Paragraph Style" value={currentFormat.paragraphStyle} onChange={(e) => applyParagraphStyle(e.target.value)}>
-                                        <option value="p">Paragraph</option>
+                                    <ToolbarDropdown label={t.paragraphStyle} value={currentFormat.paragraphStyle} onChange={(e) => applyParagraphStyle(e.target.value)}>
+                                        <option value="p">{t.paragraph}</option>
                                         <option value="h1">Heading 1</option>
                                         <option value="h2">Heading 2</option>
                                         <option value="h3">Heading 3</option>
-                                        <option value="blockquote">Blockquote</option>
+                                        <option value="blockquote">{t.blockquote}</option>
                                     </ToolbarDropdown>
-                                    <ToolbarDropdown label="Font" value={currentFormat.font} onChange={(e) => applyFont(e.target.value)}>
+                                    <ToolbarDropdown label={t.font} value={currentFormat.font} onChange={(e) => applyFont(e.target.value)}>
                                         {fontOptions.map(font => <option key={font.name} value={font.value}>{font.name}</option>)}
                                     </ToolbarDropdown>
                                     <div className="grid grid-cols-2 gap-4">
-                                        <ToolbarDropdown label="Size" value={currentFormat.size} onChange={(e) => applyFontSize(e.target.value)}>
+                                        <ToolbarDropdown label={t.size} value={currentFormat.size} onChange={(e) => applyFontSize(e.target.value)}>
                                             <option value="14px">14</option>
                                             <option value="16px">16</option>
                                             <option value="18px">18</option>
                                             <option value="20px">20</option>
                                             <option value="24px">24</option>
                                         </ToolbarDropdown>
-                                        <ToolbarDropdown label="Paragraph Spacing" value={currentFormat.paragraphSpacing} onChange={(e) => applyParagraphSpacing(e.target.value)}>
+                                        <ToolbarDropdown label={t.paragraphSpacing} value={currentFormat.paragraphSpacing} onChange={(e) => applyParagraphSpacing(e.target.value)}>
                                             <option value="0.5em">0.5</option>
                                             <option value="1em">1.0</option>
                                             <option value="1.5em">1.5</option>
@@ -1075,7 +1095,7 @@ const StoryIdeaEditorPage = () => {
                                         </ToolbarDropdown>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-semibold mb-2 text-white/70">Color</label>
+                                        <label className="block text-xs font-semibold mb-2 text-white/70">{t.color}</label>
                                         <div className="flex space-x-2">
                                             {colorPalette.map(color => (
                                                 <button key={color} onClick={() => applyColor(color)} className="w-6 h-6 rounded-full border border-gray-400" style={{backgroundColor: color}}></button>
@@ -1103,6 +1123,7 @@ const StoryIdeaEditorPage = () => {
                             <button onClick={() => applyCommand('redo')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors`}><RedoIcon className="w-5 h-5"/></button>
                             <div className="w-px h-5 bg-white/20 mx-1"></div>
                             <div className="px-3 text-sm text-white/70 font-sans" aria-live="polite">
+                                {/* FIX: Change undefined chapter reference to idea.wordCount */}
                                 {(idea.wordCount || 0).toLocaleString()} {t.wordsCount}
                             </div>
                         </div>
@@ -1120,8 +1141,8 @@ const StoryIdeaEditorPage = () => {
                 isOpen={isDeleteConfirmOpen} 
                 onClose={() => setIsDeleteConfirmOpen(false)} 
                 onConfirm={handleDelete} 
-                title={`Delete "${idea.title}"?`} 
-                message="Are you sure you want to delete this idea? This action is permanent." 
+                title={t.deleteIdeaConfirmTitle(idea.title)} 
+                message={t.deleteIdeaMessage} 
             />
         </>
     );

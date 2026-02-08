@@ -107,6 +107,7 @@ const sanitizeProjectData = (data: any): ProjectData => {
         tags: Array.isArray(idea.tags) ? idea.tags : [],
         status: status,
         folderId: idea.folderId || null,
+        visitCount: typeof idea.visitCount === 'number' ? idea.visitCount : 0,
         createdAt: idea.createdAt || new Date().toISOString(),
         updatedAt: idea.updatedAt || new Date().toISOString(),
       };
@@ -187,6 +188,7 @@ export function useProject() {
 
     isSavingRef.current = true;
     setSaveStatus('saving');
+    let hasError = false;
 
     try {
         while (isDirtyRef.current) {
@@ -194,6 +196,13 @@ export function useProject() {
             if (!dataToSave) {
                  isDirtyRef.current = false;
                  break;
+            }
+
+            // Always save to local IndexedDB backup first (Offline-First strategy)
+            try {
+                await set(LOCAL_BACKUP_KEY, dataToSave);
+            } catch (backupError) {
+                console.warn("Failed to write to local backup:", backupError);
             }
 
             isDirtyRef.current = false;
@@ -208,9 +217,10 @@ export function useProject() {
                     if (storageMode === 'drive') {
                         await storage.saveToDrive(dataToSave);
                     } else if (storageMode === 'local') {
-                        await set(LOCAL_BACKUP_KEY, dataToSave);
+                        // We already saved to IDB above, now try File System Handle if available
                         await storage.saveToFileHandle(dataToSave);
                     } else {
+                        // If mode is lost, we at least saved to IDB above.
                         throw new Error("Storage mode not initialized or lost.");
                     }
                     success = true;
@@ -244,6 +254,7 @@ export function useProject() {
         console.error("Save failed after retries:", error);
         setSaveStatus('error');
         isDirtyRef.current = true;
+        hasError = true;
     } finally {
         isSavingRef.current = false;
         
@@ -251,9 +262,14 @@ export function useProject() {
             if (saveTimeoutRef.current) {
                 clearTimeout(saveTimeoutRef.current);
             }
+            // If we hit an error (likely server downtime), wait significantly longer (10s)
+            // to avoid hammering the server and freezing the browser. 
+            // If normal operation (just rapid typing), use short delay (2s).
+            const retryDelay = hasError ? 10000 : 2000;
+            
             saveTimeoutRef.current = window.setTimeout(() => {
                 saveProjectRef.current?.();
-            }, 2000); 
+            }, retryDelay); 
         }
     }
 

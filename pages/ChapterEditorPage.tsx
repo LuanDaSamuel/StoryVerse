@@ -40,6 +40,7 @@ const ChapterListModal = ({ isOpen, onClose, novel, currentChapterId, themeClass
     currentChapterId: string;
     themeClasses: any;
 }) => {
+    const t = useTranslations();
     if (!isOpen) return null;
 
     return (
@@ -54,7 +55,7 @@ const ChapterListModal = ({ isOpen, onClose, novel, currentChapterId, themeClass
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold">Chapter Outline</h2>
+                    <h2 className="text-xl font-bold">{t.chapterOutline}</h2>
                     <button onClick={onClose} className={`p-1 rounded-full hover:${themeClasses.bgTertiary}`}>
                         <CloseIcon className="w-6 h-6" />
                     </button>
@@ -120,6 +121,7 @@ const FindReplaceModal = ({ isOpen, onClose, editorRef, onReplaceAllInNovel }: {
   onReplaceAllInNovel: (find: string, replace: string, caseSensitive: boolean, wholeWord: boolean) => void;
 }) => {
   const { themeClasses } = React.useContext(ProjectContext);
+  const t = useTranslations();
   const [findText, setFindText] = React.useState('');
   const [replaceText, setReplaceText] = React.useState('');
   const [scope, setScope] = React.useState<'current' | 'all'>('current');
@@ -272,7 +274,7 @@ const FindReplaceModal = ({ isOpen, onClose, editorRef, onReplaceAllInNovel }: {
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 transition-opacity font-sans" onClick={handleClose}>
       <div className={`p-6 rounded-lg shadow-2xl w-full max-w-md m-4 ${themeClasses.bgSecondary} ${themeClasses.accentText} border ${themeClasses.border}`} onClick={e => e.stopPropagation()}>
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold">Find & Replace</h2>
+          <h2 className="text-xl font-bold">{t.findAndReplace}</h2>
           <button onClick={handleClose} className={`p-1 rounded-full hover:${themeClasses.bgTertiary}`} aria-label="Close">
             <CloseIcon className="w-6 h-6" />
           </button>
@@ -282,7 +284,7 @@ const FindReplaceModal = ({ isOpen, onClose, editorRef, onReplaceAllInNovel }: {
           <div className="relative">
             <input 
               type="text" 
-              placeholder="Find..." 
+              placeholder={t.find} 
               value={findText} 
               onChange={(e) => setFindText(e.target.value)} 
               className={`w-full px-3 py-2 rounded-md ${themeClasses.input} border ${themeClasses.border}`}
@@ -295,42 +297,42 @@ const FindReplaceModal = ({ isOpen, onClose, editorRef, onReplaceAllInNovel }: {
           </div>
           <input 
             type="text" 
-            placeholder="Replace with..." 
+            placeholder={t.replaceWith} 
             value={replaceText} 
             onChange={(e) => setReplaceText(e.target.value)} 
             className={`w-full px-3 py-2 rounded-md ${themeClasses.input} border ${themeClasses.border}`}
           />
         </div>
         <div className="flex items-center space-x-4 mt-3">
-          <button onClick={() => setCaseSensitive(p => !p)} className={`px-3 py-1 text-xs rounded-md font-semibold ${caseSensitive ? `${themeClasses.accent} ${themeClasses.accentText}` : themeClasses.bgTertiary}`}>Aa</button>
-          <button onClick={() => setWholeWord(p => !p)} className={`px-3 py-1 text-xs rounded-md font-semibold ${wholeWord ? `${themeClasses.accent} ${themeClasses.accentText}` : themeClasses.bgTertiary}`}>Whole Word</button>
+          <button onClick={() => setCaseSensitive(p => !p)} className={`px-3 py-1 text-xs rounded-md font-semibold ${caseSensitive ? `${themeClasses.accent} ${themeClasses.accentText}` : themeClasses.bgTertiary}`}>{t.caseSensitive}</button>
+          <button onClick={() => setWholeWord(p => !p)} className={`px-3 py-1 text-xs rounded-md font-semibold ${wholeWord ? `${themeClasses.accent} ${themeClasses.accentText}` : themeClasses.bgTertiary}`}>{t.wholeWord}</button>
         </div>
 
         <div className="flex justify-between items-center mt-4">
             <div className="flex items-center space-x-2">
-                <button onClick={() => handleNavigate('prev')} disabled={matches.length === 0 || scope === 'all'} className={`px-3 py-1 rounded-md text-sm font-semibold ${themeClasses.bgTertiary} disabled:opacity-50`}>Previous</button>
-                <button onClick={() => handleNavigate('next')} disabled={matches.length === 0 || scope === 'all'} className={`px-3 py-1 rounded-md text-sm font-semibold ${themeClasses.bgTertiary} disabled:opacity-50`}>Next</button>
+                <button onClick={() => handleNavigate('prev')} disabled={matches.length === 0 || scope === 'all'} className={`px-3 py-1 rounded-md text-sm font-semibold ${themeClasses.bgTertiary} disabled:opacity-50`}>{t.previous}</button>
+                <button onClick={() => handleNavigate('next')} disabled={matches.length === 0 || scope === 'all'} className={`px-3 py-1 rounded-md text-sm font-semibold ${themeClasses.bgTertiary} disabled:opacity-50`}>{t.next}</button>
             </div>
             <div className="flex items-center space-x-2">
-                <button onClick={handleReplace} disabled={currentIndex === -1 || scope === 'all'} className={`px-4 py-2 font-semibold rounded-lg ${themeClasses.bgTertiary} disabled:opacity-50`}>Replace</button>
-                <button onClick={handleReplaceAll} disabled={!findText} className={`px-4 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} disabled:opacity-50`}>Replace All</button>
+                <button onClick={handleReplace} disabled={currentIndex === -1 || scope === 'all'} className={`px-4 py-2 font-semibold rounded-lg ${themeClasses.bgTertiary} disabled:opacity-50`}>{t.replace}</button>
+                <button onClick={handleReplaceAll} disabled={!findText} className={`px-4 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} disabled:opacity-50`}>{t.replaceAll}</button>
             </div>
         </div>
         
         <div className="mt-4">
-            <label className={`block text-sm font-semibold mb-2 ${themeClasses.textSecondary}`}>Scope</label>
+            <label className={`block text-sm font-semibold mb-2 ${themeClasses.textSecondary}`}>{t.scope}</label>
             <div className={`flex rounded-md overflow-hidden border ${themeClasses.border}`}>
               <button 
                 onClick={() => setScope('current')}
                 className={`flex-1 py-2 text-sm font-semibold transition-colors ${scope === 'current' ? `${themeClasses.accent} ${themeClasses.accentText}` : `hover:${themeClasses.bgTertiary}`}`}
               >
-                Current Chapter
+                {t.currentChapter}
               </button>
               <button 
                 onClick={() => setScope('all')}
                 className={`flex-1 py-2 text-sm font-semibold transition-colors border-l ${themeClasses.border} ${scope === 'all' ? `${themeClasses.accent} ${themeClasses.accentText}` : `hover:${themeClasses.bgTertiary}`}`}
               >
-                Entire Novel
+                {t.entireNovel}
               </button>
             </div>
         </div>
@@ -1197,9 +1199,9 @@ const ChapterEditorPage = () => {
                 let chapterChanged = false;
                 textNodes.forEach(textNode => {
                     const originalText = textNode.nodeValue || '';
-                    const newText = originalText.replace(findRegex, replace);
-                    if (originalText !== newText) {
-                        textNode.nodeValue = newText;
+                    const iReplace = originalText.replace(findRegex, replace);
+                    if (originalText !== iReplace) {
+                        textNode.nodeValue = iReplace;
                         chapterChanged = true;
                     }
                 });
@@ -1230,7 +1232,7 @@ const ChapterEditorPage = () => {
     if (!projectData || !novel || !chapter || !chapterId) {
         return (
             <div className={`flex h-screen items-center justify-center ${themeClasses.bg}`}>
-                <p>Loading chapter...</p>
+                <p>{t.loading}...</p>
             </div>
         );
     }
@@ -1252,7 +1254,7 @@ const ChapterEditorPage = () => {
                         <div className="flex-1 flex items-center justify-between pl-8 md:pl-16 lg:pl-24">
                             <button onClick={() => navigate(`/novel/${novelId}`)} className={`flex items-center space-x-2 ${themeClasses.text} opacity-70 hover:opacity-100`}>
                                 <BackIcon className="w-5 h-5" />
-                                <span className="font-sans">Return to Details</span>
+                                <span className="font-sans">{t.returnToDetails}</span>
                             </button>
                             <SaveStatusIndicator />
                         </div>
@@ -1263,7 +1265,7 @@ const ChapterEditorPage = () => {
                                 <button
                                     onClick={() => setIsSidebarOpen(true)}
                                     className={`p-2 rounded-md transition-colors text-inherit opacity-70 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10`}
-                                    aria-label="Open editor tools"
+                                    aria-label={t.editorTools}
                                 >
                                     <ChevronLeftIcon className="w-5 h-5" />
                                 </button>
@@ -1276,7 +1278,7 @@ const ChapterEditorPage = () => {
                             type="text"
                             value={chapter.title}
                             onChange={(e) => updateChapterField('title', e.target.value)}
-                            placeholder="Chapter Title"
+                            placeholder={t.chapterTitlePlaceholder}
                             className="text-4xl font-bold bg-transparent outline-none w-full mb-8"
                         />
                         <div
@@ -1304,7 +1306,7 @@ const ChapterEditorPage = () => {
                 >
                     <div className={`w-80 h-full ${themeClasses.bgSecondary} ${themeClasses.accentText} text-sm font-sans border-l ${themeClasses.border} flex flex-col`}>
                         <div className={`px-4 py-3 flex justify-between items-center border-b ${themeClasses.border}`}>
-                            <span className="font-bold text-base">EDITOR TOOLS</span>
+                            <span className="font-bold text-base">{t.editorTools}</span>
                             <button onClick={() => setIsSidebarOpen(false)}>
                                 <ChevronRightIcon className="w-5 h-5"/>
                             </button>
@@ -1318,7 +1320,7 @@ const ChapterEditorPage = () => {
                                 >
                                     <div className="flex items-center space-x-3">
                                         <Bars3Icon className="w-5 h-5" />
-                                        <span>Chapter Outline</span>
+                                        <span>{t.chapterOutline}</span>
                                     </div>
                                 </button>
                             </div>
@@ -1329,7 +1331,7 @@ const ChapterEditorPage = () => {
                                 >
                                     <div className="flex items-center space-x-3">
                                         <ClipboardIcon className="w-5 h-5" />
-                                        <span>Copy Chapter Text</span>
+                                        <span>{t.copyChapterText}</span>
                                     </div>
                                     {isCopied && <span className="text-xs text-green-400 font-normal">Copied!</span>}
                                 </button>
@@ -1341,7 +1343,7 @@ const ChapterEditorPage = () => {
                                 >
                                     <div className="flex items-center space-x-3">
                                         <BookOpenIcon className="w-5 h-5" />
-                                        <span>Read Novel</span>
+                                        <span>{t.readNovel}</span>
                                     </div>
                                 </button>
                             </div>
@@ -1352,7 +1354,7 @@ const ChapterEditorPage = () => {
                                 >
                                     <div className="flex items-center space-x-3">
                                         <DownloadIcon className="w-5 h-5" />
-                                        <span>Export Novel</span>
+                                        <span>{t.exportNovel}</span>
                                     </div>
                                 </button>
                             </div>
@@ -1368,22 +1370,22 @@ const ChapterEditorPage = () => {
                                 className="absolute bottom-full mb-2 p-4 rounded-lg shadow-lg bg-stone-900/80 border border-white/10 backdrop-blur-sm w-[320px]"
                             >
                                 <div className="space-y-4">
-                                    <ToolbarDropdown label="Paragraph Style" value={currentFormat.paragraphStyle} onChange={(e) => applyParagraphStyle(e.target.value)}>
-                                        <option value="p">Paragraph</option>
-                                        <option value="blockquote">Blockquote</option>
+                                    <ToolbarDropdown label={t.paragraphStyle} value={currentFormat.paragraphStyle} onChange={(e) => applyParagraphStyle(e.target.value)}>
+                                        <option value="p">{t.paragraph}</option>
+                                        <option value="blockquote">{t.blockquote}</option>
                                     </ToolbarDropdown>
-                                    <ToolbarDropdown label="Font" value={currentFormat.font} onChange={(e) => applyFont(e.target.value)}>
+                                    <ToolbarDropdown label={t.font} value={currentFormat.font} onChange={(e) => applyFont(e.target.value)}>
                                         {fontOptions.map(font => <option key={font.name} value={font.value}>{font.name}</option>)}
                                     </ToolbarDropdown>
                                     <div className="grid grid-cols-2 gap-4">
-                                        <ToolbarDropdown label="Size" value={currentFormat.size} onChange={(e) => applyFontSize(e.target.value)}>
+                                        <ToolbarDropdown label={t.size} value={currentFormat.size} onChange={(e) => applyFontSize(e.target.value)}>
                                             <option value="14px">14</option>
                                             <option value="16px">16</option>
                                             <option value="18px">18</option>
                                             <option value="20px">20</option>
                                             <option value="24px">24</option>
                                         </ToolbarDropdown>
-                                        <ToolbarDropdown label="Paragraph Spacing" value={currentFormat.paragraphSpacing} onChange={(e) => applyParagraphSpacing(e.target.value)}>
+                                        <ToolbarDropdown label={t.paragraphSpacing} value={currentFormat.paragraphSpacing} onChange={(e) => applyParagraphSpacing(e.target.value)}>
                                             <option value="0.5em">0.5</option>
                                             <option value="1em">1.0</option>
                                             <option value="1.5em">1.5</option>
@@ -1401,7 +1403,7 @@ const ChapterEditorPage = () => {
                                         </ToolbarDropdown>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-semibold mb-2 text-white/70">Color</label>
+                                        <label className="block text-xs font-semibold mb-2 text-white/70">{t.color}</label>
                                         <div className="flex space-x-2">
                                             {colorPalette.map(color => (
                                                 <button key={color} onClick={() => applyColor(color)} className="w-6 h-6 rounded-full border border-gray-400" style={{backgroundColor: color}}></button>

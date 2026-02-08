@@ -1,9 +1,8 @@
-
 import * as React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { StoryIdea, IdeaFolder } from '../types';
-import { PlusIcon, UploadIcon, BackIcon, TrashIcon, FolderIcon, PencilIcon, ChevronLeftIcon } from '../components/Icons';
+import { PlusIcon, UploadIcon, BackIcon, TrashIcon, FolderIcon, PencilIcon, ChevronLeftIcon, SparklesIcon, TextIcon } from '../components/Icons';
 import ConfirmModal from '../components/ConfirmModal';
 import { enhancePlainText } from '../constants';
 import * as mammoth from 'mammoth';
@@ -128,6 +127,20 @@ const DemosPage = () => {
 
     const currentFolder = folders.find(f => f.id === viewFolderId);
 
+    const mostVisitedIdeas = React.useMemo(() => {
+        const allIdeas = projectData?.storyIdeas || [];
+        return [...allIdeas]
+            .filter(i => (i.visitCount || 0) > 0)
+            .sort((a, b) => {
+                // Primary sort: visit count
+                const diff = (b.visitCount || 0) - (a.visitCount || 0);
+                if (diff !== 0) return diff;
+                // Secondary sort: most recently updated
+                return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+            })
+            .slice(0, 4);
+    }, [projectData?.storyIdeas]);
+
     const storyIdeas = React.useMemo(() => {
         const allIdeas = [...(projectData?.storyIdeas || [])];
         return allIdeas.filter(idea => {
@@ -149,6 +162,7 @@ const DemosPage = () => {
             tags: [],
             status: 'Seedling',
             folderId: viewFolderId || undefined, // Assign to current folder
+            visitCount: 0,
             createdAt: now,
             updatedAt: now,
         };
@@ -249,6 +263,7 @@ const DemosPage = () => {
                 tags: [],
                 status: 'Seedling',
                 folderId: viewFolderId || undefined, // Import into current folder
+                visitCount: 0,
                 createdAt: now,
                 updatedAt: now,
             };
@@ -446,6 +461,32 @@ const DemosPage = () => {
                     </button>
                 </div>
             </div>
+
+            {/* MOST VISITED SECTION (Only in Root View) */}
+            {!viewFolderId && mostVisitedIdeas.length > 0 && (
+                <div className="mb-10">
+                     <h2 className={`flex items-center space-x-2 text-sm font-bold uppercase tracking-wider mb-4 ${themeClasses.textSecondary}`}>
+                        <SparklesIcon className="w-4 h-4 text-amber-500" />
+                        <span>{t.mostVisited}</span>
+                    </h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {mostVisitedIdeas.map(idea => (
+                            <div
+                                key={idea.id}
+                                className={`relative p-4 rounded-lg cursor-pointer transition-all duration-200 hover:shadow-xl hover:-translate-y-1 border border-transparent hover:border-amber-500/50 ${themeClasses.bgTertiary}`}
+                                onClick={() => navigate(`/idea/${idea.id}/edit`)}
+                            >
+                                <div className="flex justify-between items-start mb-2">
+                                    <h3 className={`font-bold text-base line-clamp-1 ${themeClasses.accentText}`}>{enhancePlainText(idea.title) || 'Untitled Idea'}</h3>
+                                </div>
+                                <p className={`text-xs line-clamp-3 ${themeClasses.textSecondary}`}>
+                                    {getSnippet(idea.synopsis)}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* FOLDERS GRID (Only in Root) */}
             {!viewFolderId && folders.length > 0 && (

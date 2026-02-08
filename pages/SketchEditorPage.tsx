@@ -1,3 +1,4 @@
+
 import * as React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
@@ -22,6 +23,7 @@ const SaveStatusIndicator = () => {
 
 const FindReplaceModal = ({ isOpen, onClose, editorRef }: { isOpen: boolean, onClose: () => void, editorRef: React.RefObject<HTMLDivElement> }) => {
   const { themeClasses } = React.useContext(ProjectContext);
+  const t = useTranslations();
   const [findText, setFindText] = React.useState('');
   const [replaceText, setReplaceText] = React.useState('');
   const [matches, setMatches] = React.useState<HTMLElement[]>([]);
@@ -84,21 +86,21 @@ const FindReplaceModal = ({ isOpen, onClose, editorRef }: { isOpen: boolean, onC
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 transition-opacity font-sans" onClick={handleClose}>
       <div className={`p-6 rounded-lg shadow-2xl w-full max-w-md m-4 ${themeClasses.bgSecondary} ${themeClasses.accentText} border ${themeClasses.border}`} onClick={e => e.stopPropagation()}>
-        <div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold">Find & Replace</h2><button onClick={handleClose} className={`p-1 rounded-full hover:${themeClasses.bgTertiary}`} aria-label="Close"><CloseIcon className="w-6 h-6" /></button></div>
+        <div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold">{t.findAndReplace}</h2><button onClick={handleClose} className={`p-1 rounded-full hover:${themeClasses.bgTertiary}`} aria-label="Close"><CloseIcon className="w-6 h-6" /></button></div>
         <div className="space-y-4">
           <div className="relative">
-            <input type="text" placeholder="Find..." value={findText} onChange={(e) => setFindText(e.target.value)} className={`w-full px-3 py-2 rounded-md ${themeClasses.input} border ${themeClasses.border}`} />
+            <input type="text" placeholder={t.find} value={findText} onChange={(e) => setFindText(e.target.value)} className={`w-full px-3 py-2 rounded-md ${themeClasses.input} border ${themeClasses.border}`} />
             {findText && <div className={`absolute right-3 top-1/2 -translate-y-1/2 text-xs ${themeClasses.textSecondary}`}>{matches.length > 0 ? `${currentIndex + 1} / ${matches.length}` : '0 matches'}</div>}
           </div>
-          <input type="text" placeholder="Replace with..." value={replaceText} onChange={(e) => setReplaceText(e.target.value)} className={`w-full px-3 py-2 rounded-md ${themeClasses.input} border ${themeClasses.border}`} />
+          <input type="text" placeholder={t.replaceWith} value={replaceText} onChange={(e) => setReplaceText(e.target.value)} className={`w-full px-3 py-2 rounded-md ${themeClasses.input} border ${themeClasses.border}`} />
         </div>
         <div className="flex items-center space-x-4 mt-3">
-            <button onClick={() => setCaseSensitive(p => !p)} className={`px-3 py-1 text-xs rounded-md font-semibold ${caseSensitive ? `${themeClasses.accent} ${themeClasses.accentText}` : themeClasses.bgTertiary}`}>Aa</button>
-            <button onClick={() => setWholeWord(p => !p)} className={`px-3 py-1 text-xs rounded-md font-semibold ${wholeWord ? `${themeClasses.accent} ${themeClasses.accentText}` : themeClasses.bgTertiary}`}>Whole Word</button>
+            <button onClick={() => setCaseSensitive(p => !p)} className={`px-3 py-1 text-xs rounded-md font-semibold ${caseSensitive ? `${themeClasses.accent} ${themeClasses.accentText}` : themeClasses.bgTertiary}`}>{t.caseSensitive}</button>
+            <button onClick={() => setWholeWord(p => !p)} className={`px-3 py-1 text-xs rounded-md font-semibold ${wholeWord ? `${themeClasses.accent} ${themeClasses.accentText}` : themeClasses.bgTertiary}`}>{t.wholeWord}</button>
         </div>
         <div className="flex justify-between items-center mt-4">
-            <div className="flex items-center space-x-2"><button onClick={() => handleNavigate('prev')} disabled={matches.length === 0} className={`px-3 py-1 rounded-md text-sm font-semibold ${themeClasses.bgTertiary} disabled:opacity-50`}>Previous</button><button onClick={() => handleNavigate('next')} disabled={matches.length === 0} className={`px-3 py-1 rounded-md text-sm font-semibold ${themeClasses.bgTertiary} disabled:opacity-50`}>Next</button></div>
-            <div className="flex items-center space-x-2"><button onClick={handleReplace} disabled={currentIndex === -1} className={`px-4 py-2 font-semibold rounded-lg ${themeClasses.bgTertiary} disabled:opacity-50`}>Replace</button><button onClick={handleReplaceAll} disabled={!findText} className={`px-4 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} disabled:opacity-50`}>Replace All</button></div>
+            <div className="flex items-center space-x-2"><button onClick={() => handleNavigate('prev')} disabled={matches.length === 0} className={`px-3 py-1 rounded-md text-sm font-semibold ${themeClasses.bgTertiary} disabled:opacity-50`}>{t.previous}</button><button onClick={() => handleNavigate('next')} disabled={matches.length === 0} className={`px-3 py-1 rounded-md text-sm font-semibold ${themeClasses.bgTertiary} disabled:opacity-50`}>{t.next}</button></div>
+            <div className="flex items-center space-x-2"><button onClick={handleReplace} disabled={currentIndex === -1} className={`px-4 py-2 font-semibold rounded-lg ${themeClasses.bgTertiary} disabled:opacity-50`}>{t.replace}</button><button onClick={handleReplaceAll} disabled={!findText} className={`px-4 py-2 font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} disabled:opacity-50`}>{t.replaceAll}</button></div>
         </div>
       </div>
     </div>
@@ -385,7 +387,7 @@ const SketchEditorPage = () => {
     if (!novel || !sketch) {
         return (
             <div className={`flex h-screen items-center justify-center ${themeClasses.bg}`}>
-                <p>Loading sketch...</p>
+                <p>{t.loading}...</p>
             </div>
         );
     }
@@ -397,7 +399,7 @@ const SketchEditorPage = () => {
                 <div className="flex-1 overflow-y-auto relative">
                     <div className={`sticky top-0 z-10 pt-6 pb-4 ${themeClasses.bg} bg-opacity-80 backdrop-blur-sm border-b ${themeClasses.border} flex items-center justify-between`}>
                         <div className="flex-1 flex items-center justify-between pl-8 md:pl-16 lg:pl-24">
-                            <button onClick={() => navigate('/sketches')} className={`flex items-center space-x-2 ${themeClasses.text} opacity-70 hover:opacity-100`}><BackIcon className="w-5 h-5" /><span className="font-sans">Return to Sketches</span></button>
+                            <button onClick={() => navigate('/sketches')} className={`flex items-center space-x-2 ${themeClasses.text} opacity-70 hover:opacity-100`}><BackIcon className="w-5 h-5" /><span className="font-sans">{t.returnToSketches}</span></button>
                             <div className="flex items-center space-x-4">
                                 <SaveStatusIndicator />
                             </div>
@@ -416,17 +418,17 @@ const SketchEditorPage = () => {
                         </div>
                     </div>
                     <div className="px-8 md:px-16 lg:px-24 pt-8 pb-48">
-                        <input type="text" value={sketch.title} onChange={e => updateSketch({ title: e.target.value })} onBlur={(e) => updateSketch({ title: enhancePlainText(e.target.value) })} placeholder="Sketch Title" className="text-4xl font-bold bg-transparent outline-none w-full mb-8" />
+                        <input type="text" value={sketch.title} onChange={e => updateSketch({ title: e.target.value })} onBlur={(e) => updateSketch({ title: enhancePlainText(e.target.value) })} placeholder={t.sketchTitlePlaceholder} className="text-4xl font-bold bg-transparent outline-none w-full mb-8" />
                         <div ref={editorRef} contentEditable spellCheck={true} suppressContentEditableWarning onInput={handleEditorInput} onKeyDown={handleKeyDown} onPaste={handlePaste} className="w-full leading-relaxed outline-none story-content" style={{ fontSize: `${projectData?.settings?.baseFontSize || 18}px` }}/>
                     </div>
                 </div>
                 <div className={`fixed top-0 right-0 h-full z-40 transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
                     <div className={`w-80 h-full ${themeClasses.bgSecondary} ${themeClasses.accentText} text-sm font-sans border-l ${themeClasses.border} flex flex-col`}>
-                        <div className={`px-4 py-3 flex justify-between items-center border-b ${themeClasses.border}`}><span className="font-bold text-base">SKETCH DETAILS</span><button onClick={() => setIsSidebarOpen(false)}><ChevronRightIcon className="w-5 h-5"/></button></div>
+                        <div className={`px-4 py-3 flex justify-between items-center border-b ${themeClasses.border}`}><span className="font-bold text-base uppercase tracking-widest">{t.sketchDetails}</span><button onClick={() => setIsSidebarOpen(false)}><ChevronRightIcon className="w-5 h-5"/></button></div>
                         <div className="flex-1 p-4 space-y-6 overflow-y-auto">
-                           <div><h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Novel</h3><p className="px-3 py-2 rounded-md bg-black/10">{enhancePlainText(novel.title)}</p></div>
-                           <div><h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Tags</h3><div className="flex flex-wrap gap-1.5">{SKETCH_TAG_OPTIONS.map(t => <button key={t} onClick={() => handleTagClick(t)} className={`px-2 py-1 text-xs rounded-full font-semibold ${sketch.tags.includes(t) ? `${themeClasses.accent} ${themeClasses.accentText}` : `${themeClasses.bgTertiary} hover:opacity-80`}`}>{t}</button>)}</div></div>
-                           <div><h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>Actions</h3><button onClick={() => setIsDeleteConfirmOpen(true)} className="w-full flex items-center space-x-3 text-left px-4 py-3 rounded-lg font-semibold bg-red-700 text-red-100 hover:bg-red-800"><TrashIcon className="w-5 h-5"/><span>Delete Sketch</span></button></div>
+                           <div><h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>{t.novel}</h3><p className="px-3 py-2 rounded-md bg-black/10">{enhancePlainText(novel.title)}</p></div>
+                           <div><h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>{t.tags}</h3><div className="flex flex-wrap gap-1.5">{SKETCH_TAG_OPTIONS.map(tag_item => <button key={tag_item} onClick={() => handleTagClick(tag_item)} className={`px-2 py-1 text-xs rounded-full font-semibold ${sketch.tags.includes(tag_item) ? `${themeClasses.accent} ${themeClasses.accentText}` : `${themeClasses.bgTertiary} hover:opacity-80`}`}>{tag_item}</button>)}</div></div>
+                           <div><h3 className={`font-bold mb-2 text-sm uppercase ${themeClasses.textSecondary}`}>{t.actions}</h3><button onClick={() => setIsDeleteConfirmOpen(true)} className="w-full flex items-center space-x-3 text-left px-4 py-3 rounded-lg font-semibold bg-red-700 text-red-100 hover:bg-red-800"><TrashIcon className="w-5 h-5"/><span>{t.deleteSketch}</span></button></div>
                         </div>
                     </div>
                 </div>
@@ -458,7 +460,7 @@ const SketchEditorPage = () => {
                 </div>
             </div>
             <FindReplaceModal isOpen={isFindReplaceOpen} onClose={() => setIsFindReplaceOpen(false)} editorRef={editorRef} />
-            <ConfirmModal isOpen={isDeleteConfirmOpen} onClose={() => setIsDeleteConfirmOpen(false)} onConfirm={handleDelete} title={`Delete "${sketch.title}"?`} message="Are you sure you want to delete this sketch? This action is permanent." />
+            <ConfirmModal isOpen={isDeleteConfirmOpen} onClose={() => setIsDeleteConfirmOpen(false)} onConfirm={handleDelete} title={t.deleteSketchTitle(sketch.title)} message={t.deleteSketchMessage} />
         </>
     );
 };
