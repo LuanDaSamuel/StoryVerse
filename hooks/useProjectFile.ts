@@ -7,6 +7,7 @@ import { useProjectStorage, PermanentAuthError } from './useProjectStorage';
 // --- Constants ---
 const LOCAL_BACKUP_KEY = 'storyverse-local-backup';
 const LOCAL_UNLOAD_BACKUP_KEY = 'storyverse-unload-backup';
+const STORAGE_PREFERENCE_KEY = 'storyverse-storage-preference';
 const isFileSystemAccessAPISupported = 'showOpenFilePicker' in window;
 
 const defaultProjectData: ProjectData = {
@@ -20,10 +21,8 @@ const defaultProjectData: ProjectData = {
 
 // --- Helper Functions ---
 const sanitizeProjectData = (data: any): ProjectData => {
-  // Deep clone the default structure to avoid mutations
   const sanitized = JSON.parse(JSON.stringify(defaultProjectData));
   
-  // Safely merge settings
   if (data?.settings) {
     if (['dark', 'book'].includes(data.settings.theme)) {
       sanitized.settings.theme = data.settings.theme as Theme;
@@ -51,7 +50,6 @@ const sanitizeProjectData = (data: any): ProjectData => {
       sanitized.userDictionary = data.userDictionary.filter((w: any) => typeof w === 'string');
   }
 
-  // Safely merge novels and their nested structures
   if (Array.isArray(data?.novels)) {
     sanitized.novels = data.novels.map((novel: any) => ({
       id: novel.id || crypto.randomUUID(),
@@ -85,7 +83,6 @@ const sanitizeProjectData = (data: any): ProjectData => {
     }));
   }
 
-  // Safely merge folders
   if (Array.isArray(data?.ideaFolders)) {
     sanitized.ideaFolders = data.ideaFolders.map((folder: any) => ({
         id: folder.id || crypto.randomUUID(),
@@ -94,7 +91,6 @@ const sanitizeProjectData = (data: any): ProjectData => {
     }));
   }
 
-  // Safely merge story ideas
   if (Array.isArray(data?.storyIdeas)) {
     sanitized.storyIdeas = data.storyIdeas.map((idea: any) => {
       const validStatuses: StoryIdeaStatus[] = ['Seedling', 'Developing', 'Archived'];
@@ -147,6 +143,7 @@ export function useProject() {
     setUserProfile(null);
     setSaveStatus('idle');
     isDirtyRef.current = false;
+    localStorage.removeItem(STORAGE_PREFERENCE_KEY); 
   }, []);
 
   const flushChanges = React.useCallback(async () => {
@@ -178,17 +175,12 @@ export function useProject() {
     }, [flushChanges, storage, resetState]);
 
   const saveProject = React.useCallback(async () => {
-    if (isSavingRef.current) {
-        return;
-    }
-
-    if (!isDirtyRef.current) {
-        return;
-    }
+    if (isSavingRef.current) return;
+    if (!isDirtyRef.current) return;
 
     isSavingRef.current = true;
     setSaveStatus('saving');
-    let hasError = false;
+    let hasCloudError = false;
 
     try {
         while (isDirtyRef.current) {
@@ -198,17 +190,19 @@ export function useProject() {
                  break;
             }
 
-            // Always save to local IndexedDB backup first (Offline-First strategy)
-            try {
-                await set(LOCAL_BACKUP_KEY, dataToSave);
-            } catch (backupError) {
-                console.warn("Failed to write to local backup:", backupError);
+            // ONLY save to local backup if NOT in cloud mode
+            if (storageMode === 'local') {
+                try {
+                    await set(LOCAL_BACKUP_KEY, dataToSave);
+                } catch (backupError) {
+                    console.warn("Local IDB backup failed:", backupError);
+                }
             }
 
             isDirtyRef.current = false;
 
-            const MAX_RETRIES = 3;
-            const INITIAL_DELAY_MS = 1500;
+            const MAX_RETRIES = 2;
+            const INITIAL_DELAY_MS = 1000;
             let success = false;
             let lastError: any = null;
 
@@ -217,65 +211,48 @@ export function useProject() {
                     if (storageMode === 'drive') {
                         await storage.saveToDrive(dataToSave);
                     } else if (storageMode === 'local') {
-                        // We already saved to IDB above, now try File System Handle if available
                         await storage.saveToFileHandle(dataToSave);
                     } else {
-                        // If mode is lost, we at least saved to IDB above.
-                        throw new Error("Storage mode not initialized or lost.");
+                        success = true; 
+                        break;
                     }
                     success = true;
                     break;
                 } catch (error: any) {
                     lastError = error;
-                    console.error(`Save attempt ${attempt}/${MAX_RETRIES} failed for storage mode '${storageMode}':`, error);
-
-                    if (error instanceof PermanentAuthError) {
-                        console.error("Permanent Authentication Error:", error.message, "Sign out required.");
-                        throw error; 
-                    }
-
+                    if (error instanceof PermanentAuthError) throw error; 
                     if (attempt < MAX_RETRIES) {
-                        const delay = INITIAL_DELAY_MS * Math.pow(2, attempt - 1);
-                        console.log(`Will retry in ${delay}ms...`);
-                        await new Promise(resolve => setTimeout(resolve, delay));
+                        await new Promise(resolve => setTimeout(resolve, INITIAL_DELAY_MS * attempt));
                     }
                 }
             }
             
             if (success) {
+                // Always clear emergency backup on success regardless of mode
                 localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
             } else {
-                throw lastError || new Error("Unknown save error");
+                throw lastError || new Error("Save operation failed");
             }
         }
         
         setSaveStatus('saved');
     } catch (error) {
-        console.error("Save failed after retries:", error);
+        console.error("Critical Sync Error:", error);
         setSaveStatus('error');
         isDirtyRef.current = true;
-        hasError = true;
+        hasCloudError = true;
     } finally {
         isSavingRef.current = false;
-        
         if (isDirtyRef.current) {
-            if (saveTimeoutRef.current) {
-                clearTimeout(saveTimeoutRef.current);
-            }
-            // If we hit an error (likely server downtime), wait significantly longer (10s)
-            // to avoid hammering the server and freezing the browser. 
-            // If normal operation (just rapid typing), use short delay (2s).
-            const retryDelay = hasError ? 10000 : 2000;
-            
+            if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+            const retryDelay = hasCloudError ? 10000 : 2000;
             saveTimeoutRef.current = window.setTimeout(() => {
                 saveProjectRef.current?.();
             }, retryDelay); 
         }
     }
+  }, [storage, storageMode]);
 
-  }, [storage, storageMode]); // Removed signOut from dependencies to prevent circular dependency/auto-signout on error
-
-  // Keep the ref updated with the latest version of the save function
   React.useEffect(() => {
     saveProjectRef.current = saveProject;
   }, [saveProject]);
@@ -283,41 +260,22 @@ export function useProject() {
   const updateDailyWordCount = React.useCallback((wordCountDelta: number) => {
     setProjectData((prevData) => {
       if (!prevData) return null;
-      
       const today = new Date().toISOString().split('T')[0];
       const lastUpdated = prevData.dailyGoal.lastUpdated;
-      
       let newCurrent = prevData.dailyGoal.current;
-      
-      // Reset if it's a new day
-      if (today !== lastUpdated) {
-        newCurrent = 0;
-      }
-      
-      // Prevent negative current if deleting words from a previous session, 
-      // but allow negative delta to reduce today's count if deleting words written today.
+      if (today !== lastUpdated) newCurrent = 0;
       newCurrent = Math.max(0, newCurrent + wordCountDelta);
-
       const newData = {
         ...prevData,
-        dailyGoal: {
-          ...prevData.dailyGoal,
-          current: newCurrent,
-          lastUpdated: today
-        }
+        dailyGoal: { ...prevData.dailyGoal, current: newCurrent, lastUpdated: today }
       };
-      
-      // Manually trigger dirty state/save logic since we are bypassing the main setProjectDataAndMarkDirty wrapper for this internal update
       projectDataRef.current = newData;
       isDirtyRef.current = true;
       if (!isSavingRef.current) setSaveStatus('unsaved');
-      
-      // Debounce save
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = window.setTimeout(() => {
           saveProjectRef.current?.();
       }, 500);
-
       return newData;
     });
   }, []);
@@ -325,65 +283,46 @@ export function useProject() {
   const setProjectDataAndMarkDirty = React.useCallback((updater: React.SetStateAction<ProjectData | null>) => {
     setProjectData(prevData => {
         const newData = typeof updater === 'function' ? updater(prevData) : updater;
-        
-        // Update Ref immediately
         projectDataRef.current = newData;
         isDirtyRef.current = true;
-
         return newData;
     });
 
-    // Handle side effects outside of the state setter to ensure React purity
-    if (!isSavingRef.current) {
-        setSaveStatus('unsaved');
+    if (!isSavingRef.current) setSaveStatus('unsaved');
+
+    // ONLY perform emergency unload backup if NOT in drive mode
+    if (storageMode !== 'drive') {
+        if (localStorageBackupTimeoutRef.current) clearTimeout(localStorageBackupTimeoutRef.current);
+        localStorageBackupTimeoutRef.current = window.setTimeout(() => {
+            try {
+                if (projectDataRef.current) {
+                     localStorage.setItem(LOCAL_UNLOAD_BACKUP_KEY, JSON.stringify(projectDataRef.current));
+                }
+            } catch (e) { console.error("Unload backup failed", e); }
+        }, 2000); 
     }
 
-    if (localStorageBackupTimeoutRef.current) {
-        clearTimeout(localStorageBackupTimeoutRef.current);
-    }
-    localStorageBackupTimeoutRef.current = window.setTimeout(() => {
-        try {
-            if (projectDataRef.current) {
-                 localStorage.setItem(LOCAL_UNLOAD_BACKUP_KEY, JSON.stringify(projectDataRef.current));
-            }
-        } catch (e) {
-            console.error("Failed to write to localStorage backup", e);
-        }
-    }, 3000); 
-
-    if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-    }
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = window.setTimeout(() => {
         saveProjectRef.current?.();
-    }, 500); 
+    }, 800); 
+  }, [storageMode]);
 
-  }, []);
-
-  // Effect to revert 'saved' status to 'idle'.
   React.useEffect(() => {
     if (saveStatus === 'saved') {
         const timeoutId = setTimeout(() => {
-            // Only revert to idle if no new changes have come in.
-            if (!isDirtyRef.current) {
-                setSaveStatus('idle');
-            }
+            if (!isDirtyRef.current) setSaveStatus('idle');
         }, 1500); 
         return () => clearTimeout(timeoutId);
     }
   }, [saveStatus]);
     
-    // Save on visibility change (e.g., switching tabs)
     React.useEffect(() => {
         const handleVisibilityChange = () => {
-            if (document.visibilityState === 'hidden') {
-                flushChanges();
-            }
+            if (document.visibilityState === 'hidden') flushChanges();
         };
         document.addEventListener('visibilitychange', handleVisibilityChange);
-        return () => {
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-        };
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     }, [flushChanges]);
   
   const handleDriveProject = React.useCallback((driveProject: { name: string, data: any } | null) => {
@@ -393,6 +332,9 @@ export function useProject() {
         projectDataRef.current = sanitizedData;
         setProjectName(driveProject.name);
         setStatus('ready');
+        // Aggressively clear local artifacts when cloud project is loaded
+        del(LOCAL_BACKUP_KEY);
+        localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
     } else {
         setStatus('drive-no-project');
     }
@@ -409,9 +351,6 @@ export function useProject() {
         const driveProject = await storage.loadFromDrive();
 
         if (driveProject && localData) {
-            const sanitizedLocal = sanitizeProjectData(localData.data);
-            setProjectData(sanitizedLocal); 
-            projectDataRef.current = sanitizedLocal;
             setProjectName(localData.name);
             setStatus('drive-conflict');
         } else if (driveProject) {
@@ -423,11 +362,14 @@ export function useProject() {
             setProjectName(localData.name);
             await storage.createOnDrive(localData.data);
             setStatus('ready');
+            // Clean up local after migration
+            del(LOCAL_BACKUP_KEY);
+            localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
         } else {
             setStatus('drive-no-project');
         }
     } catch (error) {
-        console.error("Sign in failed:", error);
+        console.error("Sign in error:", error);
         await storage.signOut();
         resetState();
         setStatus('welcome');
@@ -442,8 +384,11 @@ export function useProject() {
         setProjectData(defaultProjectData);
         projectDataRef.current = defaultProjectData;
         setStatus('ready');
+        // Clear local artifacts
+        del(LOCAL_BACKUP_KEY);
+        localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
     } catch (error) {
-        alert("Failed to create project on Google Drive.");
+        alert("Could not create project on Drive.");
         await signOut();
     }
   }, [storage, signOut]);
@@ -462,27 +407,19 @@ export function useProject() {
     }, [storage]);
 
   const checkForRecentLocalProject = React.useCallback(async () => {
-    try {
-        const backupJson = localStorage.getItem(LOCAL_UNLOAD_BACKUP_KEY);
-        if (backupJson) {
-            console.log("Found unload backup, restoring...");
+    const backupJson = localStorage.getItem(LOCAL_UNLOAD_BACKUP_KEY);
+    if (backupJson) {
+        try {
             const unloadBackup = sanitizeProjectData(JSON.parse(backupJson));
-            
             if (isFileSystemAccessAPISupported) {
                 const handle = await storage.getHandleFromIdb();
-                if (handle) {
-                    await storage.saveToFileHandle(unloadBackup);
-                    console.log("Restored unload backup to File Handle.");
-                }
+                if (handle) await storage.saveToFileHandle(unloadBackup);
             }
             await set(LOCAL_BACKUP_KEY, unloadBackup);
-            console.log("Restored unload backup to IndexedDB.");
-
+            return unloadBackup; 
+        } catch (e) {
             localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
         }
-    } catch (e) {
-        console.error("Error processing unload backup:", e);
-        localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
     }
 
     const localData = await getLocalProjectData();
@@ -491,7 +428,6 @@ export function useProject() {
         setProjectData(sanitizedData);
         projectDataRef.current = sanitizedData;
         setProjectName(localData.name);
-        // We don't set status here anymore, let initializeApp decide
         return sanitizedData;
     }
     return null;
@@ -503,58 +439,47 @@ export function useProject() {
     const initializeApp = async () => {
         try {
             await storage.initGapiClient(); 
-            const restoredLocalData = await checkForRecentLocalProject();
-            
-            // Check for existing Google session
             const storedProfile = await storage.getStoredProfile();
+            
+            // If user is logged in, we ignore local restored data to ensure cloud-only flow
             if (storedProfile) {
-                console.log("Found existing Google session for:", storedProfile.email);
                 setUserProfile(storedProfile);
                 setStorageMode('drive');
-                
                 try {
                     const driveProject = await storage.loadFromDrive();
-                    if (driveProject && restoredLocalData) {
-                        setProjectName(projectName || 'Local Project'); // Use name from IDB if possible
-                        setStatus('drive-conflict');
-                    } else if (driveProject) {
+                    if (driveProject) {
                         handleDriveProject(driveProject);
-                    } else if (restoredLocalData) {
-                        // Signed in but no project on Drive yet
-                        setStorageMode('drive');
-                        setStatus('drive-no-project');
                     } else {
-                        setStatus('welcome');
+                        // Profile exists but file gone? Check local one last time for migration
+                        const restoredLocalData = await checkForRecentLocalProject();
+                        if (restoredLocalData) {
+                            setStatus('drive-no-project');
+                        } else {
+                            setStatus('welcome');
+                        }
                     }
                 } catch (error) {
-                    console.error("Auto-sign in Drive load failed:", error);
-                    // If auth refresh fails, revert to Welcome or Local mode if local data exists
-                    if (restoredLocalData) {
-                        setStorageMode('local');
-                        setStatus('ready');
-                    } else {
-                        setStatus('welcome');
-                    }
+                    setStatus('welcome');
                 }
-            } else if (restoredLocalData) {
-                // No Drive session, but we have local data
-                setStorageMode('local');
-                setStatus('ready');
             } else {
-                setStatus('welcome');
+                // NO CLOUD SESSION: Proceed with standard local flow
+                const restoredLocalData = await checkForRecentLocalProject();
+                if (restoredLocalData) {
+                    setStorageMode('local');
+                    setStatus('ready');
+                } else {
+                    setStatus('welcome');
+                }
             }
-        } catch (error: any) {
-            console.error("Initialization failed:", error);
-            setStatus('welcome');
-        }
+        } catch (error: any) { setStatus('welcome'); }
     };
     initializeApp();
     isInitialLoadRef.current = false;
-  }, [storage, checkForRecentLocalProject, handleDriveProject, projectName]);
+  }, [storage, checkForRecentLocalProject, handleDriveProject]);
   
   const openLocalProject = React.useCallback(async () => {
     if (!isFileSystemAccessAPISupported) {
-        alert("Your browser doesn't support the File System Access API, which is required for local file projects.");
+        alert("File System Access API not supported.");
         return;
     }
     setStatus('loading');
@@ -569,22 +494,13 @@ export function useProject() {
             projectDataRef.current = sanitizedData;
             setStorageMode('local');
             setStatus('ready');
-        } else {
-            alert('Permission to read the file was denied.');
-            setStatus('welcome');
-        }
-    } catch (error) {
-        if (!(error instanceof DOMException && error.name === 'AbortError')) {
-          console.error('Failed to open file:', error);
-          alert('Failed to open or read the selected file.');
-        }
-        setStatus('welcome');
-    }
+        } else { setStatus('welcome'); }
+    } catch (error) { setStatus('welcome'); }
   }, [storage]);
   
   const createLocalProject = React.useCallback(async () => {
     if (!isFileSystemAccessAPISupported) {
-        alert("Your browser doesn't support the File System Access API, which is required for local file projects.");
+        alert("File System Access API not supported.");
         return;
     }
     setStatus('loading');
@@ -597,30 +513,23 @@ export function useProject() {
         await storage.saveToFileHandle(defaultProjectData);
         setStorageMode('local');
         setStatus('ready');
-    } catch (error) {
-        if (!(error instanceof DOMException && error.name === 'AbortError')) {
-            console.error('Error creating local project:', error);
-            alert('Could not create the project file.');
-        }
-        setStatus('welcome');
-    }
+    } catch (error) { setStatus('welcome'); }
   }, [storage]);
   
   const closeProject = React.useCallback(async () => {
     await flushChanges();
-
     if (storageMode === 'local') {
         await storage.clearHandleFromIdb();
-        await del(LOCAL_BACKUP_KEY);
     }
+    await del(LOCAL_BACKUP_KEY);
     localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
+    localStorage.removeItem(STORAGE_PREFERENCE_KEY);
     resetState();
     setStatus('welcome');
   }, [flushChanges, storageMode, storage, resetState]);
   
   const downloadProject = React.useCallback(async () => {
     await flushChanges();
-
     if (!projectDataRef.current) return;
     const blob = new Blob([JSON.stringify(projectDataRef.current, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -638,30 +547,42 @@ export function useProject() {
         try {
             await storage.createOnDrive(projectDataRef.current);
             setStatus('ready');
-        } catch (error) {
-            alert("Failed to upload project to Google Drive.");
-            setStatus('drive-no-project');
-        }
+            // Migration complete: remove local traces
+            del(LOCAL_BACKUP_KEY);
+            localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
+        } catch (error) { setStatus('drive-no-project'); }
     }, [storage]);
 
     const overwriteDriveProject = React.useCallback(async () => {
         if (!projectDataRef.current) return;
         setStatus('loading');
-        await storage.saveToDrive(projectDataRef.current);
-        await storage.clearHandleFromIdb();
-        await del(LOCAL_BACKUP_KEY);
-        setStatus('ready');
+        try {
+            await storage.saveToDrive(projectDataRef.current);
+            localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
+            del(LOCAL_BACKUP_KEY);
+            localStorage.setItem(STORAGE_PREFERENCE_KEY, 'local'); 
+            setStatus('ready');
+        } catch (e) {
+            alert("Could not overwrite cloud project. Check your connection.");
+            setStatus('drive-conflict');
+        }
     }, [storage]);
 
     const loadDriveProjectAndDiscardLocal = React.useCallback(async () => {
         setStatus('loading');
-        const driveProject = await storage.loadFromDrive();
-        if (driveProject) {
-            handleDriveProject(driveProject);
-            await storage.clearHandleFromIdb();
-            await del(LOCAL_BACKUP_KEY);
-        } else {
-            setStatus('drive-no-project');
+        try {
+            const driveProject = await storage.loadFromDrive();
+            if (driveProject) {
+                handleDriveProject(driveProject);
+                localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
+                del(LOCAL_BACKUP_KEY);
+                localStorage.setItem(STORAGE_PREFERENCE_KEY, 'drive'); 
+            } else {
+                setStatus('drive-no-project');
+            }
+        } catch (e) {
+            alert("Could not load cloud project.");
+            setStatus('drive-conflict');
         }
     }, [storage, handleDriveProject]);
 
