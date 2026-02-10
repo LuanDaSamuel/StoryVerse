@@ -1,6 +1,7 @@
 
 export type Theme = 'dark' | 'book';
 export type Language = 'en' | 'vi' | 'fi' | 'sv';
+// Added WritingMode type to support the new writing mode setting.
 export type WritingMode = 'standard' | 'book-note';
 
 export type SaveStatus = 'idle' | 'unsaved' | 'saving' | 'saved' | 'error';
@@ -78,6 +79,7 @@ export interface ProjectData {
     theme: Theme;
     baseFontSize: number;
     language: Language;
+    // Added writingMode to the settings interface to resolve build errors.
     writingMode: WritingMode;
   };
   dailyGoal: DailyGoal;

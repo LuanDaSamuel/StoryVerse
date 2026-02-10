@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { ProjectData, Theme, ThemeConfig, UserProfile, SaveStatus } from '../types';
 
@@ -11,13 +10,15 @@ interface ProjectContextType {
   themeClasses: ThemeConfig;
   projectName: string;
   saveStatus: SaveStatus;
-  storageMode: 'local' | 'cloud' | null;
+  // Google Drive & Auth properties
+  storageMode: 'local' | 'drive' | null;
   userProfile: UserProfile | null;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   createProjectOnDrive: () => void;
   uploadProjectToDrive: () => void;
   connectLocalToDrive: () => void;
+  // Drive Conflict Resolution
   overwriteDriveProject: () => void;
   loadDriveProjectAndDiscardLocal: () => void;
 }
@@ -29,8 +30,17 @@ export const ProjectContext = React.createContext<ProjectContextType>({
   closeProject: () => {},
   theme: 'dark',
   themeClasses: {
-    bg: '', bgSecondary: '', bgTertiary: '', text: '', textSecondary: '',
-    accent: '', accentText: '', accentBorder: '', border: '', input: '', logoColor: '',
+    bg: '',
+    bgSecondary: '',
+    bgTertiary: '',
+    text: '',
+    textSecondary: '',
+    accent: '',
+    accentText: '',
+    accentBorder: '',
+    border: '',
+    input: '',
+    logoColor: '',
   },
   projectName: '',
   saveStatus: 'idle',

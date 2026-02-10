@@ -60,7 +60,7 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
   };
 
   const handleCloseOrSignOut = async () => {
-    if (storageMode === 'cloud') {
+    if (storageMode === 'drive') {
       await signOut();
     } else {
       await closeProject();
@@ -78,10 +78,10 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
     return themeClasses.border;
   };
   
-  const storageLocation = storageMode === 'cloud' ? 'Google Drive' : 'a local file';
-  const closeButtonText = storageMode === 'cloud' ? t.signOutAndClose : t.closeProject;
-  const confirmTitle = storageMode === 'cloud' ? t.signOutTitle : t.closeProjectTitle;
-  const confirmMessage = storageMode === 'cloud' ? t.signOutMessage : t.closeProjectMessage;
+  const storageLocation = storageMode === 'drive' ? 'Google Drive' : 'a local file';
+  const closeButtonText = storageMode === 'drive' ? t.signOutAndClose : t.closeProject;
+  const confirmTitle = storageMode === 'drive' ? t.signOutTitle : t.closeProjectTitle;
+  const confirmMessage = storageMode === 'drive' ? t.signOutMessage : t.closeProjectMessage;
 
 
   return (
