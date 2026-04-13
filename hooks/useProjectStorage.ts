@@ -28,6 +28,13 @@ export class PermanentAuthError extends Error {
     }
 }
 
+export class ExpiredVersionError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'ExpiredVersionError';
+    }
+}
+
 
 // --- Helper Functions ---
 async function verifyPermission(handle: FileSystemHandle) {
@@ -39,6 +46,7 @@ async function verifyPermission(handle: FileSystemHandle) {
 
 export function useProjectStorage() {
     const driveFileIdRef = React.useRef<string | null>(null);
+    const driveFileModifiedTimeRef = React.useRef<string | null>(null);
     const projectFileHandleRef = React.useRef<FileSystemFileHandle | null>(null);
 
     const signOut = React.useCallback(async () => {
@@ -49,6 +57,7 @@ export function useProjectStorage() {
         await idbDel(DRIVE_FILE_ID_KEY);
         await idbDel(USER_PROFILE_KEY);
         driveFileIdRef.current = null;
+        driveFileModifiedTimeRef.current = null;
         if (google?.accounts?.id) {
           google.accounts.id.disableAutoSelect();
         }
@@ -171,6 +180,14 @@ export function useProjectStorage() {
             throw new Error(`File content upload failed: ${errorBody?.error?.message || uploadResponse.statusText}`);
         }
         
+        const metadataResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=modifiedTime`, {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+        if (metadataResponse.ok) {
+            const metadata = await metadataResponse.json();
+            driveFileModifiedTimeRef.current = metadata.modifiedTime;
+        }
+
         console.log("File content uploaded successfully.");
         driveFileIdRef.current = fileId;
         await idbSet(DRIVE_FILE_ID_KEY, fileId);
@@ -191,6 +208,23 @@ export function useProjectStorage() {
     
         try {
             const accessToken = await getAccessToken();
+
+            if (driveFileModifiedTimeRef.current) {
+                const checkResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=modifiedTime`, {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                if (checkResponse.ok) {
+                    const checkData = await checkResponse.json();
+                    if (checkData.modifiedTime) {
+                        const driveTime = new Date(checkData.modifiedTime).getTime();
+                        const localTime = new Date(driveFileModifiedTimeRef.current).getTime();
+                        if (driveTime > localTime + 2000) {
+                            throw new ExpiredVersionError("Project was modified on another device.");
+                        }
+                    }
+                }
+            }
+
             console.log(`Initiating upload for Drive file: ${fileId} via fetch`);
             const response = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
                 method: 'PATCH',
@@ -203,6 +237,13 @@ export function useProjectStorage() {
     
             if (response.ok) {
                 console.log("File updated successfully using fetch.");
+                const updateResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=modifiedTime`, {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                if (updateResponse.ok) {
+                    const updateData = await updateResponse.json();
+                    driveFileModifiedTimeRef.current = updateData.modifiedTime;
+                }
                 return; // Success
             }
     
@@ -234,7 +275,7 @@ export function useProjectStorage() {
             try {
                 const fileMetadata = await gapi.client.request({
                     path: `https://www.googleapis.com/drive/v3/files/${storedFileId}`,
-                    params: { fields: 'id, name, trashed' }
+                    params: { fields: 'id, name, trashed, modifiedTime' }
                 });
 
                 if (fileMetadata.result && !fileMetadata.result.trashed) {
@@ -243,6 +284,7 @@ export function useProjectStorage() {
                         params: { alt: 'media' }
                     });
                     driveFileIdRef.current = storedFileId;
+                    driveFileModifiedTimeRef.current = fileMetadata.result.modifiedTime;
                     console.log(`Successfully loaded file from stored ID.`);
                     return { name: fileMetadata.result.name, data: contentResponse.result };
                 } else {
@@ -277,6 +319,7 @@ export function useProjectStorage() {
             const file = listResponse.result.files[0];
             console.log(`Found most recent project file by name with ID: ${file.id}`);
             driveFileIdRef.current = file.id;
+            driveFileModifiedTimeRef.current = file.modifiedTime;
             await idbSet(DRIVE_FILE_ID_KEY, file.id);
             
             const contentResponse = await gapi.client.request({

@@ -220,7 +220,7 @@ export function useProject() {
                     break;
                 } catch (error: any) {
                     lastError = error;
-                    if (error instanceof PermanentAuthError) throw error; 
+                    if (error instanceof PermanentAuthError || error.name === 'ExpiredVersionError') throw error; 
                     if (attempt < MAX_RETRIES) {
                         await new Promise(resolve => setTimeout(resolve, INITIAL_DELAY_MS * attempt));
                     }
@@ -236,11 +236,17 @@ export function useProject() {
         }
         
         setSaveStatus('saved');
-    } catch (error) {
+    } catch (error: any) {
         console.error("Critical Sync Error:", error);
         setSaveStatus('error');
         isDirtyRef.current = true;
         hasCloudError = true;
+        
+        if (error.name === 'ExpiredVersionError') {
+            alert("This session has expired because the project was modified on another device. You will be logged out to prevent overwriting changes.");
+            signOut({ flush: false });
+            return;
+        }
     } finally {
         isSavingRef.current = false;
         if (isDirtyRef.current) {
@@ -251,7 +257,7 @@ export function useProject() {
             }, retryDelay); 
         }
     }
-  }, [storage, storageMode]);
+  }, [storage, storageMode, signOut]);
 
   React.useEffect(() => {
     saveProjectRef.current = saveProject;
@@ -479,7 +485,28 @@ export function useProject() {
   
   const openLocalProject = React.useCallback(async () => {
     if (!isFileSystemAccessAPISupported) {
-        alert("File System Access API not supported.");
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json,application/json';
+        input.onchange = async (e: any) => {
+            const file = e.target.files[0];
+            if (file) {
+                const text = await file.text();
+                try {
+                    const json = JSON.parse(text);
+                    const sanitizedData = sanitizeProjectData(json);
+                    setProjectName(file.name.replace('.json', ''));
+                    setProjectData(sanitizedData);
+                    projectDataRef.current = sanitizedData;
+                    setStorageMode('local');
+                    setStatus('ready');
+                    await storage.clearHandleFromIdb();
+                } catch (err) {
+                    alert("Failed to parse project file.");
+                }
+            }
+        };
+        input.click();
         return;
     }
     setStatus('loading');
@@ -500,7 +527,12 @@ export function useProject() {
   
   const createLocalProject = React.useCallback(async () => {
     if (!isFileSystemAccessAPISupported) {
-        alert("File System Access API not supported.");
+        setProjectName("New Project");
+        setProjectData(defaultProjectData);
+        projectDataRef.current = defaultProjectData;
+        setStorageMode('local');
+        setStatus('ready');
+        await storage.clearHandleFromIdb();
         return;
     }
     setStatus('loading');
