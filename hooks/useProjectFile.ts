@@ -484,7 +484,7 @@ export function useProject() {
   }, [storage, checkForRecentLocalProject, handleDriveProject]);
   
   const openLocalProject = React.useCallback(async () => {
-    if (!isFileSystemAccessAPISupported) {
+    const fallbackInput = () => {
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = '.json,application/json';
@@ -507,11 +507,16 @@ export function useProject() {
             }
         };
         input.click();
+    };
+
+    if (!isFileSystemAccessAPISupported) {
+        fallbackInput();
         return;
     }
-    setStatus('loading');
+    
     try {
         const [handle] = await window.showOpenFilePicker({ types: [{ description: 'StoryVerse Projects', accept: { 'application/json': ['.json'] } }] });
+        setStatus('loading');
         const fileData = await storage.loadFromFileHandle(handle);
         if (fileData) {
             await storage.saveHandleToIdb(handle);
@@ -522,22 +527,30 @@ export function useProject() {
             setStorageMode('local');
             setStatus('ready');
         } else { setStatus('welcome'); }
-    } catch (error) { setStatus('welcome'); }
+    } catch (error: any) { 
+        console.warn("showOpenFilePicker failed, falling back to input:", error);
+        fallbackInput();
+    }
   }, [storage]);
   
   const createLocalProject = React.useCallback(async () => {
-    if (!isFileSystemAccessAPISupported) {
+    const fallbackCreate = async () => {
         setProjectName("New Project");
         setProjectData(defaultProjectData);
         projectDataRef.current = defaultProjectData;
         setStorageMode('local');
         setStatus('ready');
         await storage.clearHandleFromIdb();
+    };
+
+    if (!isFileSystemAccessAPISupported) {
+        await fallbackCreate();
         return;
     }
-    setStatus('loading');
+    
     try {
         const handle = await window.showSaveFilePicker({ suggestedName: 'StoryVerse-Project.json', types: [{ description: 'StoryVerse Projects', accept: { 'application/json': ['.json'] } }] });
+        setStatus('loading');
         await storage.saveHandleToIdb(handle);
         setProjectName(handle.name);
         setProjectData(defaultProjectData);
@@ -545,7 +558,10 @@ export function useProject() {
         await storage.saveToFileHandle(defaultProjectData);
         setStorageMode('local');
         setStatus('ready');
-    } catch (error) { setStatus('welcome'); }
+    } catch (error: any) { 
+        console.warn("showSaveFilePicker failed, falling back to in-memory:", error);
+        await fallbackCreate();
+    }
   }, [storage]);
   
   const closeProject = React.useCallback(async () => {

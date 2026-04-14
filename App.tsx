@@ -15,7 +15,6 @@ import DemosPage from './pages/DemosPage';
 import StoryIdeaEditorPage from './pages/StoryIdeaEditorPage';
 import SketchesPage from './pages/SketchesPage';
 import SketchEditorPage from './pages/SketchEditorPage';
-import ConfirmModal from './components/ConfirmModal';
 import { THEME_CONFIG } from './constants';
 import { LoadingIcon, Bars3Icon, DocumentPlusIcon, UploadIcon, CloudIcon } from './components/Icons';
 import { Theme, Language } from './types';
@@ -52,7 +51,6 @@ const AppContent = () => {
     const t = useTranslations();
     
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = React.useState(false);
-    const [isOverwriteConfirmOpen, setIsOverwriteConfirmOpen] = React.useState(false);
     const navigate = useNavigate();
     const initialLoadHandled = React.useRef(false);
 
@@ -153,24 +151,24 @@ const AppContent = () => {
                             </p>
                             <div className="space-y-4">
                                 <button
-                                    onClick={project.loadDriveProjectAndDiscardLocal}
+                                    onClick={project.overwriteDriveProject}
                                     className={`flex flex-col items-center justify-center w-full px-6 py-4 text-lg font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}
-                                >
-                                    <div className="flex items-center">
-                                        <CloudIcon className="w-6 h-6 mr-3" />
-                                        <span>Use Cloud Project</span>
-                                    </div>
-                                    <span className="text-sm font-normal opacity-80 mt-1">Load the version from Google Drive (Recommended).</span>
-                                </button>
-                                <button
-                                    onClick={() => setIsOverwriteConfirmOpen(true)}
-                                    className={`flex flex-col items-center justify-center w-full px-6 py-4 text-lg font-semibold rounded-lg ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-80`}
                                 >
                                     <div className="flex items-center">
                                         <UploadIcon className="w-6 h-6 mr-3" />
                                         <span>Upload Local Project</span>
                                     </div>
                                     <span className="text-sm font-normal opacity-80 mt-1">This will overwrite the project on Google Drive.</span>
+                                </button>
+                                <button
+                                    onClick={project.loadDriveProjectAndDiscardLocal}
+                                    className={`flex flex-col items-center justify-center w-full px-6 py-4 text-lg font-semibold rounded-lg ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-80`}
+                                >
+                                    <div className="flex items-center">
+                                        <CloudIcon className="w-6 h-6 mr-3" />
+                                        <span>Use Cloud Project</span>
+                                    </div>
+                                    <span className="text-sm font-normal opacity-80 mt-1">Your local changes will not be uploaded.</span>
                                 </button>
                             </div>
                              <div className="mt-8 text-center">
@@ -179,15 +177,6 @@ const AppContent = () => {
                                 </button>
                             </div>
                         </div>
-                        
-                        <ConfirmModal
-                            isOpen={isOverwriteConfirmOpen}
-                            onClose={() => setIsOverwriteConfirmOpen(false)}
-                            onConfirm={project.overwriteDriveProject}
-                            title="Overwrite Cloud Project?"
-                            message="Are you sure you want to upload your local project? This will permanently overwrite the version saved on Google Drive, and any changes made on other devices will be lost."
-                            confirmButtonClass="px-6 py-2 font-semibold rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors"
-                        />
                     </div>
                 );
             case 'ready':

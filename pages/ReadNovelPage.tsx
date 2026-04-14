@@ -90,6 +90,10 @@ const ReadNovelPage = () => {
         const mainEl = mainRef.current;
         if (!mainEl || !novelId || !chapterId) return;
 
+        if (currentChapter && novel) {
+            document.title = `${enhancePlainText(currentChapter.title)} - ${enhancePlainText(novel.title)}`;
+        }
+
         const savedPosition = sessionStorage.getItem(`storyverse-scroll-pos-${novelId}-${chapterId}`);
         if (savedPosition) {
             mainEl.scrollTo(0, parseInt(savedPosition, 10));
@@ -170,8 +174,8 @@ const ReadNovelPage = () => {
                         aria-labelledby={`chapter-title-${currentChapter.id}`}
                     >
                         <div className="text-center mb-12">
-                            <h1 className="text-3xl font-bold">{enhancePlainText(novel.title)}</h1>
-                            <h2 id={`chapter-title-${currentChapter.id}`} className="text-4xl font-bold mt-4">{enhancePlainText(currentChapter.title)}</h2>
+                            <h2 className="text-xl font-semibold opacity-70 uppercase tracking-widest">{enhancePlainText(novel.title)}</h2>
+                            <h1 id={`chapter-title-${currentChapter.id}`} className="text-4xl font-bold mt-4">{enhancePlainText(currentChapter.title)}</h1>
                         </div>
                         
                         <div

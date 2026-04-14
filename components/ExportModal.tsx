@@ -71,17 +71,18 @@ const ExportModal = ({ isOpen, onClose, novel }: ExportModalProps) => {
         
         const css = `
             body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 40px auto; padding: 20px; }
-            h1, h2, h3 { color: #111; }
+            h1, h2, h3 { color: #111; border: none !important; }
             h1 { font-size: 2.5em; } h2 { font-size: 1.8em; } h3 { font-size: 1.5em; }
+            p { text-indent: 2em; margin-bottom: 1em; }
             .novel-title { text-align: center; font-size: 3em; margin-bottom: 0; }
-            .description { text-align: center; color: #777; font-style: italic; margin-top: 10px; }
+            .description { text-align: center; color: #777; font-style: italic; margin-top: 10px; text-indent: 0; }
             .tags { text-align: center; margin-bottom: 40px; }
             .tag { display: inline-block; background-color: #eee; padding: 5px 10px; border-radius: 5px; font-size: 0.9em; margin: 2px; }
-            .chapter-title { margin-top: 40px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+            .chapter-title { margin-top: 40px; margin-bottom: 40px; page-break-before: always; text-align: center; }
         `;
         let chaptersHtml = '';
         chaptersToExport.forEach(chapter => {
-            chaptersHtml += `<h2 class="chapter-title">${enhancePlainText(chapter.title)}</h2><div>${enhanceHtml(chapter.content)}</div>`;
+            chaptersHtml += `<h1 class="chapter-title">${enhancePlainText(chapter.title)}</h1><br><br><div>${enhanceHtml(chapter.content)}</div>`;
         });
 
         const fullHtml = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>${novel.title}</title><style>${css}</style></head><body><h1 class="novel-title">${enhancePlainText(novel.title)}</h1><p class="description">${enhancePlainText(novel.description)}</p><div class="tags">${novel.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}</div><hr>${chaptersHtml}</body></html>`;
@@ -97,7 +98,7 @@ const ExportModal = ({ isOpen, onClose, novel }: ExportModalProps) => {
 
         chaptersToExport.forEach(chapter => {
             tempDiv.innerHTML = chapter.content;
-            textContent += `## ${chapter.title}\n\n${tempDiv.textContent || ''}\n\n---\n\n`;
+            textContent += `# ${chapter.title}\n\n${tempDiv.textContent || ''}\n\n---\n\n`;
         });
         
         const blob = new Blob([enhancePlainText(textContent)], { type: 'text/plain;charset=utf-8' });
@@ -130,7 +131,7 @@ const ExportModal = ({ isOpen, onClose, novel }: ExportModalProps) => {
         markdownContent += '\n\n---\n\n';
 
         chaptersToExport.forEach(chapter => {
-            markdownContent += `## ${chapter.title}\n\n${htmlToMarkdown(chapter.content)}\n\n---\n\n`;
+            markdownContent += `# ${chapter.title}\n\n${htmlToMarkdown(chapter.content)}\n\n---\n\n`;
         });
         
         const blob = new Blob([enhancePlainText(markdownContent)], { type: 'text/markdown;charset=utf-8' });

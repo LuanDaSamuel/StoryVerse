@@ -1067,6 +1067,12 @@ const ChapterEditorPage = () => {
     }, []);
 
     // --- Effects ---
+    React.useEffect(() => {
+        if (chapter && novel) {
+            document.title = `Editing: ${enhancePlainText(chapter.title)} - ${enhancePlainText(novel.title)}`;
+        }
+    }, [chapter, novel]);
+
     // This effect handles loading content when the chapter is switched.
     React.useEffect(() => {
         if (editorRef.current && chapter) {
