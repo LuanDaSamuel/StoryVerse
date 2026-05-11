@@ -2,7 +2,7 @@
 import * as React from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
-import { BackIcon, BookOpenIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, TextIcon, SearchIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, CloseIcon, Bars3Icon, DownloadIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, LoadingIcon, CheckIcon, ExclamationTriangleIcon, ClipboardIcon } from '../components/Icons';
+import { BackIcon, BookOpenIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, TextIcon, SearchIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, CloseIcon, Bars3Icon, DownloadIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, LoadingIcon, CheckIcon, ExclamationTriangleIcon, ClipboardIcon, PlusIcon } from '../components/Icons';
 import { enhancePlainText, enhanceHtml, THEME_CONFIG } from '../constants';
 import ExportModal from '../components/ExportModal';
 import { useTranslations } from '../hooks/useTranslations';
@@ -60,6 +60,7 @@ const ChapterListModal = ({ isOpen, onClose, novel, currentChapterId, themeClass
                         <CloseIcon className="w-6 h-6" />
                     </button>
                 </div>
+
                 <nav className="max-h-[60vh] overflow-y-auto -mr-2 pr-2">
                     <ul className="space-y-1">
                         {novel.chapters.map(c => (
@@ -508,6 +509,36 @@ const ChapterEditorPage = () => {
             return updatedProjectData;
         });
     }, [novelIndex, chapterIndex, setProjectData]);
+
+    const handleAddChapter = React.useCallback(() => {
+        if (novelIndex === -1 || !novel) return;
+        
+        const newChapterId = crypto.randomUUID();
+        const now = new Date().toISOString();
+        const newChapter = {
+            id: newChapterId,
+            title: `Chapter ${novel.chapters.length + 1}`,
+            content: '',
+            wordCount: 0,
+            createdAt: now,
+            updatedAt: now,
+            history: [],
+        };
+
+        setProjectData(currentData => {
+            if (!currentData) return null;
+            const updatedNovels = [...currentData.novels];
+            if (novelIndex >= updatedNovels.length) return currentData;
+            updatedNovels[novelIndex] = {
+                ...updatedNovels[novelIndex],
+                chapters: [...updatedNovels[novelIndex].chapters, newChapter]
+            };
+            return { ...currentData, novels: updatedNovels };
+        });
+        
+        navigate(`/novel/${novelId}/edit/${newChapterId}`);
+        setIsChapterListModalOpen(false);
+    }, [novelIndex, novel, novelId, setProjectData, navigate]);
 
     const updateActiveFormats = React.useCallback(() => {
         setActiveFormats({
@@ -1327,6 +1358,20 @@ const ChapterEditorPage = () => {
                                     <div className="flex items-center space-x-3">
                                         <Bars3Icon className="w-5 h-5" />
                                         <span>{t.chapterOutline}</span>
+                                    </div>
+                                </button>
+                            </div>
+                            <div className={`border-b ${themeClasses.border}`}>
+                                <button
+                                    onClick={() => {
+                                        handleAddChapter();
+                                        setIsSidebarOpen(false);
+                                    }}
+                                    className={`w-full flex justify-between items-center py-3 px-4 font-semibold text-left transition-colors hover:${themeClasses.bgTertiary}`}
+                                >
+                                    <div className="flex items-center space-x-3">
+                                        <PlusIcon className="w-5 h-5" />
+                                        <span>{t.addNewChapter}</span>
                                     </div>
                                 </button>
                             </div>
