@@ -292,12 +292,7 @@ const SketchEditorPage = () => {
         const text = e.clipboardData.getData('text/plain');
         if (!text) return;
 
-        const htmlToInsert = text
-            .split(/\r?\n/)
-            .map(line => `<p>${line.trim() === '' ? '<br>' : enhancePlainText(line)}</p>`)
-            .join('');
-
-        document.execCommand('insertHTML', false, htmlToInsert);
+        document.execCommand('insertText', false, text);
     };
 
     React.useEffect(() => {

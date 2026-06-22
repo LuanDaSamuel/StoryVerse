@@ -2,11 +2,12 @@ import * as React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { StoryIdea, IdeaFolder } from '../types';
-import { PlusIcon, UploadIcon, BackIcon, TrashIcon, FolderIcon, PencilIcon, ChevronLeftIcon, SparklesIcon, TextIcon } from '../components/Icons';
+import { PlusIcon, UploadIcon, BackIcon, TrashIcon, FolderIcon, PencilIcon, ChevronLeftIcon, SparklesIcon, TextIcon, DownloadIcon } from '../components/Icons';
 import ConfirmModal from '../components/ConfirmModal';
 import { enhancePlainText } from '../constants';
 import * as mammoth from 'mammoth';
 import { useTranslations } from '../hooks/useTranslations';
+import { downloadAsHtml } from '../utils/htmlExport';
 
 const CreateFolderModal = ({ isOpen, onClose, onConfirm }: { isOpen: boolean, onClose: () => void, onConfirm: (name: string) => void }) => {
     const { themeClasses } = React.useContext(ProjectContext);
@@ -207,6 +208,26 @@ const DemosPage = () => {
             // Clean up empty paragraphs
             tempDiv.innerHTML = html.replace(/<p>(\s|&nbsp;|<br\s*\/?>)*<\/p>/gi, '').trim();
             
+            const formatTextNodes = (node: Node) => {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    if (node.textContent) {
+                        let text = node.textContent;
+                        text = text.replace(/\.{3}/g, '…');
+                        text = text.replace(/--/g, '—');
+                        
+                        text = text.replace(/(^|\W)"/g, '$1“'); 
+                        text = text.replace(/"/g, '”');
+                        text = text.replace(/(^|\W)'/g, '$1‘');
+                        text = text.replace(/'/g, '’');
+                        
+                        node.textContent = text;
+                    }
+                } else if (node.nodeType === Node.ELEMENT_NODE) {
+                    node.childNodes.forEach(formatTextNodes);
+                }
+            };
+            formatTextNodes(tempDiv);
+            
             // Use filename as title, replacing .docx case-insensitively
             let ideaTitle = file.name.replace(/\.docx$/i, '');
             
@@ -291,6 +312,10 @@ const DemosPage = () => {
             return { ...currentData, storyIdeas: updatedIdeas };
         });
         setIdeaToDelete(null);
+    };
+
+    const handleDownloadHtml = (idea: StoryIdea) => {
+        downloadAsHtml(idea.synopsis, idea.title || 'document');
     };
 
     const handleCreateFolder = (name: string) => {
@@ -590,15 +615,27 @@ const DemosPage = () => {
                                 <span className={`text-xs font-semibold ${themeClasses.textSecondary}`}>
                                     {(idea.wordCount || 0).toLocaleString()} {t.wordsCount}
                                 </span>
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setIdeaToMove(idea);
-                                    }}
-                                    className={`p-1 rounded text-xs font-semibold ${themeClasses.bgTertiary} hover:opacity-80 opacity-0 group-hover:opacity-100 transition-opacity`}
-                                >
-                                    {t.move}
-                                </button>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDownloadHtml(idea);
+                                        }}
+                                        className={`p-1 rounded text-xs font-semibold ${themeClasses.bgTertiary} hover:opacity-80 opacity-0 group-hover:opacity-100 transition-opacity`}
+                                        title="Download HTML"
+                                    >
+                                        <DownloadIcon className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setIdeaToMove(idea);
+                                        }}
+                                        className={`p-1 rounded text-xs font-semibold ${themeClasses.bgTertiary} hover:opacity-80 opacity-0 group-hover:opacity-100 transition-opacity`}
+                                    >
+                                        {t.move}
+                                    </button>
+                                </div>
                             </div>
                             <button
                                 onClick={(e) => {

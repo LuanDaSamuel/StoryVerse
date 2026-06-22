@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { NavLink } from 'react-router-dom';
-import { AppLogoIcon, HomeIcon, PlusIcon, SettingsIcon, LightbulbIcon, QuillPenIcon, LoadingIcon, CheckIcon, ExclamationTriangleIcon } from './Icons';
+import { AppLogoIcon, HomeIcon, PlusIcon, SettingsIcon, LightbulbIcon, QuillPenIcon, LoadingIcon, CheckIcon, ExclamationTriangleIcon, BookOpenIcon } from './Icons';
 import SettingsModal from './SettingsModal';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { useTranslations } from '../hooks/useTranslations';
@@ -78,6 +78,10 @@ const Sidebar = ({ onLinkClick = () => {} }: SidebarProps) => {
                     <NavLink to="/sketches" className={navLinkClasses} onClick={onLinkClick}>
                         <QuillPenIcon className="w-5 h-5" />
                         <span>{t.sketches}</span>
+                    </NavLink>
+                    <NavLink to="/working-model" className={navLinkClasses} onClick={onLinkClick}>
+                        <BookOpenIcon className="w-5 h-5" />
+                        <span>{t.workingModel}</span>
                     </NavLink>
                 </nav>
 

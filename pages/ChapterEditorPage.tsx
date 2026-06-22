@@ -1047,14 +1047,7 @@ const ChapterEditorPage = () => {
         const text = e.clipboardData.getData('text/plain');
         if (!text) return;
 
-        // Sanitize pasted text into clean paragraphs.
-        // Each line becomes a new <p> tag, preserving paragraph breaks from the source.
-        const htmlToInsert = text
-            .split(/\r?\n/)
-            .map(line => `<p>${line.trim() === '' ? '<br>' : enhancePlainText(line)}</p>`)
-            .join('');
-
-        document.execCommand('insertHTML', false, htmlToInsert);
+        document.execCommand('insertText', false, text);
         cleanupEditor();
     };
 

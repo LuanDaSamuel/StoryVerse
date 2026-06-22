@@ -15,6 +15,7 @@ import DemosPage from './pages/DemosPage';
 import StoryIdeaEditorPage from './pages/StoryIdeaEditorPage';
 import SketchesPage from './pages/SketchesPage';
 import SketchEditorPage from './pages/SketchEditorPage';
+import WorkingModelPage from './pages/WorkingModelPage';
 import { THEME_CONFIG } from './constants';
 import { LoadingIcon, Bars3Icon, DocumentPlusIcon, UploadIcon, CloudIcon } from './components/Icons';
 import { Theme, Language } from './types';
@@ -51,6 +52,7 @@ const AppContent = () => {
     const t = useTranslations();
     
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = React.useState(false);
+    const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = React.useState(true);
     const navigate = useNavigate();
     const initialLoadHandled = React.useRef(false);
 
@@ -91,7 +93,8 @@ const AppContent = () => {
     const onReadPage = useMatch('/novel/:novelId/read/:chapterId?');
     const onIdeaEditPage = useMatch('/idea/:ideaId/edit');
     const onSketchEditPage = useMatch('/novel/:novelId/sketch/:sketchId/edit');
-    const isSidebarPermanentlyHidden = !!onEditPage || !!onReadPage || !!onIdeaEditPage || !!onSketchEditPage;
+    const onWorkingModelPage = useMatch('/working-model');
+    const isSidebarPermanentlyHidden = !!onEditPage || !!onReadPage || !!onIdeaEditPage || !!onSketchEditPage || !!onWorkingModelPage;
 
     const renderContent = () => {
         switch (project.status) {
@@ -184,12 +187,12 @@ const AppContent = () => {
                 return (
                     <div className={`flex h-screen ${themeClasses.bg} ${themeClasses.text}`}>
                         {/* Desktop Sidebar */}
-                        {!isSidebarPermanentlyHidden && (
-                            <div className="hidden md:block flex-shrink-0">
-                                <Sidebar />
+                        {!isSidebarPermanentlyHidden && isDesktopSidebarOpen && (
+                            <div className="hidden md:flex flex-col flex-shrink-0 relative">
+                                <Sidebar onLinkClick={() => setIsDesktopSidebarOpen(false)} />
                             </div>
                         )}
-
+                        
                         {/* Mobile Sidebar & Overlay */}
                         {!isSidebarPermanentlyHidden && (
                             <>
@@ -204,11 +207,18 @@ const AppContent = () => {
                             </>
                         )}
                         
-                        <main className="flex-1 overflow-y-auto">
-                            {/* Mobile Header with Hamburger */}
+                        <main className="flex-1 overflow-y-auto relative">
+                            {/* Header with Hamburger */}
                             {!isSidebarPermanentlyHidden && (
-                                <header className={`sticky top-0 z-10 flex items-center justify-between p-4 md:hidden ${themeClasses.bgSecondary} border-b ${themeClasses.border}`}>
-                                    <button onClick={() => setIsMobileSidebarOpen(true)} className={themeClasses.accentText}>
+                                <header className={`sticky top-0 z-10 flex items-center justify-between p-4 ${isDesktopSidebarOpen ? 'md:hidden' : ''} ${themeClasses.bgSecondary} border-b ${themeClasses.border}`}>
+                                    <button 
+                                        onClick={() => { 
+                                            // Ensure both states enable sidebar visibility appropriately
+                                            setIsMobileSidebarOpen(true); 
+                                            setIsDesktopSidebarOpen(true); 
+                                        }} 
+                                        className={themeClasses.accentText}
+                                    >
                                         <span className="sr-only">Open Menu</span>
                                         <Bars3Icon className="h-6 w-6" />
                                     </button>
@@ -228,6 +238,7 @@ const AppContent = () => {
                                 <Route path="/novel/:novelId/read/:chapterId?" element={<ReadNovelPage />} />
                                 <Route path="/novel/:novelId/edit" element={<NovelEditRedirect />} />
                                 <Route path="/novel/:novelId/edit/:chapterId" element={<ChapterEditorPage />} />
+                                <Route path="/working-model" element={<WorkingModelPage />} />
                             </Routes>
                         </main>
                     </div>

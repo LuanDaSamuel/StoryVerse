@@ -33,7 +33,16 @@
         - Vertical space is added between paragraphs for better readability.
         - The first paragraph after a heading is not indented, for better typographic flow.
       */
-      .story-content p {
+      .story-content {
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        word-break: break-word;
+        max-width: 100%;
+        overflow-x: hidden;
+      }
+
+      .story-content p,
+      .story-content div {
         text-indent: 2em;
         margin-bottom: 1em;
       }
@@ -64,12 +73,6 @@
         margin-top: 1.5em;
       }
 
-      .story-content h1 + p,
-      .story-content h2 + p,
-      .story-content h3 + p {
-        text-indent: 0;
-      }
-      
       .story-content blockquote {
         border-left: 3px solid;
         border-color: currentColor;
@@ -77,9 +80,11 @@
         margin: 1.5em 0;
         padding-left: 1.5em;
         font-style: italic;
+        text-indent: 0;
       }
 
-      .story-content blockquote p {
+      .story-content blockquote p,
+      .story-content blockquote div {
         text-indent: 0;
       }
       

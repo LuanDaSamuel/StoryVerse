@@ -2,11 +2,12 @@
 import * as React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
-import { BackIcon, ChevronLeftIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, TrashIcon, H1Icon, H2Icon, H3Icon, SearchIcon, LoadingIcon, CheckIcon, ExclamationTriangleIcon, CloseIcon, ChevronDownIcon, TextIcon, ChevronRightIcon, Bars3Icon } from '../components/Icons';
+import { BackIcon, ChevronLeftIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, TrashIcon, H1Icon, H2Icon, H3Icon, SearchIcon, LoadingIcon, CheckIcon, ExclamationTriangleIcon, CloseIcon, ChevronDownIcon, TextIcon, ChevronRightIcon, Bars3Icon, DownloadIcon } from '../components/Icons';
 import { enhanceHtml, enhancePlainText, SKETCH_TAG_OPTIONS, THEME_CONFIG } from '../constants';
 import { StoryIdea, StoryIdeaStatus } from '../types';
 import ConfirmModal from '../components/ConfirmModal';
 import { useTranslations } from '../hooks/useTranslations';
+import { downloadAsHtml } from '../utils/htmlExport';
 
 // --- Reusable Components (Matching ChapterEditorPage) ---
 
@@ -762,12 +763,7 @@ const StoryIdeaEditorPage = () => {
         const text = e.clipboardData.getData('text/plain');
         if (!text) return;
 
-        const htmlToInsert = text
-            .split(/\r?\n/)
-            .map(line => `<p>${line.trim() === '' ? '<br>' : enhancePlainText(line)}</p>`)
-            .join('');
-
-        document.execCommand('insertHTML', false, htmlToInsert);
+        document.execCommand('insertText', false, text);
         cleanupEditor();
     };
 
@@ -839,6 +835,11 @@ const StoryIdeaEditorPage = () => {
         navigate('/demos');
     };
 
+    const handleDownloadHtml = () => {
+        if (!idea) return;
+        downloadAsHtml(idea.synopsis, idea.title || 'document');
+    };
+
     const editorStyle = React.useMemo(() => {
         const baseFontSize = projectData?.settings?.baseFontSize || 18;
         const style: React.CSSProperties = {
@@ -897,6 +898,14 @@ const StoryIdeaEditorPage = () => {
                                     title={t.outline}
                                 >
                                     <Bars3Icon className="w-5 h-5" />
+                                </button>
+                                {/* Download HTML Toggle */}
+                                <button 
+                                    onClick={handleDownloadHtml}
+                                    className={`p-2 rounded-md transition-colors text-inherit opacity-70 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10`}
+                                    title="Download HTML"
+                                >
+                                    <DownloadIcon className="w-5 h-5" />
                                 </button>
                             </div>
                             
