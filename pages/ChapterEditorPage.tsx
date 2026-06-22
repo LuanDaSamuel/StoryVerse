@@ -2,7 +2,7 @@
 import * as React from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
-import { BackIcon, BookOpenIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, TextIcon, SearchIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, CloseIcon, Bars3Icon, DownloadIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, LoadingIcon, CheckIcon, ExclamationTriangleIcon, ClipboardIcon, PlusIcon } from '../components/Icons';
+import { BackIcon, BookOpenIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, TextIcon, SearchIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, CloseIcon, Bars3Icon, DownloadIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, LoadingIcon, CheckIcon, ExclamationTriangleIcon, ClipboardIcon, PlusIcon, PencilIcon } from '../components/Icons';
 import { enhancePlainText, enhanceHtml, THEME_CONFIG } from '../constants';
 import ExportModal from '../components/ExportModal';
 import { useTranslations } from '../hooks/useTranslations';
@@ -106,6 +106,152 @@ const ToolbarDropdown = ({ label, value, onChange, children }: ToolbarDropdownPr
     );
 };
 
+
+const SketchSidebar = ({ novel, novelIndex, onClose }: { novel: any, novelIndex: number, onClose: () => void }) => {
+    const { projectData, setProjectData, themeClasses } = React.useContext(ProjectContext);
+    const t = useTranslations();
+    const [selectedSketchId, setSelectedSketchId] = React.useState<string | null>(null);
+    const editorRef = React.useRef<HTMLDivElement>(null);
+
+    const activeSketch = React.useMemo(() => {
+        return novel.sketches.find((s: any) => s.id === selectedSketchId) || null;
+    }, [novel, selectedSketchId]);
+
+    const handleCreateSketch = () => {
+        const now = new Date().toISOString();
+        const newSketch = {
+            id: crypto.randomUUID(),
+            title: 'Untitled Sketch',
+            content: '<p><br></p>',
+            wordCount: 0,
+            tags: [],
+            createdAt: now,
+            updatedAt: now,
+        };
+
+        setProjectData((currentData: any) => {
+            if (!currentData || !currentData.novels[novelIndex]) return currentData;
+            const updatedNovels = [...currentData.novels];
+            const novelToUpdate = { ...updatedNovels[novelIndex] };
+            novelToUpdate.sketches = [newSketch, ...novelToUpdate.sketches];
+            updatedNovels[novelIndex] = novelToUpdate;
+            return { ...currentData, novels: updatedNovels };
+        });
+        setSelectedSketchId(newSketch.id);
+    };
+
+    const updateSketch = (updates: any) => {
+        if (!selectedSketchId) return;
+        setProjectData((currentData: any) => {
+            if (!currentData || !currentData.novels[novelIndex]) return currentData;
+            const updatedNovels = [...currentData.novels];
+            const novelToUpdate = { ...updatedNovels[novelIndex] };
+            const sIndex = novelToUpdate.sketches.findIndex((s: any) => s.id === selectedSketchId);
+            if (sIndex === -1) return currentData;
+
+            const updatedSketches = [...novelToUpdate.sketches];
+            updatedSketches[sIndex] = {
+                ...updatedSketches[sIndex],
+                ...updates,
+                updatedAt: new Date().toISOString()
+            };
+
+            novelToUpdate.sketches = updatedSketches;
+            updatedNovels[novelIndex] = novelToUpdate;
+            return { ...currentData, novels: updatedNovels };
+        });
+    };
+
+    const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        updateSketch({ title: e.target.value });
+    };
+
+    const handleEditorInput = () => {
+        if (!editorRef.current) return;
+        updateSketch({ content: editorRef.current.innerHTML });
+    };
+    
+    // Set html content on mount/switch
+    React.useEffect(() => {
+        if (editorRef.current && activeSketch) {
+            if (editorRef.current.innerHTML !== activeSketch.content) {
+                editorRef.current.innerHTML = activeSketch.content || '<p><br></p>';
+            }
+        }
+    }, [activeSketch?.id]);
+
+    return (
+        <div className="flex flex-col h-full">
+            <div className={`px-4 py-3 flex justify-between items-center border-b ${themeClasses.border}`}>
+                <span className="font-bold text-base">{t.sketches || "Sketches"}</span>
+                <button onClick={onClose} className="opacity-70 hover:opacity-100 transition-opacity">
+                    <CloseIcon className="w-5 h-5"/>
+                </button>
+            </div>
+            
+            {!selectedSketchId ? (
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                    <button 
+                        onClick={handleCreateSketch}
+                        className={`w-full flex items-center justify-center space-x-2 p-3 border border-dashed ${themeClasses.border} rounded-lg opacity-70 hover:opacity-100 transition-opacity mb-4`}
+                    >
+                        <PlusIcon className="w-5 h-5" />
+                        <span>{t.newSketch || "New Sketch"}</span>
+                    </button>
+                    {novel.sketches.map((sketch: any) => (
+                        <div 
+                            key={sketch.id} 
+                            onClick={() => setSelectedSketchId(sketch.id)}
+                            className={`p-3 border ${themeClasses.border} rounded-lg cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors`}
+                        >
+                            <h3 className="font-semibold mb-1 truncate">{sketch.title}</h3>
+                            <div className="text-xs opacity-60">
+                                {new Date(sketch.updatedAt).toLocaleDateString()}
+                            </div>
+                        </div>
+                    ))}
+                    {novel.sketches.length === 0 && (
+                        <div className="text-center text-sm opacity-50 pt-8">
+                            {t.emptySketch || "No sketches yet."}
+                        </div>
+                    )}
+                </div>
+            ) : (
+                <div className="flex-1 flex flex-col p-4">
+                    <button 
+                        onClick={() => setSelectedSketchId(null)}
+                        className="flex items-center space-x-1 text-sm opacity-70 hover:opacity-100 transition-opacity mb-4"
+                    >
+                        <BackIcon className="w-4 h-4" />
+                        <span>Back to list</span>
+                    </button>
+                    
+                    <input
+                        type="text"
+                        value={activeSketch?.title || ''}
+                        onChange={handleTitleChange}
+                        placeholder="Sketch Title"
+                        className="text-xl font-bold bg-transparent outline-none w-full mb-4"
+                    />
+                    
+                    <div className="flex-1 overflow-y-auto w-full relative">
+                        <div
+                            ref={editorRef}
+                            contentEditable
+                            suppressContentEditableWarning
+                            onInput={handleEditorInput}
+                            className={`w-full h-full min-h-[300px] outline-none story-content text-sm`}
+                            style={{ 
+                                wordWrap: 'break-word',
+                                overflowWrap: 'break-word'
+                            }}
+                        />
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
 
 const fontOptions = [
     { name: 'Times New Roman', value: '"Times New Roman", Times, serif' },
@@ -355,6 +501,7 @@ const ChapterEditorPage = () => {
     const toolbarRef = React.useRef<HTMLDivElement>(null);
     
     const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+    const [isSketchSidebarOpen, setIsSketchSidebarOpen] = React.useState(false);
     const [isFindReplaceOpen, setIsFindReplaceOpen] = React.useState(false);
     const [isChapterListModalOpen, setIsChapterListModalOpen] = React.useState(false);
     const [isFormatPanelOpen, setIsFormatPanelOpen] = React.useState(false);
@@ -1326,6 +1473,12 @@ const ChapterEditorPage = () => {
                         />
                     </div>
                 </div>
+
+                {isSketchSidebarOpen && (
+                    <div className={`w-1/4 min-w-[280px] shrink-0 h-full overflow-y-auto border-l ${themeClasses.border} flex flex-col font-sans relative ${themeClasses.bgSecondary} z-20`}>
+                        <SketchSidebar novel={novel} novelIndex={novelIndex} onClose={() => setIsSketchSidebarOpen(false)} />
+                    </div>
+                )}
                 
                 {/* Editor Tools Sidebar */}
                 <div
@@ -1365,6 +1518,20 @@ const ChapterEditorPage = () => {
                                     <div className="flex items-center space-x-3">
                                         <PlusIcon className="w-5 h-5" />
                                         <span>{t.addNewChapter}</span>
+                                    </div>
+                                </button>
+                            </div>
+                            <div className={`border-b ${themeClasses.border}`}>
+                                <button
+                                    onClick={() => {
+                                        setIsSketchSidebarOpen(true);
+                                        setIsSidebarOpen(false);
+                                    }}
+                                    className={`w-full flex justify-between items-center py-3 px-4 font-semibold text-left transition-colors hover:${themeClasses.bgTertiary}`}
+                                >
+                                    <div className="flex items-center space-x-3">
+                                        <PencilIcon className="w-5 h-5" />
+                                        <span>{t.sketches || "Novel Sketches"}</span>
                                     </div>
                                 </button>
                             </div>
