@@ -641,7 +641,10 @@ const ChapterEditorPage = () => {
                         timestamp: originalChapter.updatedAt,
                         content: originalChapter.content,
                     };
-                    updatedChapter.history = [newHistoryEntry, ...(originalChapter.history || [])];
+                    // Cap chapter edit history to 20 entries to prevent infinite memory growth
+                    const maxHistoryEntries = 20;
+                    const cleanHistory = (originalChapter.history || []).slice(0, maxHistoryEntries - 1);
+                    updatedChapter.history = [newHistoryEntry, ...cleanHistory];
                 }
                 
                 updatedChapter = { ...updatedChapter, content: value, wordCount, updatedAt: now.toISOString() };
@@ -1310,7 +1313,7 @@ const ChapterEditorPage = () => {
                 editorEl.removeEventListener('keyup', handleSelectionChange);
                 editorEl.removeEventListener('mouseup', handleSelectionChange);
                 editorEl.removeEventListener('focus', handleSelectionChange);
-                editorEl.addEventListener('copy', handleCopy);
+                editorEl.removeEventListener('copy', handleCopy);
             }
             window.removeEventListener('resize', handleSelectionChange);
         };
