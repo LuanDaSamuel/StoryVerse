@@ -4,6 +4,7 @@ import { ProjectContext } from '../contexts/ProjectContext';
 import { PlusIcon, CloseIcon, DownloadIcon, BoldIcon, ItalicIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, UndoIcon, RedoIcon, BookOpenIcon } from '../components/Icons';
 import * as mammoth from 'mammoth';
 import { useTranslations } from '../hooks/useTranslations';
+import { useTabTitle } from '../hooks/useTabTitle';
 import { StoryIdea } from '../types';
 import { downloadAsHtml } from '../utils/htmlExport';
 
@@ -18,6 +19,7 @@ type PaneData = {
 const WorkingModelPage = () => {
     const { themeClasses, projectData, setProjectData } = React.useContext(ProjectContext);
     const t = useTranslations();
+    useTabTitle(t.workingModel || 'Working Model', 'model');
     
     // Manage state for two panes
     const [leftPane, setLeftPane] = React.useState<PaneData>(null);

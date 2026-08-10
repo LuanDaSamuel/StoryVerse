@@ -1,11 +1,14 @@
 
 
 import * as React from 'react';
-import { HashRouter, Routes, Route, Navigate, useParams, useNavigate, useMatch } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, useParams, useNavigate, useMatch, useLocation } from 'react-router-dom';
 import { useProject } from './hooks/useProjectFile';
 import { ProjectContext } from './contexts/ProjectContext';
+import { TabProvider, TabContext } from './contexts/TabContext';
+import { TabBar } from './components/TabBar';
 import WelcomeScreen from './components/WelcomeScreen';
 import Sidebar from './components/Sidebar';
+
 import HomePage from './pages/HomePage';
 import CreateNovelPage from './pages/CreateNovelPage';
 import ChapterEditorPage from './pages/ChapterEditorPage';
@@ -22,6 +25,7 @@ import { Theme, Language } from './types';
 import { LanguageContext } from './contexts/LanguageContext';
 import { translations } from './utils/translations';
 import { useTranslations } from './hooks/useTranslations';
+import { startPeriodicCacheCleanup } from './utils/cacheManager';
 
 const NovelEditRedirect = () => {
     const { novelId } = useParams<{ novelId: string }>();
@@ -47,26 +51,136 @@ const NovelEditRedirect = () => {
     return <Navigate to={`/novel/${novelId}/edit/${firstChapterId}`} replace />;
 };
 
+const MainWorkspaceLayout = ({
+    isSidebarPermanentlyHidden,
+    isDesktopSidebarOpen,
+    isMobileSidebarOpen,
+    setIsDesktopSidebarOpen,
+    setIsMobileSidebarOpen,
+    themeClasses
+}: {
+    isSidebarPermanentlyHidden: boolean;
+    isDesktopSidebarOpen: boolean;
+    isMobileSidebarOpen: boolean;
+    setIsDesktopSidebarOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    setIsMobileSidebarOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    themeClasses: any;
+}) => {
+    const { isPopoutWindow } = React.useContext(TabContext);
+
+    const toggleSidebar = React.useCallback(() => {
+        setIsDesktopSidebarOpen(prev => !prev);
+        setIsMobileSidebarOpen(prev => !prev);
+    }, [setIsDesktopSidebarOpen, setIsMobileSidebarOpen]);
+
+    const closeSidebar = React.useCallback(() => {
+        setIsDesktopSidebarOpen(false);
+        setIsMobileSidebarOpen(false);
+    }, [setIsDesktopSidebarOpen, setIsMobileSidebarOpen]);
+
+    if (isPopoutWindow) {
+        return (
+            <div className={`flex flex-col h-screen overflow-hidden ${themeClasses.bg} ${themeClasses.text}`}>
+                <TabBar />
+                <main className="flex-1 min-h-0 overflow-y-auto relative">
+                    <Routes>
+                        <Route path="/" element={<HomePage />} />
+                        <Route path="/create-novel" element={<CreateNovelPage />} />
+                        <Route path="/demos" element={<DemosPage />} />
+                        <Route path="/idea/:ideaId/edit" element={<StoryIdeaEditorPage />} />
+                        <Route path="/sketches" element={<SketchesPage />} />
+                        <Route path="/novel/:novelId/sketch/:sketchId/edit" element={<SketchEditorPage />} />
+                        <Route path="/novel/:novelId" element={<NovelDetailPage />} />
+                        <Route path="/novel/:novelId/read/:chapterId?" element={<ReadNovelPage />} />
+                        <Route path="/novel/:novelId/edit" element={<NovelEditRedirect />} />
+                        <Route path="/novel/:novelId/edit/:chapterId" element={<ChapterEditorPage />} />
+                        <Route path="/working-model" element={<WorkingModelPage />} />
+                    </Routes>
+                </main>
+            </div>
+        );
+    }
+
+    const isAnySidebarOpen = isDesktopSidebarOpen || isMobileSidebarOpen;
+
+    return (
+        <div className={`flex flex-col h-screen overflow-hidden ${themeClasses.bg} ${themeClasses.text}`}>
+            {/* Top Workspace Tab Bar */}
+            <TabBar onToggleSidebar={toggleSidebar} />
+
+            <div className="flex flex-1 min-h-0 overflow-hidden relative">
+                {/* Backdrop Overlay when Sidebar is Open (Auto-closes when clicking anywhere outside) */}
+                {!isSidebarPermanentlyHidden && isAnySidebarOpen && (
+                    <div 
+                        className="fixed inset-0 bg-black/50 z-30 transition-opacity animate-fade-in"
+                        onClick={closeSidebar}
+                        aria-hidden="true"
+                    />
+                )}
+                
+                {/* Auto-Hiding Drawer Sidebar */}
+                {!isSidebarPermanentlyHidden && (
+                    <div 
+                        className={`fixed inset-y-0 left-0 z-40 transition-transform duration-300 ease-in-out shadow-2xl ${
+                            isAnySidebarOpen ? 'translate-x-0' : '-translate-x-full'
+                        }`}
+                    >
+                        <Sidebar onLinkClick={closeSidebar} />
+                    </div>
+                )}
+                
+                <main 
+                    className="flex-1 min-h-0 overflow-y-auto relative"
+                    onClick={() => {
+                        if (isAnySidebarOpen) {
+                            closeSidebar();
+                        }
+                    }}
+                >
+                    <Routes>
+                        <Route path="/" element={<HomePage />} />
+                        <Route path="/create-novel" element={<CreateNovelPage />} />
+                        <Route path="/demos" element={<DemosPage />} />
+                        <Route path="/idea/:ideaId/edit" element={<StoryIdeaEditorPage />} />
+                        <Route path="/sketches" element={<SketchesPage />} />
+                        <Route path="/novel/:novelId/sketch/:sketchId/edit" element={<SketchEditorPage />} />
+                        <Route path="/novel/:novelId" element={<NovelDetailPage />} />
+                        <Route path="/novel/:novelId/read/:chapterId?" element={<ReadNovelPage />} />
+                        <Route path="/novel/:novelId/edit" element={<NovelEditRedirect />} />
+                        <Route path="/novel/:novelId/edit/:chapterId" element={<ChapterEditorPage />} />
+                        <Route path="/working-model" element={<WorkingModelPage />} />
+                    </Routes>
+                </main>
+            </div>
+        </div>
+    );
+};
+
 const AppContent = () => {
     const project = useProject();
     const t = useTranslations();
     
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = React.useState(false);
-    const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = React.useState(true);
+    const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = React.useState(false);
     const navigate = useNavigate();
+    const location = useLocation();
     const initialLoadHandled = React.useRef(false);
 
     // This effect handles redirecting to the home page on initial load or after import.
     React.useEffect(() => {
         if (project.status === 'ready' && !initialLoadHandled.current) {
-            navigate('/', { replace: true });
             initialLoadHandled.current = true;
         }
-    }, [project.status, navigate]);
+    }, [project.status]);
+
+    // Start periodic cache cleanup (deletes browser/temp caches after 30 minutes)
+    React.useEffect(() => {
+        const cleanup = startPeriodicCacheCleanup();
+        return cleanup;
+    }, []);
 
     const theme = React.useMemo(() => {
         const projectTheme = project.projectData?.settings?.theme || 'book';
-        // Fallback to 'book' theme if the saved theme from a project file is no longer valid.
         return (projectTheme in THEME_CONFIG) ? projectTheme as Theme : 'book';
     }, [project.projectData]);
 
@@ -84,10 +198,50 @@ const AppContent = () => {
     }, [theme]);
 
     const contextValue = React.useMemo(() => ({
-        ...project,
+        projectData: project.projectData,
+        setProjectData: project.setProjectData,
+        updateDailyWordCount: project.updateDailyWordCount,
+        status: project.status,
+        projectName: project.projectName,
+        storageMode: project.storageMode,
+        userProfile: project.userProfile,
+        saveStatus: project.saveStatus,
+        signInWithGoogle: project.signInWithGoogle,
+        signOut: project.signOut,
+        createProjectOnDrive: project.createProjectOnDrive,
+        createLocalProject: project.createLocalProject,
+        openLocalProject: project.openLocalProject,
+        downloadProject: project.downloadProject,
+        closeProject: project.closeProject,
+        uploadProjectToDrive: project.uploadProjectToDrive,
+        overwriteDriveProject: project.overwriteDriveProject,
+        loadDriveProjectAndDiscardLocal: project.loadDriveProjectAndDiscardLocal,
+        connectLocalToDrive: project.connectLocalToDrive,
         theme,
         themeClasses,
-    }), [project, theme, themeClasses]);
+    }), [
+        project.projectData,
+        project.setProjectData,
+        project.updateDailyWordCount,
+        project.status,
+        project.projectName,
+        project.storageMode,
+        project.userProfile,
+        project.saveStatus,
+        project.signInWithGoogle,
+        project.signOut,
+        project.createProjectOnDrive,
+        project.createLocalProject,
+        project.openLocalProject,
+        project.downloadProject,
+        project.closeProject,
+        project.uploadProjectToDrive,
+        project.overwriteDriveProject,
+        project.loadDriveProjectAndDiscardLocal,
+        project.connectLocalToDrive,
+        theme,
+        themeClasses,
+    ]);
 
     const onEditPage = useMatch('/novel/:novelId/edit/:chapterId');
     const onReadPage = useMatch('/novel/:novelId/read/:chapterId?');
@@ -185,63 +339,14 @@ const AppContent = () => {
             case 'ready':
                 if (!project.projectData) return null;
                 return (
-                    <div className={`flex h-screen ${themeClasses.bg} ${themeClasses.text}`}>
-                        {/* Desktop Sidebar */}
-                        {!isSidebarPermanentlyHidden && isDesktopSidebarOpen && (
-                            <div className="hidden md:flex flex-col flex-shrink-0 relative">
-                                <Sidebar onLinkClick={() => setIsDesktopSidebarOpen(false)} />
-                            </div>
-                        )}
-                        
-                        {/* Mobile Sidebar & Overlay */}
-                        {!isSidebarPermanentlyHidden && (
-                            <>
-                                <div 
-                                    className={`fixed inset-0 bg-black/60 z-30 md:hidden transition-opacity ${isMobileSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-                                    onClick={() => setIsMobileSidebarOpen(false)}
-                                    aria-hidden="true"
-                                />
-                                <div className={`fixed inset-y-0 left-0 z-40 transition-transform duration-300 ease-in-out md:hidden ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-                                    <Sidebar onLinkClick={() => setIsMobileSidebarOpen(false)} />
-                                </div>
-                            </>
-                        )}
-                        
-                        <main className="flex-1 overflow-y-auto relative">
-                            {/* Header with Hamburger */}
-                            {!isSidebarPermanentlyHidden && (
-                                <header className={`sticky top-0 z-10 flex items-center justify-between p-4 ${isDesktopSidebarOpen ? 'md:hidden' : ''} ${themeClasses.bgSecondary} border-b ${themeClasses.border}`}>
-                                    <button 
-                                        onClick={() => { 
-                                            // Ensure both states enable sidebar visibility appropriately
-                                            setIsMobileSidebarOpen(true); 
-                                            setIsDesktopSidebarOpen(true); 
-                                        }} 
-                                        className={themeClasses.accentText}
-                                    >
-                                        <span className="sr-only">Open Menu</span>
-                                        <Bars3Icon className="h-6 w-6" />
-                                    </button>
-                                    <span className={`font-bold ${themeClasses.accentText}`}>StoryVerse</span>
-                                    <div className="w-6" /> {/* Spacer to center title */}
-                                </header>
-                            )}
-
-                            <Routes>
-                                <Route path="/" element={<HomePage />} />
-                                <Route path="/create-novel" element={<CreateNovelPage />} />
-                                <Route path="/demos" element={<DemosPage />} />
-                                <Route path="/idea/:ideaId/edit" element={<StoryIdeaEditorPage />} />
-                                <Route path="/sketches" element={<SketchesPage />} />
-                                <Route path="/novel/:novelId/sketch/:sketchId/edit" element={<SketchEditorPage />} />
-                                <Route path="/novel/:novelId" element={<NovelDetailPage />} />
-                                <Route path="/novel/:novelId/read/:chapterId?" element={<ReadNovelPage />} />
-                                <Route path="/novel/:novelId/edit" element={<NovelEditRedirect />} />
-                                <Route path="/novel/:novelId/edit/:chapterId" element={<ChapterEditorPage />} />
-                                <Route path="/working-model" element={<WorkingModelPage />} />
-                            </Routes>
-                        </main>
-                    </div>
+                    <MainWorkspaceLayout
+                        isSidebarPermanentlyHidden={isSidebarPermanentlyHidden}
+                        isDesktopSidebarOpen={isDesktopSidebarOpen}
+                        isMobileSidebarOpen={isMobileSidebarOpen}
+                        setIsDesktopSidebarOpen={setIsDesktopSidebarOpen}
+                        setIsMobileSidebarOpen={setIsMobileSidebarOpen}
+                        themeClasses={themeClasses}
+                    />
                 );
             default:
                 return null;
@@ -251,13 +356,16 @@ const AppContent = () => {
     return (
         <ProjectContext.Provider value={contextValue}>
             <LanguageContext.Provider value={currentTranslations}>
-                <div className="font-sans">
-                    {renderContent()}
-                </div>
+                <TabProvider navigate={navigate} currentPath={location.pathname}>
+                    <div className="font-sans">
+                        {renderContent()}
+                    </div>
+                </TabProvider>
             </LanguageContext.Provider>
         </ProjectContext.Provider>
     );
 };
+
 
 
 function App() {

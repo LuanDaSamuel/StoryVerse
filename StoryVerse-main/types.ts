@@ -110,3 +110,14 @@ export interface ThemeConfig {
     input: string;
     logoColor: string;
 }
+
+export type TabIconType = 'home' | 'novel' | 'editor' | 'idea' | 'sketch' | 'reader' | 'demo' | 'create' | 'model';
+
+export interface TabItem {
+    id: string;
+    title: string;
+    path: string;
+    iconType?: TabIconType;
+    isPoppedOut?: boolean;
+}
+

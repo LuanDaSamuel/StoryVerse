@@ -7,11 +7,13 @@ import { PlusIcon } from '../components/Icons';
 import ConfirmModal from '../components/ConfirmModal';
 import SelectNovelModal from '../components/SelectNovelModal';
 import { useTranslations } from '../hooks/useTranslations';
+import { useTabTitle } from '../hooks/useTabTitle';
 
 const SketchesPage = () => {
     const { projectData, setProjectData, themeClasses } = React.useContext(ProjectContext);
     const navigate = useNavigate();
     const t = useTranslations();
+    useTabTitle(t.sketches || 'Sketches', 'sketch');
     
     const [isCreatingSketch, setIsCreatingSketch] = React.useState(false);
     const [sketchToDelete, setSketchToDelete] = React.useState<AggregatedSketch | null>(null);
@@ -87,7 +89,7 @@ const SketchesPage = () => {
     };
 
     return (
-        <div className={`p-8 md:p-12 ${themeClasses.bg} h-full overflow-y-auto`}>
+        <div className={`p-8 md:p-12 ${themeClasses.bg} min-h-full`}>
             <div className="flex justify-between items-center mb-8">
                 <h1 className={`text-3xl font-bold ${themeClasses.text}`}>{t.sketches}</h1>
                 <button 

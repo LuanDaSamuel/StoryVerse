@@ -4,12 +4,14 @@ import { ProjectContext } from '../contexts/ProjectContext';
 import { Novel } from '../types';
 import { UploadIcon, BackIcon, CloseIcon, PlusIcon } from '../components/Icons';
 import { useTranslations } from '../hooks/useTranslations';
+import { useTabTitle } from '../hooks/useTabTitle';
 
 const DRAFT_KEY = 'storyverse-novel-draft';
 
 const CreateNovelPage = () => {
     const { setProjectData, themeClasses } = React.useContext(ProjectContext);
     const t = useTranslations();
+    useTabTitle(t.createNovel || 'Create Novel', 'create');
     const navigate = useNavigate();
     const [title, setTitle] = React.useState('');
     const [description, setDescription] = React.useState('');
@@ -142,7 +144,7 @@ const CreateNovelPage = () => {
     };
 
     return (
-        <div className={`p-4 sm:p-8 md:p-12 ${themeClasses.bg} min-h-screen`}>
+        <div className={`p-4 sm:p-8 md:p-12 ${themeClasses.bg} min-h-full`}>
             <button onClick={() => navigate(-1)} className={`flex items-center space-x-2 mb-8 ${themeClasses.text} opacity-70 hover:opacity-100`}>
                 <BackIcon className="w-5 h-5" />
                 <span>{t.backTo} {t.homePage}</span>

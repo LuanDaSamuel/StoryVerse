@@ -4,11 +4,14 @@ import { ProjectContext } from '../contexts/ProjectContext';
 import { enhancePlainText } from '../constants';
 import { Novel } from '../types';
 import { useTranslations } from '../hooks/useTranslations';
+import { useTabTitle } from '../hooks/useTabTitle';
 
 const HomePage = () => {
     const { projectData, themeClasses } = React.useContext(ProjectContext);
     const t = useTranslations();
+    useTabTitle('Home', 'home');
     const novels = projectData?.novels || [];
+
 
     if (novels.length === 0) {
         return (

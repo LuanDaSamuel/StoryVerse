@@ -7,6 +7,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import { enhancePlainText } from '../constants';
 import * as mammoth from 'mammoth';
 import { useTranslations } from '../hooks/useTranslations';
+import { useTabTitle } from '../hooks/useTabTitle';
 import { downloadAsHtml } from '../utils/htmlExport';
 
 const CreateFolderModal = ({ isOpen, onClose, onConfirm }: { isOpen: boolean, onClose: () => void, onConfirm: (name: string) => void }) => {
@@ -105,6 +106,7 @@ const MoveIdeaModal = ({ isOpen, onClose, onConfirm, folders }: { isOpen: boolea
 const DemosPage = () => {
     const { projectData, setProjectData, themeClasses, theme } = React.useContext(ProjectContext);
     const t = useTranslations();
+    useTabTitle(t.ideaBox || 'Idea Box', 'demo');
     const navigate = useNavigate();
     const [isDocxConfirmOpen, setIsDocxConfirmOpen] = React.useState(false);
     const [pendingImportData, setPendingImportData] = React.useState<{ title: string; synopsisHtml: string; originalFilename: string } | null>(null);
@@ -421,11 +423,10 @@ const DemosPage = () => {
 
 
     const getSnippet = (html: string) => {
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = html;
-        const text = tempDiv.textContent || '';
-        if (!text.trim()) return t.noSynopsis;
-        return text.trim().substring(0, 150) + (text.length > 150 ? '...' : '');
+        if (!html) return t.noSynopsis;
+        const plainText = html.replace(/<[^>]*>/g, ' ').trim();
+        if (!plainText) return t.noSynopsis;
+        return plainText.substring(0, 150) + (plainText.length > 150 ? '...' : '');
     };
 
     const statusStyles: { [key: string]: string } = {
@@ -437,7 +438,7 @@ const DemosPage = () => {
     const isEmpty = storyIdeas.length === 0 && (viewFolderId !== null || folders.length === 0);
 
     return (
-        <div className={`p-4 sm:p-8 md:p-12 ${themeClasses.bg} h-full overflow-y-auto`}>
+        <div className={`p-4 sm:p-8 md:p-12 ${themeClasses.bg} min-h-full`}>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
                 <div className="flex items-center space-x-2">
                     {viewFolderId ? (

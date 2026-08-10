@@ -49,6 +49,30 @@ export function useProjectStorage() {
     const driveFileModifiedTimeRef = React.useRef<string | null>(null);
     const projectFileHandleRef = React.useRef<FileSystemFileHandle | null>(null);
 
+    const tokenClientRef = React.useRef<any>(null);
+    const gisCallbackRef = React.useRef<((response: any) => void) | null>(null);
+    const gisErrorCallbackRef = React.useRef<((error: any) => void) | null>(null);
+
+    const initTokenClientOnce = React.useCallback(() => {
+        if (!tokenClientRef.current && typeof google !== 'undefined' && google.accounts?.oauth2) {
+            tokenClientRef.current = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID,
+                scope: SCOPES,
+                callback: (tokenResponse: any) => {
+                    if (gisCallbackRef.current) {
+                        gisCallbackRef.current(tokenResponse);
+                    }
+                },
+                error_callback: (error: any) => {
+                    if (gisErrorCallbackRef.current) {
+                        gisErrorCallbackRef.current(error);
+                    }
+                }
+            });
+        }
+        return tokenClientRef.current;
+    }, []);
+
     const signOut = React.useCallback(async () => {
         if (gapi.client) {
             gapi.client.setToken('');
@@ -72,48 +96,53 @@ export function useProjectStorage() {
         console.log("Attempting to refresh token silently...");
         return new Promise((resolve) => {
             try {
-                const tokenClient = google.accounts.oauth2.initTokenClient({
-                    client_id: CLIENT_ID,
-                    scope: SCOPES,
-                    callback: async (tokenResponse: TokenResponse) => {
-                        if (tokenResponse && tokenResponse.access_token) {
-                            console.log("Silent token refresh successful.");
-                            const expires_at = Date.now() + (tokenResponse.expires_in * 1000);
-                            const storedToken: StoredToken = { ...tokenResponse, expires_at };
-                            await idbSet(GAPI_AUTH_TOKEN_KEY, storedToken);
+                const tokenClient = initTokenClientOnce();
+                if (!tokenClient) {
+                    console.error("Token client not initialized (Google GIS library not loaded).");
+                    resolve(null);
+                    return;
+                }
 
-                            gapi.client.setToken(tokenResponse);
-                            
-                            const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-                                headers: { 'Authorization': `Bearer ${tokenResponse.access_token}` }
-                            });
+                gisCallbackRef.current = async (tokenResponse: TokenResponse) => {
+                    if (tokenResponse && tokenResponse.access_token) {
+                        console.log("Silent token refresh successful.");
+                        const expires_at = Date.now() + (tokenResponse.expires_in * 1000);
+                        const storedToken: StoredToken = { ...tokenResponse, expires_at };
+                        await idbSet(GAPI_AUTH_TOKEN_KEY, storedToken);
 
-                            if (!userInfoRes.ok) {
-                                console.error("Could not fetch user info after token refresh.");
-                                resolve(null);
-                                return;
-                            }
-                            const userInfo = await userInfoRes.json();
-                            const profile: UserProfile = { name: userInfo.name, email: userInfo.email, picture: userInfo.picture };
-                            await idbSet(USER_PROFILE_KEY, profile);
-                            resolve(profile);
-                        } else {
-                            console.log("Silent token refresh failed to get access_token.");
+                        gapi.client.setToken(tokenResponse);
+                        
+                        const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                            headers: { 'Authorization': `Bearer ${tokenResponse.access_token}` }
+                        });
+
+                        if (!userInfoRes.ok) {
+                            console.error("Could not fetch user info after token refresh.");
                             resolve(null);
+                            return;
                         }
-                    },
-                    error_callback: (error: any) => {
-                        console.warn("Silent token refresh error:", error);
+                        const userInfo = await userInfoRes.json();
+                        const profile: UserProfile = { name: userInfo.name, email: userInfo.email, picture: userInfo.picture };
+                        await idbSet(USER_PROFILE_KEY, profile);
+                        resolve(profile);
+                    } else {
+                        console.log("Silent token refresh failed to get access_token.");
                         resolve(null);
                     }
-                });
+                };
+
+                gisErrorCallbackRef.current = (error: any) => {
+                    console.warn("Silent token refresh error:", error);
+                    resolve(null);
+                };
+
                 tokenClient.requestAccessToken({ prompt: 'none' });
             } catch (error) {
                 console.error("Error setting up silent token refresh.", error);
                 resolve(null);
             }
         });
-    }, []);
+    }, [initTokenClientOnce]);
 
     const getAccessToken = React.useCallback(async (): Promise<string> => {
         let token = await idbGet<StoredToken>(GAPI_AUTH_TOKEN_KEY);
@@ -337,37 +366,41 @@ export function useProjectStorage() {
     const signIn = React.useCallback(async (): Promise<UserProfile> => {
       return new Promise((resolve, reject) => {
         try {
-            const tokenClient = google.accounts.oauth2.initTokenClient({
-                client_id: CLIENT_ID,
-                scope: SCOPES,
-                callback: async (tokenResponse: TokenResponse) => {
-                    if (tokenResponse && tokenResponse.access_token) {
-                        const expires_at = Date.now() + (tokenResponse.expires_in * 1000);
-                        const storedToken: StoredToken = { ...tokenResponse, expires_at };
-                        await idbSet(GAPI_AUTH_TOKEN_KEY, storedToken);
+            const tokenClient = initTokenClientOnce();
+            if (!tokenClient) {
+                reject(new Error("Sign in failed: Google GIS library not loaded."));
+                return;
+            }
 
-                        gapi.client.setToken(tokenResponse);
-                        const userInfo = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-                            headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-                        }).then(res => res.json());
-                        const profile = { name: userInfo.name, email: userInfo.email, picture: userInfo.picture };
-                        await idbSet(USER_PROFILE_KEY, profile);
-                        resolve(profile);
-                    } else {
-                        reject(new Error("Sign in failed: No access token received."));
-                    }
-                },
-                error_callback: (error: any) => {
-                    console.error("Google Sign-In Error:", error);
-                    reject(new Error(`Sign in failed: ${error.type || 'Unknown error'}`));
+            gisCallbackRef.current = async (tokenResponse: TokenResponse) => {
+                if (tokenResponse && tokenResponse.access_token) {
+                    const expires_at = Date.now() + (tokenResponse.expires_in * 1000);
+                    const storedToken: StoredToken = { ...tokenResponse, expires_at };
+                    await idbSet(GAPI_AUTH_TOKEN_KEY, storedToken);
+
+                    gapi.client.setToken(tokenResponse);
+                    const userInfo = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                        headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+                    }).then(res => res.json());
+                    const profile = { name: userInfo.name, email: userInfo.email, picture: userInfo.picture };
+                    await idbSet(USER_PROFILE_KEY, profile);
+                    resolve(profile);
+                } else {
+                    reject(new Error("Sign in failed: No access token received."));
                 }
-            });
+            };
+
+            gisErrorCallbackRef.current = (error: any) => {
+                console.error("Google Sign-In Error:", error);
+                reject(new Error(`Sign in failed: ${error.type || 'Unknown error'}`));
+            };
+
             tokenClient.requestAccessToken();
         } catch (error) {
             reject(error);
         }
       });
-    }, []);
+    }, [initTokenClientOnce]);
 
     const initGapiClient = React.useCallback(async (): Promise<void> => {
         await new Promise<void>((resolve, reject) => {

@@ -7,6 +7,7 @@ import { enhanceHtml, enhancePlainText, SKETCH_TAG_OPTIONS, THEME_CONFIG } from 
 import { StoryIdea, StoryIdeaStatus } from '../types';
 import ConfirmModal from '../components/ConfirmModal';
 import { useTranslations } from '../hooks/useTranslations';
+import { useTabTitle } from '../hooks/useTabTitle';
 import { downloadAsHtml } from '../utils/htmlExport';
 
 // --- Reusable Components (Matching ChapterEditorPage) ---
@@ -229,7 +230,6 @@ const StoryIdeaEditorPage = () => {
     const [isFindReplaceOpen, setIsFindReplaceOpen] = React.useState(false);
     const [isFormatPanelOpen, setIsFormatPanelOpen] = React.useState(false);
     const [headings, setHeadings] = React.useState<{id: string, text: string, level: number}[]>([]); // Headings data
-
     const [activeFormats, setActiveFormats] = React.useState({ isBold: false, isItalic: false, isUL: false, isOL: false });
     const [currentFormat, setCurrentFormat] = React.useState({
         paragraphStyle: 'p',
@@ -252,6 +252,8 @@ const StoryIdeaEditorPage = () => {
             folders: projectData.ideaFolders || []
         };
     }, [projectData, ideaId]);
+
+    useTabTitle(idea ? idea.title : 'Idea Editor', 'idea');
 
     // Increment visit count on mount
     React.useEffect(() => {
@@ -313,10 +315,13 @@ const StoryIdeaEditorPage = () => {
 
             // Update word count if synopsis changes
             if ('synopsis' in updates) {
-                const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = updates.synopsis || '';
-                const text = tempDiv.textContent || "";
-                updatedIdea.wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+                const plainText = (updates.synopsis || '').replace(/<[^>]*>/g, ' ');
+                let wordCount = 0;
+                const regex = /\S+/g;
+                while (regex.exec(plainText) !== null) {
+                    wordCount++;
+                }
+                updatedIdea.wordCount = wordCount;
             }
             
             updatedIdeas[ideaIndex] = updatedIdea;
@@ -864,7 +869,7 @@ const StoryIdeaEditorPage = () => {
 
     if (!idea) {
         return (
-            <div className={`flex h-screen items-center justify-center ${themeClasses.bg}`}>
+            <div className={`flex h-full items-center justify-center ${themeClasses.bg}`}>
                 <p>{t.loading}...</p>
             </div>
         );
@@ -873,7 +878,7 @@ const StoryIdeaEditorPage = () => {
 
     return (
         <>
-            <div className={`flex h-screen font-serif ${themeClasses.bg} ${themeClasses.text}`}>
+            <div className={`flex h-full font-serif ${themeClasses.bg} ${themeClasses.text}`}>
                 {/* Backdrop for sidebars */}
                 {(isSidebarOpen || isOutlineOpen) && (
                     <div
@@ -1132,8 +1137,7 @@ const StoryIdeaEditorPage = () => {
                             <button onClick={() => applyCommand('redo')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors`}><RedoIcon className="w-5 h-5"/></button>
                             <div className="w-px h-5 bg-white/20 mx-1"></div>
                             <div className="px-3 text-sm text-white/70 font-sans" aria-live="polite">
-                                {/* FIX: Change undefined chapter reference to idea.wordCount */}
-                                {(idea.wordCount || 0).toLocaleString()} {t.wordsCount}
+                                {((idea && idea.wordCount) || 0).toLocaleString()} {t.wordsCount}
                             </div>
                         </div>
                     </div>

@@ -9,6 +9,8 @@ import ConfirmModal from '../components/ConfirmModal';
 import NovelHistoryPage from '../components/NovelHistoryPage';
 import ExportModal from '../components/ExportModal';
 import { useTranslations } from '../hooks/useTranslations';
+import { useTabTitle } from '../hooks/useTabTitle';
+import * as mammoth from 'mammoth';
 
 const NovelDetailPage = () => {
     const { novelId } = useParams<{ novelId: string }>();
@@ -18,9 +20,16 @@ const NovelDetailPage = () => {
     const coverImageInputRef = React.useRef<HTMLInputElement>(null);
     const descriptionTextareaRef = React.useRef<HTMLTextAreaElement>(null);
     const tagInputRef = React.useRef<HTMLInputElement>(null);
+    const docxInputRef = React.useRef<HTMLInputElement>(null);
 
     const [isExportModalOpen, setIsExportModalOpen] = React.useState(false);
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = React.useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = React.useState(false);
+    const [pendingImport, setPendingImport] = React.useState<{
+        fileName: string;
+        chapters: { title: string; content: string; wordCount: number }[];
+        preamble: string;
+    } | null>(null);
     const [chapterToDelete, setChapterToDelete] = React.useState<Chapter | null>(null);
     const [activeTab, setActiveTab] = React.useState<'Details' | 'History'>('Details');
     const [isAddingTag, setIsAddingTag] = React.useState(false);
@@ -37,6 +46,9 @@ const NovelDetailPage = () => {
             novelIndex: index,
         };
     }, [projectData, novelId]);
+
+    useTabTitle(novel ? novel.title : 'Novel Details', 'novel');
+
     
     const updateNovelDetails = (details: Partial<Pick<Novel, 'title' | 'description'>>) => {
         if (novelIndex === -1) return;
@@ -63,7 +75,6 @@ const NovelDetailPage = () => {
         if (novelIndex === -1) return;
 
         let needsUpdate = false;
-        const tempDiv = document.createElement('div');
 
         setProjectData(currentData => {
             if (!currentData) return null;
@@ -72,9 +83,12 @@ const NovelDetailPage = () => {
 
             const updatedChapters = currentNovel.chapters.map(chapter => {
                 if (chapter.content && (!chapter.wordCount || chapter.wordCount === 0)) {
-                    tempDiv.innerHTML = chapter.content;
-                    const text = tempDiv.textContent || "";
-                    const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+                    const plainText = chapter.content.replace(/<[^>]*>/g, ' ');
+                    let wordCount = 0;
+                    const regex = /\S+/g;
+                    while (regex.exec(plainText) !== null) {
+                        wordCount++;
+                    }
                     if (wordCount > 0) {
                         needsUpdate = true;
                         return { ...chapter, wordCount };
@@ -122,6 +136,178 @@ const NovelDetailPage = () => {
             };
             reader.readAsDataURL(file);
         }
+    };
+
+    const handleFileSelectForDocx = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            
+            // Safe Mammoth Resolution
+            // @ts-ignore
+            const mammothLib = mammoth.default || mammoth;
+             
+            if (!mammothLib || typeof mammothLib.convertToHtml !== 'function') {
+                 throw new Error("The DOCX processing library could not be loaded.");
+            }
+
+            const styleMap = [
+                "p[style-name='Title'] => h1:fresh",
+                "p[style-name='Subtitle'] => h2:fresh",
+                "p[style-name='Heading 1'] => h1:fresh",
+                "p[style-name='Heading 2'] => h2:fresh",
+                "p[style-name='Heading 3'] => h3:fresh",
+                "p[style-name='Heading 4'] => h4:fresh",
+                "p[style-name='Heading 5'] => h5:fresh",
+                "p[style-name='Heading 6'] => h6:fresh",
+            ];
+            const { value: html } = await mammothLib.convertToHtml({ arrayBuffer }, { styleMap });
+            
+            const tempDiv = document.createElement('div');
+            // Clean up empty paragraphs
+            tempDiv.innerHTML = html.replace(/<p>(\s|&nbsp;|<br\s*\/?>)*<\/p>/gi, '').trim();
+            
+            const formatTextNodes = (node: Node) => {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    if (node.textContent) {
+                        let text = node.textContent;
+                        text = text.replace(/\.{3}/g, '…');
+                        text = text.replace(/--/g, '—');
+                        
+                        text = text.replace(/(^|\W)"/g, '$1“'); 
+                        text = text.replace(/"/g, '”');
+                        text = text.replace(/(^|\W)'/g, '$1‘');
+                        text = text.replace(/'/g, '’');
+                        
+                        node.textContent = text;
+                    }
+                } else if (node.nodeType === Node.ELEMENT_NODE) {
+                    node.childNodes.forEach(formatTextNodes);
+                }
+            };
+            formatTextNodes(tempDiv);
+
+            // Parse headings and split into chapters
+            const parsedChapters: { title: string; content: string; wordCount: number }[] = [];
+            let preambleHtml = '';
+            let currentChapter: { title: string; content: string; wordCount: number } | null = null;
+
+            const children = Array.from(tempDiv.childNodes);
+            children.forEach(node => {
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    const el = node as HTMLElement;
+                    const isHeading = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6'].includes(el.tagName);
+                    if (isHeading) {
+                        const titleText = el.textContent?.trim() || '';
+                        currentChapter = {
+                            title: titleText || `Chapter ${parsedChapters.length + 1}`,
+                            content: '',
+                            wordCount: 0
+                        };
+                        parsedChapters.push(currentChapter);
+                    } else {
+                        if (currentChapter) {
+                            currentChapter.content += el.outerHTML;
+                        } else {
+                            preambleHtml += el.outerHTML;
+                        }
+                    }
+                } else if (node.nodeType === Node.TEXT_NODE) {
+                    const text = node.textContent || '';
+                    if (text.trim()) {
+                        if (currentChapter) {
+                            currentChapter.content += text;
+                        } else {
+                            preambleHtml += text;
+                        }
+                    }
+                }
+            });
+
+            // If no headings were found, put everything under one chapter
+            if (parsedChapters.length === 0) {
+                const titleText = file.name.replace(/\.docx$/i, '');
+                const contentHtml = preambleHtml || tempDiv.innerHTML || '<p><br></p>';
+                parsedChapters.push({
+                    title: titleText,
+                    content: contentHtml,
+                    wordCount: 0
+                });
+                preambleHtml = '';
+            }
+
+            // Calculate word count for each parsed chapter
+            parsedChapters.forEach(ch => {
+                const plainText = ch.content.replace(/<[^>]*>/g, ' ');
+                let wordCount = 0;
+                const regex = /\S+/g;
+                while (regex.exec(plainText) !== null) {
+                    wordCount++;
+                }
+                ch.wordCount = wordCount;
+            });
+
+            setPendingImport({
+                fileName: file.name,
+                chapters: parsedChapters,
+                preamble: preambleHtml
+            });
+            setIsImportModalOpen(true);
+        } catch (error: any) {
+            console.error(`Error processing file ${file.name}:`, error);
+            alert(`Failed to process ${file.name}. Error: ${error.message || 'Unknown error'}`);
+        } finally {
+            e.target.value = '';
+        }
+    };
+
+    const handleConfirmImport = (options: { overwriteChapters: boolean; overwriteDescription: boolean }) => {
+        if (!pendingImport || novelIndex === -1) return;
+
+        const now = new Date().toISOString();
+        const newChapters: Chapter[] = pendingImport.chapters.map((ch) => ({
+            id: crypto.randomUUID(),
+            title: ch.title,
+            content: ch.content,
+            wordCount: ch.wordCount,
+            createdAt: now,
+            updatedAt: now,
+            history: []
+        }));
+
+        setProjectData(currentData => {
+            if (!currentData) return null;
+            const updatedNovels = [...currentData.novels];
+            if (novelIndex >= updatedNovels.length) return currentData;
+            
+            const currentNovel = updatedNovels[novelIndex];
+            
+            // Set chapters
+            const finalChapters = options.overwriteChapters
+                ? newChapters
+                : [...currentNovel.chapters, ...newChapters];
+
+            // Set description
+            let finalDescription = currentNovel.description;
+            if (options.overwriteDescription && pendingImport.preamble) {
+                const tempEl = document.createElement('div');
+                tempEl.innerHTML = pendingImport.preamble;
+                finalDescription = tempEl.textContent || tempEl.innerText || '';
+            }
+
+            updatedNovels[novelIndex] = {
+                ...currentNovel,
+                chapters: finalChapters,
+                description: finalDescription
+            };
+
+            return { ...currentData, novels: updatedNovels };
+        });
+
+        setIsImportModalOpen(false);
+        setPendingImport(null);
     };
 
     const handleAddTag = () => {
@@ -269,11 +455,26 @@ const NovelDetailPage = () => {
                     <div className="flex justify-between items-center mb-4">
                         <h2 className={`text-xl font-bold ${themeClasses.accentText}`}>{t.chapters}</h2>
                     </div>
-                    
-                    <button onClick={handleAddChapter} className={`w-full flex items-center justify-center space-x-2 p-4 rounded-lg border-2 border-dashed transition-colors ${themeClasses.border} ${themeClasses.textSecondary} hover:border-opacity-70 hover:text-opacity-70 mb-4`}>
-                        <PlusIcon className="w-5 h-5"/>
-                        <span>{t.addNewChapter}</span>
-                    </button>
+
+                    <input
+                        type="file"
+                        ref={docxInputRef}
+                        onChange={handleFileSelectForDocx}
+                        className="hidden"
+                        accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    />
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                        <button onClick={handleAddChapter} className={`flex items-center justify-center space-x-2 p-4 rounded-lg border-2 border-dashed transition-colors ${themeClasses.border} ${themeClasses.textSecondary} hover:border-opacity-70 hover:text-opacity-70`}>
+                            <PlusIcon className="w-5 h-5"/>
+                            <span>{t.addNewChapter}</span>
+                        </button>
+                        
+                        <button onClick={() => docxInputRef.current?.click()} className={`flex items-center justify-center space-x-2 p-4 rounded-lg border-2 border-dashed transition-colors ${themeClasses.border} ${themeClasses.textSecondary} hover:border-opacity-70 hover:text-opacity-70`}>
+                            <UploadIcon className="w-5 h-5"/>
+                            <span>{t.importFromDocx || 'Import from DOCX'}</span>
+                        </button>
+                    </div>
                     
                     <div className="space-y-3">
                         {novel.chapters.map((chapter) => (
@@ -308,7 +509,7 @@ const NovelDetailPage = () => {
     };
 
     return (
-        <div className={`p-4 sm:p-8 md:p-12 ${themeClasses.bg} min-h-screen overflow-y-auto`}>
+        <div className={`p-4 sm:p-8 md:p-12 ${themeClasses.bg} min-h-full`}>
             <button onClick={() => navigate('/')} className={`flex items-center space-x-2 mb-8 ${themeClasses.text} opacity-70 hover:opacity-100`}>
                 <BackIcon className="w-5 h-5" />
                 <span>{t.backTo} {t.homePage}</span>
@@ -433,6 +634,151 @@ const NovelDetailPage = () => {
                 title={t.deleteChapterTitle(chapterToDelete?.title || '')}
                 message={t.deleteChapterMessage}
             />
+            {pendingImport && (
+                <ImportDocxModal
+                    isOpen={isImportModalOpen}
+                    onClose={() => {
+                        setIsImportModalOpen(false);
+                        setPendingImport(null);
+                    }}
+                    onConfirm={handleConfirmImport}
+                    fileName={pendingImport.fileName}
+                    chapters={pendingImport.chapters}
+                    preamble={pendingImport.preamble}
+                    themeClasses={themeClasses}
+                    t={t}
+                />
+            )}
+        </div>
+    );
+};
+
+interface ImportDocxModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onConfirm: (options: { overwriteChapters: boolean; overwriteDescription: boolean }) => void;
+    fileName: string;
+    chapters: { title: string; content: string; wordCount: number }[];
+    preamble: string;
+    themeClasses: any;
+    t: any;
+}
+
+const ImportDocxModal = ({
+    isOpen,
+    onClose,
+    onConfirm,
+    fileName,
+    chapters,
+    preamble,
+    themeClasses,
+    t
+}: ImportDocxModalProps) => {
+    const [overwriteChapters, setOverwriteChapters] = React.useState(true);
+    const [overwriteDescription, setOverwriteDescription] = React.useState(true);
+
+    if (!isOpen) return null;
+
+    // Get a text preview of the preamble
+    const getPreambleText = () => {
+        const temp = document.createElement('div');
+        temp.innerHTML = preamble;
+        const text = temp.textContent || temp.innerText || '';
+        return text.trim();
+    };
+
+    const preambleText = getPreambleText();
+    const cleanPreambleSnippet = preambleText.length > 120 
+        ? preambleText.substring(0, 120) + '...' 
+        : preambleText;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4" onClick={onClose}>
+            <div className={`p-6 rounded-lg shadow-xl w-full max-w-lg ${themeClasses.bgSecondary} ${themeClasses.text} border ${themeClasses.border} flex flex-col max-h-[85vh]`} onClick={e => e.stopPropagation()}>
+                <h2 className={`text-2xl font-bold mb-2 ${themeClasses.accentText}`}>
+                    {t.importFromDocx || 'Import from DOCX'}
+                </h2>
+                <p className={`text-sm mb-4 ${themeClasses.textSecondary}`}>
+                    File: <span className="font-semibold text-emerald-500">{fileName}</span>
+                </p>
+
+                {/* Content area */}
+                <div className="flex-1 overflow-y-auto mb-6 space-y-4 pr-1">
+                    {/* Chapter options */}
+                    <div className={`p-4 rounded-lg border ${themeClasses.border} ${themeClasses.bgTertiary}`}>
+                        <label className="flex items-start space-x-3 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={overwriteChapters}
+                                onChange={(e) => setOverwriteChapters(e.target.checked)}
+                                className="mt-1 accent-emerald-500 rounded cursor-pointer w-4 h-4"
+                            />
+                            <div>
+                                <span className="font-bold text-sm">Replace existing chapters</span>
+                                <p className={`text-xs mt-1 ${themeClasses.textSecondary}`}>
+                                    If checked, this novel's current chapters will be fully replaced. If unchecked, the new chapters will be appended to the end of the book.
+                                </p>
+                            </div>
+                        </label>
+                    </div>
+
+                    {/* Description options */}
+                    {preambleText && (
+                        <div className={`p-4 rounded-lg border ${themeClasses.border} ${themeClasses.bgTertiary}`}>
+                            <label className="flex items-start space-x-3 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={overwriteDescription}
+                                    onChange={(e) => setOverwriteDescription(e.target.checked)}
+                                    className="mt-1 accent-emerald-500 rounded cursor-pointer w-4 h-4"
+                                />
+                                <div>
+                                    <span className="font-bold text-sm">Update novel description</span>
+                                    <p className={`text-xs mt-1 mb-2 ${themeClasses.textSecondary}`}>
+                                        Introductory text was detected before your first chapter heading. Check this to update the novel's main description with this text.
+                                    </p>
+                                    <div className={`p-2 rounded text-xs italic ${themeClasses.bgSecondary} border ${themeClasses.border} ${themeClasses.textSecondary}`}>
+                                        "{cleanPreambleSnippet}"
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+                    )}
+
+                    {/* Detected chapters */}
+                    <div>
+                        <h3 className="text-sm font-bold uppercase tracking-wider mb-2">
+                            Detected Chapters ({chapters.length})
+                        </h3>
+                        <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                            {chapters.map((ch, idx) => (
+                                <div key={idx} className={`p-2.5 rounded-md border flex justify-between items-center text-sm ${themeClasses.bgTertiary} ${themeClasses.border}`}>
+                                    <span className="font-semibold truncate pr-2">{ch.title}</span>
+                                    <span className={`text-xs flex-shrink-0 px-2 py-0.5 rounded-full ${themeClasses.bgSecondary} ${themeClasses.textSecondary}`}>
+                                        {ch.wordCount.toLocaleString()} words
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Footer buttons */}
+                <div className="flex space-x-3 justify-end pt-4 border-t border-white/10">
+                    <button
+                        onClick={onClose}
+                        className={`px-4 py-2 rounded-lg font-semibold border ${themeClasses.border} hover:opacity-85 transition-opacity`}
+                    >
+                        {t.cancel}
+                    </button>
+                    <button
+                        onClick={() => onConfirm({ overwriteChapters, overwriteDescription })}
+                        className={`px-4 py-2 rounded-lg font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors`}
+                    >
+                        {t.confirm}
+                    </button>
+                </div>
+            </div>
         </div>
     );
 };

@@ -1,4 +1,5 @@
 import * as React from 'react';
+import * as ReactDOM from 'react-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { CloseIcon } from './Icons';
 import { enhancePlainText } from '../constants';
@@ -24,7 +25,7 @@ const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message, confirmButto
         onClose();
     };
 
-    return (
+    return ReactDOM.createPortal(
         <div 
             className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 transition-opacity" 
             aria-modal="true" 
@@ -56,7 +57,8 @@ const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message, confirmButto
                 </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 

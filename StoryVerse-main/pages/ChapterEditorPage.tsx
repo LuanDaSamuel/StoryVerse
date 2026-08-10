@@ -6,8 +6,10 @@ import { BackIcon, BookOpenIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightI
 import { enhancePlainText, enhanceHtml, THEME_CONFIG } from '../constants';
 import ExportModal from '../components/ExportModal';
 import { useTranslations } from '../hooks/useTranslations';
+import { useTabTitle } from '../hooks/useTabTitle';
 
 // --- Reusable Components ---
+
 
 const SaveStatusIndicator = () => {
     const { theme, saveStatus } = React.useContext(ProjectContext);
@@ -387,7 +389,7 @@ const FindReplaceModal = ({ isOpen, onClose, editorRef, onReplaceAllInNovel }: {
     if (currentIndex === -1 || matches.length === 0) return;
     const match = matches[currentIndex];
     match.textContent = replaceText;
-    match.classList.remove('search-highlight, .current-match');
+    match.classList.remove('search-highlight', 'current-match');
     
     // Defer DOM changes to allow state to update first
     setTimeout(() => {
@@ -610,6 +612,9 @@ const ChapterEditorPage = () => {
         };
     }, [projectData, novelId, chapterId]);
 
+    useTabTitle(chapter ? chapter.title : 'Chapter Editor', 'editor');
+
+
     const updateChapterField = React.useCallback((field: 'title' | 'content', value: string) => {
         if (novelIndex === -1 || chapterIndex === -1) return;
 
@@ -628,10 +633,12 @@ const ChapterEditorPage = () => {
             const now = new Date();
 
             if (field === 'content') {
-                const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = value;
-                const text = tempDiv.textContent || "";
-                const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+                const plainText = value.replace(/<[^>]*>/g, ' ');
+                let wordCount = 0;
+                const regex = /\S+/g;
+                while (regex.exec(plainText) !== null) {
+                    wordCount++;
+                }
 
                 const FIVE_MINUTES = 5 * 60 * 1000;
                 const shouldCreateHistory = now.getTime() - new Date(originalChapter.updatedAt).getTime() > FIVE_MINUTES;
@@ -1277,7 +1284,8 @@ const ChapterEditorPage = () => {
         if (chapter && editorRef.current) {
             const contentFromState = chapter.content || '<p><br></p>';
             // If state content diverges from our tracked editor content, it was a programmatic change.
-            if (contentFromState !== editorContentRef.current) {
+            // Also, we ONLY update the DOM if the editor is NOT currently focused to avoid racing with user input.
+            if (contentFromState !== editorContentRef.current && document.activeElement !== editorRef.current) {
                 const enhancedContent = enhanceHtml(contentFromState);
                 editorRef.current.innerHTML = enhancedContent;
                 editorContentRef.current = contentFromState; // Re-sync the ref
@@ -1411,7 +1419,7 @@ const ChapterEditorPage = () => {
 
     if (!projectData || !novel || !chapter || !chapterId) {
         return (
-            <div className={`flex h-screen items-center justify-center ${themeClasses.bg}`}>
+            <div className={`flex h-full items-center justify-center ${themeClasses.bg}`}>
                 <p>{t.loading}...</p>
             </div>
         );
@@ -1419,7 +1427,7 @@ const ChapterEditorPage = () => {
 
     return (
         <>
-            <div className={`flex h-screen font-serif ${themeClasses.bg} ${themeClasses.text}`}>
+            <div className={`flex h-full font-serif ${themeClasses.bg} ${themeClasses.text}`}>
                 {/* Backdrop for sidebar */}
                 {isSidebarOpen && (
                     <div
@@ -1645,7 +1653,7 @@ const ChapterEditorPage = () => {
                             <button onClick={() => applyCommand('redo')} className={`p-2 rounded-full text-white/70 hover:text-white transition-colors`}><RedoIcon className="w-5 h-5"/></button>
                             <div className="w-px h-5 bg-white/20 mx-1"></div>
                             <div className="px-3 text-sm text-white/70 font-sans" aria-live="polite">
-                                {(chapter.wordCount || 0).toLocaleString()} {t.wordsCount}
+                                {((chapter && chapter.wordCount) || 0).toLocaleString()} {t.wordsCount}
                             </div>
                         </div>
                     </div>

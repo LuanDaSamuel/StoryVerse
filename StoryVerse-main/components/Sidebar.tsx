@@ -3,11 +3,14 @@ import { NavLink } from 'react-router-dom';
 import { AppLogoIcon, HomeIcon, PlusIcon, SettingsIcon, LightbulbIcon, QuillPenIcon, LoadingIcon, CheckIcon, ExclamationTriangleIcon, BookOpenIcon } from './Icons';
 import SettingsModal from './SettingsModal';
 import { ProjectContext } from '../contexts/ProjectContext';
+import { TabContext } from '../contexts/TabContext';
 import { useTranslations } from '../hooks/useTranslations';
+import { TabIconType } from '../types';
 
 interface SidebarProps {
     onLinkClick?: () => void;
 }
+
 
 const SaveStatusIndicator = () => {
     const { theme, saveStatus } = React.useContext(ProjectContext);
@@ -43,7 +46,6 @@ const Sidebar = ({ onLinkClick = () => {} }: SidebarProps) => {
         const defaultText = theme === 'book' ? themeClasses.accentText : themeClasses.text;
 
         if (isActive) {
-            // Special case for the 'book' theme to match the screenshot's active style
             if (theme === 'book') {
                 return `${baseClasses} ${themeClasses.bg} ${themeClasses.text}`;
             }
@@ -52,7 +54,6 @@ const Sidebar = ({ onLinkClick = () => {} }: SidebarProps) => {
         return `${baseClasses} ${defaultText} hover:${themeClasses.bgTertiary}`;
     };
     
-    // For the book theme, the text on the light sidebar should be dark.
     const sidebarTextColor = theme === 'book' ? themeClasses.accentText : themeClasses.text;
 
     return (
@@ -84,6 +85,7 @@ const Sidebar = ({ onLinkClick = () => {} }: SidebarProps) => {
                         <span>{t.workingModel}</span>
                     </NavLink>
                 </nav>
+
 
                 {userProfile && (
                      <div className={`px-4 pt-4 border-t border-inherit`}>

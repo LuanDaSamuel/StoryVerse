@@ -7,6 +7,7 @@ import { enhanceHtml, enhancePlainText, SKETCH_TAG_OPTIONS } from '../constants'
 import { NovelSketch } from '../types';
 import ConfirmModal from '../components/ConfirmModal';
 import { useTranslations } from '../hooks/useTranslations';
+import { useTabTitle } from '../hooks/useTabTitle';
 
 const SaveStatusIndicator = () => {
     const { theme, saveStatus } = React.useContext(ProjectContext);
@@ -79,7 +80,7 @@ const FindReplaceModal = ({ isOpen, onClose, editorRef }: { isOpen: boolean, onC
 
   React.useEffect(() => { matches.forEach((match, index) => { if (index === currentIndex) { match.classList.add('current-match'); match.scrollIntoView({ block: 'center', behavior: 'smooth' }); } else { match.classList.remove('current-match'); } }); }, [currentIndex, matches]);
   const handleNavigate = (direction: 'next' | 'prev') => { if (matches.length === 0) return; setCurrentIndex(prev => (direction === 'next' ? prev + 1 : prev - 1 + matches.length) % matches.length); };
-  const handleReplace = () => { if (currentIndex === -1 || matches.length === 0) return; const match = matches[currentIndex]; match.textContent = replaceText; match.classList.remove('search-highlight, .current-match'); setTimeout(() => { const newMatches = matches.filter(m => m !== match); setMatches(newMatches); if (newMatches.length > 0) { setCurrentIndex(currentIndex % newMatches.length); } else { setCurrentIndex(-1); } editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true })); }, 0); };
+  const handleReplace = () => { if (currentIndex === -1 || matches.length === 0) return; const match = matches[currentIndex]; match.textContent = replaceText; match.classList.remove('search-highlight', 'current-match'); setTimeout(() => { const newMatches = matches.filter(m => m !== match); setMatches(newMatches); if (newMatches.length > 0) { setCurrentIndex(currentIndex % newMatches.length); } else { setCurrentIndex(-1); } editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true })); }, 0); };
   const handleReplaceAll = () => { if (!editorRef.current || matches.length === 0) return; matches.forEach(match => { match.textContent = replaceText; }); editorRef.current.dispatchEvent(new Event('input', { bubbles: true, cancelable: true })); handleClose(); };
 
   if (!isOpen) return null;
@@ -138,6 +139,8 @@ const SketchEditorPage = () => {
             sketchIndex: sIndex,
         };
     }, [projectData, novelId, sketchId]);
+
+    useTabTitle(sketch ? sketch.title : 'Sketch Editor', 'sketch');
 
     const updateSketch = React.useCallback((updates: Partial<Omit<NovelSketch, 'id' | 'createdAt'>>) => {
         if (novelIndex === -1 || sketchIndex === -1) return;
@@ -301,7 +304,7 @@ const SketchEditorPage = () => {
             editorRef.current.innerHTML = enhanceHtml(initialContent);
             editorContentRef.current = initialContent;
         }
-    }, [sketch]);
+    }, [sketchId]);
     
     const updateActiveFormats = React.useCallback(() => {
         const selection = window.getSelection();
@@ -381,7 +384,7 @@ const SketchEditorPage = () => {
 
     if (!novel || !sketch) {
         return (
-            <div className={`flex h-screen items-center justify-center ${themeClasses.bg}`}>
+            <div className={`flex h-full items-center justify-center ${themeClasses.bg}`}>
                 <p>{t.loading}...</p>
             </div>
         );
@@ -389,7 +392,7 @@ const SketchEditorPage = () => {
 
     return (
         <>
-            <div className={`flex h-screen font-serif ${themeClasses.bg} ${themeClasses.text}`}>
+            <div className={`flex h-full font-serif ${themeClasses.bg} ${themeClasses.text}`}>
                 {isSidebarOpen && <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-black/50 z-30" />}
                 <div className="flex-1 overflow-y-auto relative">
                     <div className={`sticky top-0 z-10 pt-6 pb-4 ${themeClasses.bg} bg-opacity-80 backdrop-blur-sm border-b ${themeClasses.border} flex items-center justify-between`}>
@@ -448,7 +451,7 @@ const SketchEditorPage = () => {
                             <button onClick={(e) => applyCommand(e, 'redo')} className="p-2 rounded-full text-white/70 hover:text-white transition-colors"><RedoIcon className="w-5 h-5"/></button>
                             <div className="w-px h-5 bg-white/20 mx-1" />
                             <div className="px-3 text-sm text-white/70 font-sans" aria-live="polite">
-                                {(sketch.wordCount || 0).toLocaleString()} {t.wordsCount}
+                                {((sketch && sketch.wordCount) || 0).toLocaleString()} {t.wordsCount}
                             </div>
                         </div>
                     </div>

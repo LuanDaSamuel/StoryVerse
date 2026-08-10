@@ -7,6 +7,7 @@ import { useProjectStorage, PermanentAuthError } from './useProjectStorage';
 // --- Constants ---
 const LOCAL_BACKUP_KEY = 'storyverse-local-backup';
 const LOCAL_UNLOAD_BACKUP_KEY = 'storyverse-unload-backup';
+const LOCAL_UNLOAD_BACKUP_TIMESTAMP_KEY = 'storyverse-unload-backup-timestamp';
 const STORAGE_PREFERENCE_KEY = 'storyverse-storage-preference';
 const isFileSystemAccessAPISupported = 'showOpenFilePicker' in window;
 
@@ -135,6 +136,26 @@ export function useProject() {
   const saveProjectRef = React.useRef<() => Promise<void>>(async () => {});
   const saveTimeoutRef = React.useRef<number | null>(null);
   const localStorageBackupTimeoutRef = React.useRef<number | null>(null);
+  const broadcastChannelRef = React.useRef<BroadcastChannel | null>(null);
+
+  React.useEffect(() => {
+    if ('BroadcastChannel' in window) {
+      const channel = new BroadcastChannel('storyverse_project_data_sync');
+      broadcastChannelRef.current = channel;
+      channel.onmessage = (event) => {
+        const { type, data } = event.data || {};
+        if (type === 'PROJECT_DATA_REMOTE_UPDATE' && data) {
+          projectDataRef.current = data;
+          setProjectData(data);
+        }
+      };
+      return () => {
+        channel.close();
+        broadcastChannelRef.current = null;
+      };
+    }
+  }, []);
+
   
   const resetState = React.useCallback(() => {
     setProjectData(null);
@@ -230,6 +251,7 @@ export function useProject() {
             if (success) {
                 // Always clear emergency backup on success regardless of mode
                 localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
+                localStorage.removeItem(LOCAL_UNLOAD_BACKUP_TIMESTAMP_KEY);
             } else {
                 throw lastError || new Error("Save operation failed");
             }
@@ -244,6 +266,12 @@ export function useProject() {
         
         if (error.name === 'ExpiredVersionError') {
             alert("This session has expired because the project was modified on another device. You will be logged out to prevent overwriting changes.");
+            signOut({ flush: false });
+            return;
+        }
+        
+        if (error instanceof PermanentAuthError || error.name === 'PermanentAuthError') {
+            alert("Your Google Drive session has expired or failed to refresh. You will be signed out to prevent data loss. You can re-sign in or use local files.");
             signOut({ flush: false });
             return;
         }
@@ -291,8 +319,12 @@ export function useProject() {
         const newData = typeof updater === 'function' ? updater(prevData) : updater;
         projectDataRef.current = newData;
         isDirtyRef.current = true;
+        if (newData && broadcastChannelRef.current) {
+            broadcastChannelRef.current.postMessage({ type: 'PROJECT_DATA_REMOTE_UPDATE', data: newData });
+        }
         return newData;
     });
+
 
     if (!isSavingRef.current) setSaveStatus('unsaved');
 
@@ -303,6 +335,7 @@ export function useProject() {
             try {
                 if (projectDataRef.current) {
                      localStorage.setItem(LOCAL_UNLOAD_BACKUP_KEY, JSON.stringify(projectDataRef.current));
+                     localStorage.setItem(LOCAL_UNLOAD_BACKUP_TIMESTAMP_KEY, Date.now().toString());
                 }
             } catch (e) { console.error("Unload backup failed", e); }
         }, 2000); 
@@ -341,6 +374,7 @@ export function useProject() {
         // Aggressively clear local artifacts when cloud project is loaded
         del(LOCAL_BACKUP_KEY);
         localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
+        localStorage.removeItem(LOCAL_UNLOAD_BACKUP_TIMESTAMP_KEY);
     } else {
         setStatus('drive-no-project');
     }

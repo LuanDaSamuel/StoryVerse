@@ -6,6 +6,7 @@ import { ProjectContext } from '../contexts/ProjectContext';
 import { enhanceHtml, enhancePlainText } from '../constants';
 import { BackIcon, Bars3Icon, ChevronLeftIcon, ChevronRightIcon, CloseIcon } from '../components/Icons';
 import { useTranslations } from '../hooks/useTranslations';
+import { useTabTitle } from '../hooks/useTabTitle';
 
 const ChapterListModal = ({ isOpen, onClose, novelId, novel, themeClasses }: {
     isOpen: boolean;
@@ -76,6 +77,8 @@ const ReadNovelPage = () => {
         return { novel: n, currentChapter: c, chapterIndex: cIndex };
     }, [projectData, novelId, chapterId]);
 
+    useTabTitle(currentChapter ? currentChapter.title : (novel ? novel.title : 'Read Novel'), 'reader');
+
     const baseFontSize = projectData?.settings?.baseFontSize || 18;
 
     React.useEffect(() => {
@@ -132,7 +135,7 @@ const ReadNovelPage = () => {
 
     if (!novel || !currentChapter) {
         return (
-            <div className={`flex h-screen items-center justify-center ${themeClasses.bg} ${themeClasses.text}`}>
+            <div className={`flex h-full items-center justify-center ${themeClasses.bg} ${themeClasses.text}`}>
                 <p>{t.loading}...</p>
             </div>
         );
@@ -142,7 +145,7 @@ const ReadNovelPage = () => {
     const nextChapter = chapterIndex < novel.chapters.length - 1 ? novel.chapters[chapterIndex + 1] : null;
     
     return (
-        <div className={`h-screen font-serif ${themeClasses.bg} ${themeClasses.text}`}>
+        <div className={`h-full font-serif ${themeClasses.bg} ${themeClasses.text}`}>
              <ChapterListModal 
                 isOpen={isChapterListOpen} 
                 onClose={() => setIsChapterListOpen(false)} 

@@ -1,5 +1,6 @@
 
 import * as React from 'react';
+import * as ReactDOM from 'react-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { Theme, Language } from '../types';
 import { THEME_CONFIG } from '../constants';
@@ -84,7 +85,7 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
   const confirmMessage = storageMode === 'drive' ? t.signOutMessage : t.closeProjectMessage;
 
 
-  return (
+  return ReactDOM.createPortal(
     <>
       <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 font-sans" onClick={onClose} role="dialog" aria-modal="true">
         <div 
@@ -183,7 +184,8 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
         title={confirmTitle}
         message={confirmMessage}
       />
-    </>
+    </>,
+    document.body
   );
 };
 
