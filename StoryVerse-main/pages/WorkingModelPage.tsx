@@ -16,87 +16,6 @@ type PaneData = {
 } | null;
 
 
-const WorkingModelPage = () => {
-    const { themeClasses, projectData, setProjectData } = React.useContext(ProjectContext);
-    const t = useTranslations();
-    useTabTitle(t.workingModel || 'Working Model', 'model');
-    
-    // Manage state for two panes
-    const [leftPane, setLeftPane] = React.useState<PaneData>(null);
-    const [rightPane, setRightPane] = React.useState<PaneData>(null);
-    const navigate = useNavigate();
-
-    const applyCommand = (command: string, value?: string) => {
-        document.execCommand(command, false, value);
-    };
-
-    const applyParagraphStyle = (style: string) => {
-        document.execCommand('formatBlock', false, style);
-    };
-
-    return (
-        <div className={`h-full absolute inset-0 flex flex-col ${themeClasses.bg} ${themeClasses.text}`}>
-            {/* Unified Top Toolbar */}
-            <div className={`p-4 border-b ${themeClasses.border} ${themeClasses.bgSecondary} flex items-center justify-between`}>
-                <div className="flex items-center space-x-2">
-                    <button onClick={() => applyCommand('bold')} className={`p-2 rounded hover:bg-black/10 transition-colors`} title="Bold">
-                        <BoldIcon className="w-5 h-5"/>
-                    </button>
-                    <button onClick={() => applyCommand('italic')} className={`p-2 rounded hover:bg-black/10 transition-colors`} title="Italic">
-                        <ItalicIcon className="w-5 h-5"/>
-                    </button>
-                    <div className={`w-px h-6 ${themeClasses.border} mx-2`}></div>
-                    <button onClick={() => applyCommand('insertUnorderedList')} className={`p-2 rounded hover:bg-black/10 transition-colors`} title="Unordered List">
-                        <ListBulletIcon className="w-5 h-5"/>
-                    </button>
-                    <button onClick={() => applyCommand('insertOrderedList')} className={`p-2 rounded hover:bg-black/10 transition-colors`} title="Ordered List">
-                        <OrderedListIcon className="w-5 h-5"/>
-                    </button>
-                    <button onClick={() => applyParagraphStyle('blockquote')} className={`p-2 rounded hover:bg-black/10 transition-colors`} title="Blockquote">
-                        <BlockquoteIcon className="w-5 h-5"/>
-                    </button>
-                    <div className={`w-px h-6 ${themeClasses.border} mx-2`}></div>
-                    <button onClick={() => applyCommand('undo')} className={`p-2 rounded hover:bg-black/10 transition-colors`} title="Undo">
-                        <UndoIcon className="w-5 h-5"/>
-                    </button>
-                    <button onClick={() => applyCommand('redo')} className={`p-2 rounded hover:bg-black/10 transition-colors`} title="Redo">
-                        <RedoIcon className="w-5 h-5"/>
-                    </button>
-                </div>
-                
-                <div className="flex items-center">
-                    <button onClick={() => navigate('/')} className={`p-2 flex items-center rounded hover:bg-black/10 transition-colors text-sm font-semibold`} title="Go back to Home">
-                        <BookOpenIcon className="w-6 h-6" />
-                    </button>
-                </div>
-            </div>
-            
-            <div className="flex-1 flex overflow-hidden">
-                <Pane 
-                    data={leftPane} 
-                    onSetData={setLeftPane} 
-                    themeClasses={themeClasses}
-                    projectData={projectData}
-                    setProjectData={setProjectData}
-                    t={t}
-                />
-                
-                {/* Divider */}
-                <div className={`w-px ${themeClasses.border} bg-current opacity-20`} />
-                
-                <Pane 
-                    data={rightPane} 
-                    onSetData={setRightPane} 
-                    themeClasses={themeClasses}
-                    projectData={projectData}
-                    setProjectData={setProjectData}
-                    t={t}
-                />
-            </div>
-        </div>
-    );
-};
-
 const Pane = ({ data, onSetData, themeClasses, projectData, setProjectData, t }: any) => {
     const docxInputRef = React.useRef<HTMLInputElement>(null);
     const contentRef = React.useRef<HTMLDivElement>(null);
@@ -299,7 +218,7 @@ const Pane = ({ data, onSetData, themeClasses, projectData, setProjectData, t }:
                     if (isAtStartOfBlock) {
                         document.execCommand('insertText', false, e.key === '"' ? '“' : '‘');
                     } else if (e.key === "'") {
-                        if (/\\w/.test(lastChar)) {
+                        if (/\w/.test(lastChar)) {
                             document.execCommand('insertText', false, '’');
                         } else {
                             const openSingleCount = (fullTextBefore.match(/‘/g) || []).length;
@@ -512,6 +431,87 @@ const Pane = ({ data, onSetData, themeClasses, projectData, setProjectData, t }:
                     </div>
                 </div>
             )}
+        </div>
+    );
+};
+
+const WorkingModelPage = () => {
+    const { themeClasses, projectData, setProjectData } = React.useContext(ProjectContext);
+    const t = useTranslations();
+    useTabTitle(t.workingModel || 'Working Model', 'model');
+    
+    // Manage state for two panes
+    const [leftPane, setLeftPane] = React.useState<PaneData>(null);
+    const [rightPane, setRightPane] = React.useState<PaneData>(null);
+    const navigate = useNavigate();
+
+    const applyCommand = (command: string, value?: string) => {
+        document.execCommand(command, false, value);
+    };
+
+    const applyParagraphStyle = (style: string) => {
+        document.execCommand('formatBlock', false, style);
+    };
+
+    return (
+        <div className={`h-full absolute inset-0 flex flex-col ${themeClasses.bg} ${themeClasses.text}`}>
+            {/* Unified Top Toolbar */}
+            <div className={`p-4 border-b ${themeClasses.border} ${themeClasses.bgSecondary} flex items-center justify-between`}>
+                <div className="flex items-center space-x-2">
+                    <button onClick={() => applyCommand('bold')} className={`p-2 rounded hover:bg-black/10 transition-colors`} title="Bold">
+                        <BoldIcon className="w-5 h-5"/>
+                    </button>
+                    <button onClick={() => applyCommand('italic')} className={`p-2 rounded hover:bg-black/10 transition-colors`} title="Italic">
+                        <ItalicIcon className="w-5 h-5"/>
+                    </button>
+                    <div className={`w-px h-6 ${themeClasses.border} mx-2`}></div>
+                    <button onClick={() => applyCommand('insertUnorderedList')} className={`p-2 rounded hover:bg-black/10 transition-colors`} title="Unordered List">
+                        <ListBulletIcon className="w-5 h-5"/>
+                    </button>
+                    <button onClick={() => applyCommand('insertOrderedList')} className={`p-2 rounded hover:bg-black/10 transition-colors`} title="Ordered List">
+                        <OrderedListIcon className="w-5 h-5"/>
+                    </button>
+                    <button onClick={() => applyParagraphStyle('blockquote')} className={`p-2 rounded hover:bg-black/10 transition-colors`} title="Blockquote">
+                        <BlockquoteIcon className="w-5 h-5"/>
+                    </button>
+                    <div className={`w-px h-6 ${themeClasses.border} mx-2`}></div>
+                    <button onClick={() => applyCommand('undo')} className={`p-2 rounded hover:bg-black/10 transition-colors`} title="Undo">
+                        <UndoIcon className="w-5 h-5"/>
+                    </button>
+                    <button onClick={() => applyCommand('redo')} className={`p-2 rounded hover:bg-black/10 transition-colors`} title="Redo">
+                        <RedoIcon className="w-5 h-5"/>
+                    </button>
+                </div>
+                
+                <div className="flex items-center">
+                    <button onClick={() => navigate('/')} className={`p-2 flex items-center rounded hover:bg-black/10 transition-colors text-sm font-semibold`} title="Go back to Home">
+                        <BookOpenIcon className="w-6 h-6" />
+                    </button>
+                </div>
+            </div>
+            
+            <div className="flex-1 flex overflow-hidden">
+                <Pane 
+                    data={leftPane} 
+                    onSetData={setLeftPane} 
+                    themeClasses={themeClasses}
+                    projectData={projectData}
+                    setProjectData={setProjectData}
+                    t={t}
+                />
+                
+                {/* Divider */}
+                <div className={`w-px ${themeClasses.border} bg-current opacity-20`} />
+                
+                <Pane 
+                    data={rightPane} 
+                    onSetData={setRightPane} 
+                    themeClasses={themeClasses}
+                    projectData={projectData}
+                    setProjectData={setProjectData}
+                    t={t}
+                />
+            </div>
         </div>
     );
 };

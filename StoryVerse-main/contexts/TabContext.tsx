@@ -12,6 +12,7 @@ export interface TabContextType {
     updateTabInfo: (path: string, info: { title?: string; iconType?: TabIconType }) => void;
     popOutTab: (tabId: string) => void;
     reattachTab: (tabId: string) => void;
+    reorderTabs: (startIndex: number, endIndex: number) => void;
 }
 
 const DEFAULT_TAB: TabItem = {
@@ -34,7 +35,8 @@ export const TabContext = React.createContext<TabContextType>({
     selectTab: () => {},
     updateTabInfo: () => {},
     popOutTab: () => {},
-    reattachTab: () => {}
+    reattachTab: () => {},
+    reorderTabs: () => {}
 });
 
 export const TabProvider: React.FC<{ children: React.ReactNode; navigate: (path: string) => void; currentPath: string }> = ({
@@ -236,6 +238,17 @@ export const TabProvider: React.FC<{ children: React.ReactNode; navigate: (path:
         }
     }, [tabs, isPopoutWindow, navigate]);
 
+    const reorderTabs = React.useCallback((startIndex: number, endIndex: number) => {
+        if (startIndex === endIndex) return;
+        setTabs(prev => {
+            if (startIndex < 0 || startIndex >= prev.length || endIndex < 0 || endIndex >= prev.length) return prev;
+            const newTabs = Array.from(prev);
+            const [moved] = newTabs.splice(startIndex, 1);
+            newTabs.splice(endIndex, 0, moved);
+            return newTabs;
+        });
+    }, []);
+
     return (
         <TabContext.Provider value={{
             tabs,
@@ -247,7 +260,8 @@ export const TabProvider: React.FC<{ children: React.ReactNode; navigate: (path:
             selectTab,
             updateTabInfo,
             popOutTab,
-            reattachTab
+            reattachTab,
+            reorderTabs
         }}>
             {children}
         </TabContext.Provider>

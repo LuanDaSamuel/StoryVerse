@@ -519,81 +519,6 @@ const ChapterEditorPage = () => {
         textIndent: '2em',
     });
 
-    const cleanupEditor = React.useCallback(() => {
-        if (!editorRef.current) return;
-        const editor = editorRef.current;
-    
-        // 1. Remove empty inline elements that can cause bugs.
-        // Run multiple passes to handle nested empty elements.
-        for (let i = 0; i < 3; i++) {
-            let changed = false;
-            editor.querySelectorAll('span, strong, em, i, b').forEach(el => {
-                if (!el.hasChildNodes() || el.textContent === '\u200B') {
-                    el.remove();
-                    changed = true;
-                }
-            });
-            if (!changed) break;
-        }
-    
-        // 2. Merge adjacent sibling elements with identical styles/tags.
-        // This is crucial for fixing DOM fragmentation after multiple format applications.
-        const mergeAdjacentSiblings = (parent: HTMLElement) => {
-            let child = parent.firstChild;
-            while (child) {
-                const next = child.nextSibling;
-                if (next && child.nodeType === Node.ELEMENT_NODE && next.nodeType === Node.ELEMENT_NODE) {
-                    const el1 = child as HTMLElement;
-                    const el2 = next as HTMLElement;
-    
-                    const areMergable = 
-                        el1.tagName === el2.tagName &&
-                        el1.className === el2.className &&
-                        el1.style.cssText === el2.style.cssText;
-    
-                    if (areMergable) {
-                        while (el2.firstChild) {
-                            el1.appendChild(el2.firstChild);
-                        }
-                        parent.removeChild(el2);
-                        // Do not advance child; check the new next sibling
-                        continue;
-                    }
-                }
-                child = next;
-            }
-        };
-    
-        editor.querySelectorAll('p, h1, h2, h3, blockquote, li, div').forEach(block => {
-            mergeAdjacentSiblings(block as HTMLElement);
-        });
-    
-        // 3. Merge adjacent text nodes. This fixes "stuck word" issues.
-        editor.normalize();
-    }, []);
-
-    const editorStyle = React.useMemo(() => {
-        const baseFontSize = projectData?.settings?.baseFontSize || 18;
-        const style: React.CSSProperties = {
-            fontSize: `${baseFontSize}px`
-        };
-
-        if (theme === 'book') {
-            const colorClass = THEME_CONFIG.book.text;
-            const colorValue = colorClass.match(/\[(.*?)\]/)?.[1] || '#F5EADD';
-            style.color = colorValue;
-        }
-        return style;
-    }, [theme, projectData?.settings?.baseFontSize]);
-    
-    const colorPalette = React.useMemo(() => {
-        if (theme === 'book') {
-            const textColor = THEME_CONFIG.book.text.match(/\[(.*?)\]/)?.[1] || '#F5EADD';
-            return [textColor, '#3B82F6', '#FBBF24', '#22C55E', '#EC4899'];
-        }
-        return ['#3B2F27', '#3B82F6', '#FBBF24', '#22C55E', '#EC4899'];
-    }, [theme]);
-    
     const { novel, chapter, chapterIndex, novelIndex } = React.useMemo(() => {
         if (!projectData?.novels || !novelId || !chapterId) return { novel: null, chapter: null, chapterIndex: -1, novelIndex: -1 };
         
@@ -613,7 +538,6 @@ const ChapterEditorPage = () => {
     }, [projectData, novelId, chapterId]);
 
     useTabTitle(chapter ? chapter.title : 'Chapter Editor', 'editor');
-
 
     const updateChapterField = React.useCallback((field: 'title' | 'content', value: string) => {
         if (novelIndex === -1 || chapterIndex === -1) return;
@@ -666,6 +590,103 @@ const ChapterEditorPage = () => {
             return updatedProjectData;
         });
     }, [novelIndex, chapterIndex, setProjectData]);
+
+    const inputDebounceTimeout = React.useRef<number | null>(null);
+
+    const flushInputChanges = React.useCallback(() => {
+        if (inputDebounceTimeout.current !== null) {
+            window.clearTimeout(inputDebounceTimeout.current);
+            inputDebounceTimeout.current = null;
+        }
+        if (editorContentRef.current !== null) {
+            updateChapterField('content', editorContentRef.current);
+        }
+    }, [updateChapterField]);
+
+    const cleanupEditor = React.useCallback(() => {
+        if (!editorRef.current) return;
+        const editor = editorRef.current;
+    
+        // 1. Clean up zero-width space (\u200B) in text nodes when other text content exists
+        const walkTextNodes = (node: Node) => {
+            if (node.nodeType === Node.TEXT_NODE && node.nodeValue && node.nodeValue.length > 1 && node.nodeValue.includes('\u200B')) {
+                node.nodeValue = node.nodeValue.replace(/\u200B/g, '');
+            } else if (node.nodeType === Node.ELEMENT_NODE) {
+                node.childNodes.forEach(walkTextNodes);
+            }
+        };
+        walkTextNodes(editor);
+
+        // 2. Remove empty inline elements that can cause bugs.
+        // Run multiple passes to handle nested empty elements.
+        for (let i = 0; i < 3; i++) {
+            let changed = false;
+            editor.querySelectorAll('span, strong, em, i, b').forEach(el => {
+                if (!el.hasChildNodes() || el.textContent === '\u200B' || el.textContent === '') {
+                    el.remove();
+                    changed = true;
+                }
+            });
+            if (!changed) break;
+        }
+    
+        // 3. Merge adjacent sibling elements with identical styles/tags.
+        const mergeAdjacentSiblings = (parent: HTMLElement) => {
+            let child = parent.firstChild;
+            while (child) {
+                const next = child.nextSibling;
+                if (next && child.nodeType === Node.ELEMENT_NODE && next.nodeType === Node.ELEMENT_NODE) {
+                    const el1 = child as HTMLElement;
+                    const el2 = next as HTMLElement;
+    
+                    const areMergable = 
+                        el1.tagName === el2.tagName &&
+                        el1.className === el2.className &&
+                        el1.style.cssText === el2.style.cssText;
+    
+                    if (areMergable) {
+                        while (el2.firstChild) {
+                            el1.appendChild(el2.firstChild);
+                        }
+                        parent.removeChild(el2);
+                        continue;
+                    }
+                }
+                child = next;
+            }
+        };
+    
+        editor.querySelectorAll('p, h1, h2, h3, blockquote, li, div').forEach(block => {
+            mergeAdjacentSiblings(block as HTMLElement);
+        });
+    
+        // 4. Merge adjacent text nodes. This fixes "stuck word" issues.
+        editor.normalize();
+    }, []);
+
+    const editorStyle = React.useMemo(() => {
+        const baseFontSize = projectData?.settings?.baseFontSize || 18;
+        const style: React.CSSProperties = {
+            fontSize: `${baseFontSize}px`
+        };
+
+        if (theme === 'book') {
+            const colorClass = THEME_CONFIG.book.text;
+            const colorValue = colorClass.match(/\[(.*?)\]/)?.[1] || '#F5EADD';
+            style.color = colorValue;
+        }
+        return style;
+    }, [theme, projectData?.settings?.baseFontSize]);
+    
+    const colorPalette = React.useMemo(() => {
+        if (theme === 'book') {
+            const textColor = THEME_CONFIG.book.text.match(/\[(.*?)\]/)?.[1] || '#F5EADD';
+            return [textColor, '#3B82F6', '#FBBF24', '#22C55E', '#EC4899'];
+        }
+        return ['#3B2F27', '#3B82F6', '#FBBF24', '#22C55E', '#EC4899'];
+    }, [theme]);
+    
+
 
     const handleAddChapter = React.useCallback(() => {
         if (novelIndex === -1 || !novel) return;
@@ -1230,7 +1251,16 @@ const ChapterEditorPage = () => {
     const handleEditorInput = (e: React.FormEvent<HTMLDivElement>) => {
         const newHTML = e.currentTarget.innerHTML;
         editorContentRef.current = newHTML;
-        updateChapterField('content', newHTML);
+
+        // Debounce state synchronization to eliminate typing lag
+        if (inputDebounceTimeout.current !== null) {
+            window.clearTimeout(inputDebounceTimeout.current);
+        }
+        inputDebounceTimeout.current = window.setTimeout(() => {
+            if (editorContentRef.current !== null) {
+                updateChapterField('content', editorContentRef.current);
+            }
+        }, 200);
     };
 
     const handleCopyContent = React.useCallback(async () => {
@@ -1478,7 +1508,10 @@ const ChapterEditorPage = () => {
                             onKeyDown={handleKeyDown}
                             onKeyUp={handleKeyUp}
                             onPaste={handlePaste}
-                            onBlur={cleanupEditor}
+                            onBlur={() => {
+                                cleanupEditor();
+                                flushInputChanges();
+                            }}
                             className="w-full leading-relaxed outline-none story-content"
                             style={editorStyle}
                         />

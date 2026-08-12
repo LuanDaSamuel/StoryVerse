@@ -12,6 +12,136 @@ import { useTranslations } from '../hooks/useTranslations';
 import { useTabTitle } from '../hooks/useTabTitle';
 import * as mammoth from 'mammoth';
 
+interface ImportDocxModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onConfirm: (options: { overwriteChapters: boolean; overwriteDescription: boolean }) => void;
+    fileName: string;
+    chapters: { title: string; content: string; wordCount: number }[];
+    preamble: string;
+    themeClasses: any;
+    t: any;
+}
+
+const ImportDocxModal = ({
+    isOpen,
+    onClose,
+    onConfirm,
+    fileName,
+    chapters,
+    preamble,
+    themeClasses,
+    t
+}: ImportDocxModalProps) => {
+    const [overwriteChapters, setOverwriteChapters] = React.useState(true);
+    const [overwriteDescription, setOverwriteDescription] = React.useState(true);
+
+    if (!isOpen) return null;
+
+    // Get a text preview of the preamble
+    const getPreambleText = () => {
+        const temp = document.createElement('div');
+        temp.innerHTML = preamble;
+        const text = temp.textContent || temp.innerText || '';
+        return text.trim();
+    };
+
+    const preambleText = getPreambleText();
+    const cleanPreambleSnippet = preambleText.length > 120 
+        ? preambleText.substring(0, 120) + '...' 
+        : preambleText;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4" onClick={onClose}>
+            <div className={`p-6 rounded-lg shadow-xl w-full max-w-lg ${themeClasses.bgSecondary} ${themeClasses.text} border ${themeClasses.border} flex flex-col max-h-[85vh]`} onClick={e => e.stopPropagation()}>
+                <h2 className={`text-2xl font-bold mb-2 ${themeClasses.accentText}`}>
+                    {t.importFromDocx || 'Import from DOCX'}
+                </h2>
+                <p className={`text-sm mb-4 ${themeClasses.textSecondary}`}>
+                    File: <span className="font-semibold text-emerald-500">{fileName}</span>
+                </p>
+
+                {/* Content area */}
+                <div className="flex-1 overflow-y-auto mb-6 space-y-4 pr-1">
+                    {/* Chapter options */}
+                    <div className={`p-4 rounded-lg border ${themeClasses.border} ${themeClasses.bgTertiary}`}>
+                        <label className="flex items-start space-x-3 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={overwriteChapters}
+                                onChange={(e) => setOverwriteChapters(e.target.checked)}
+                                className="mt-1 accent-emerald-500 rounded cursor-pointer w-4 h-4"
+                            />
+                            <div>
+                                <span className="font-bold text-sm">Replace existing chapters</span>
+                                <p className={`text-xs mt-1 ${themeClasses.textSecondary}`}>
+                                    If checked, this novel's current chapters will be fully replaced. If unchecked, the new chapters will be appended to the end of the book.
+                                </p>
+                            </div>
+                        </label>
+                    </div>
+
+                    {/* Description options */}
+                    {preambleText && (
+                        <div className={`p-4 rounded-lg border ${themeClasses.border} ${themeClasses.bgTertiary}`}>
+                            <label className="flex items-start space-x-3 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={overwriteDescription}
+                                    onChange={(e) => setOverwriteDescription(e.target.checked)}
+                                    className="mt-1 accent-emerald-500 rounded cursor-pointer w-4 h-4"
+                                />
+                                <div>
+                                    <span className="font-bold text-sm">Update novel description</span>
+                                    <p className={`text-xs mt-1 mb-2 ${themeClasses.textSecondary}`}>
+                                        Introductory text was detected before your first chapter heading. Check this to update the novel's main description with this text.
+                                    </p>
+                                    <div className={`p-2 rounded text-xs italic ${themeClasses.bgSecondary} border ${themeClasses.border} ${themeClasses.textSecondary}`}>
+                                        "{cleanPreambleSnippet}"
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+                    )}
+
+                    {/* Detected chapters */}
+                    <div>
+                        <h3 className="text-sm font-bold uppercase tracking-wider mb-2">
+                            Detected Chapters ({chapters.length})
+                        </h3>
+                        <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                            {chapters.map((ch, idx) => (
+                                <div key={idx} className={`p-2.5 rounded-md border flex justify-between items-center text-sm ${themeClasses.bgTertiary} ${themeClasses.border}`}>
+                                    <span className="font-semibold truncate pr-2">{ch.title}</span>
+                                    <span className={`text-xs flex-shrink-0 px-2 py-0.5 rounded-full ${themeClasses.bgSecondary} ${themeClasses.textSecondary}`}>
+                                        {ch.wordCount.toLocaleString()} words
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Footer buttons */}
+                <div className="flex space-x-3 justify-end pt-4 border-t border-white/10">
+                    <button
+                        onClick={onClose}
+                        className={`px-4 py-2 rounded-lg font-semibold border ${themeClasses.border} hover:opacity-85 transition-opacity`}
+                    >
+                        {t.cancel}
+                    </button>
+                    <button
+                        onClick={() => onConfirm({ overwriteChapters, overwriteDescription })}
+                        className={`px-4 py-2 rounded-lg font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors`}
+                    >
+                        {t.confirm}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const NovelDetailPage = () => {
     const { novelId } = useParams<{ novelId: string }>();
     const navigate = useNavigate();
@@ -649,136 +779,6 @@ const NovelDetailPage = () => {
                     t={t}
                 />
             )}
-        </div>
-    );
-};
-
-interface ImportDocxModalProps {
-    isOpen: boolean;
-    onClose: () => void;
-    onConfirm: (options: { overwriteChapters: boolean; overwriteDescription: boolean }) => void;
-    fileName: string;
-    chapters: { title: string; content: string; wordCount: number }[];
-    preamble: string;
-    themeClasses: any;
-    t: any;
-}
-
-const ImportDocxModal = ({
-    isOpen,
-    onClose,
-    onConfirm,
-    fileName,
-    chapters,
-    preamble,
-    themeClasses,
-    t
-}: ImportDocxModalProps) => {
-    const [overwriteChapters, setOverwriteChapters] = React.useState(true);
-    const [overwriteDescription, setOverwriteDescription] = React.useState(true);
-
-    if (!isOpen) return null;
-
-    // Get a text preview of the preamble
-    const getPreambleText = () => {
-        const temp = document.createElement('div');
-        temp.innerHTML = preamble;
-        const text = temp.textContent || temp.innerText || '';
-        return text.trim();
-    };
-
-    const preambleText = getPreambleText();
-    const cleanPreambleSnippet = preambleText.length > 120 
-        ? preambleText.substring(0, 120) + '...' 
-        : preambleText;
-
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4" onClick={onClose}>
-            <div className={`p-6 rounded-lg shadow-xl w-full max-w-lg ${themeClasses.bgSecondary} ${themeClasses.text} border ${themeClasses.border} flex flex-col max-h-[85vh]`} onClick={e => e.stopPropagation()}>
-                <h2 className={`text-2xl font-bold mb-2 ${themeClasses.accentText}`}>
-                    {t.importFromDocx || 'Import from DOCX'}
-                </h2>
-                <p className={`text-sm mb-4 ${themeClasses.textSecondary}`}>
-                    File: <span className="font-semibold text-emerald-500">{fileName}</span>
-                </p>
-
-                {/* Content area */}
-                <div className="flex-1 overflow-y-auto mb-6 space-y-4 pr-1">
-                    {/* Chapter options */}
-                    <div className={`p-4 rounded-lg border ${themeClasses.border} ${themeClasses.bgTertiary}`}>
-                        <label className="flex items-start space-x-3 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={overwriteChapters}
-                                onChange={(e) => setOverwriteChapters(e.target.checked)}
-                                className="mt-1 accent-emerald-500 rounded cursor-pointer w-4 h-4"
-                            />
-                            <div>
-                                <span className="font-bold text-sm">Replace existing chapters</span>
-                                <p className={`text-xs mt-1 ${themeClasses.textSecondary}`}>
-                                    If checked, this novel's current chapters will be fully replaced. If unchecked, the new chapters will be appended to the end of the book.
-                                </p>
-                            </div>
-                        </label>
-                    </div>
-
-                    {/* Description options */}
-                    {preambleText && (
-                        <div className={`p-4 rounded-lg border ${themeClasses.border} ${themeClasses.bgTertiary}`}>
-                            <label className="flex items-start space-x-3 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={overwriteDescription}
-                                    onChange={(e) => setOverwriteDescription(e.target.checked)}
-                                    className="mt-1 accent-emerald-500 rounded cursor-pointer w-4 h-4"
-                                />
-                                <div>
-                                    <span className="font-bold text-sm">Update novel description</span>
-                                    <p className={`text-xs mt-1 mb-2 ${themeClasses.textSecondary}`}>
-                                        Introductory text was detected before your first chapter heading. Check this to update the novel's main description with this text.
-                                    </p>
-                                    <div className={`p-2 rounded text-xs italic ${themeClasses.bgSecondary} border ${themeClasses.border} ${themeClasses.textSecondary}`}>
-                                        "{cleanPreambleSnippet}"
-                                    </div>
-                                </div>
-                            </label>
-                        </div>
-                    )}
-
-                    {/* Detected chapters */}
-                    <div>
-                        <h3 className="text-sm font-bold uppercase tracking-wider mb-2">
-                            Detected Chapters ({chapters.length})
-                        </h3>
-                        <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                            {chapters.map((ch, idx) => (
-                                <div key={idx} className={`p-2.5 rounded-md border flex justify-between items-center text-sm ${themeClasses.bgTertiary} ${themeClasses.border}`}>
-                                    <span className="font-semibold truncate pr-2">{ch.title}</span>
-                                    <span className={`text-xs flex-shrink-0 px-2 py-0.5 rounded-full ${themeClasses.bgSecondary} ${themeClasses.textSecondary}`}>
-                                        {ch.wordCount.toLocaleString()} words
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Footer buttons */}
-                <div className="flex space-x-3 justify-end pt-4 border-t border-white/10">
-                    <button
-                        onClick={onClose}
-                        className={`px-4 py-2 rounded-lg font-semibold border ${themeClasses.border} hover:opacity-85 transition-opacity`}
-                    >
-                        {t.cancel}
-                    </button>
-                    <button
-                        onClick={() => onConfirm({ overwriteChapters, overwriteDescription })}
-                        className={`px-4 py-2 rounded-lg font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors`}
-                    >
-                        {t.confirm}
-                    </button>
-                </div>
-            </div>
         </div>
     );
 };

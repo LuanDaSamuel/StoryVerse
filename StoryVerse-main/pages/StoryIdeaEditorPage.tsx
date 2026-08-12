@@ -330,15 +330,37 @@ const StoryIdeaEditorPage = () => {
         });
     }, [ideaIndex, setProjectData]);
 
+    const inputDebounceTimeout = React.useRef<number | null>(null);
+
+    const flushInputChanges = React.useCallback(() => {
+        if (inputDebounceTimeout.current !== null) {
+            window.clearTimeout(inputDebounceTimeout.current);
+            inputDebounceTimeout.current = null;
+        }
+        if (editorContentRef.current !== null) {
+            updateStoryIdea({ synopsis: editorContentRef.current });
+        }
+    }, [updateStoryIdea]);
+
     const cleanupEditor = React.useCallback(() => {
         if (!editorRef.current) return;
         const editor = editorRef.current;
     
-        // 1. Remove empty inline elements.
+        // 1. Clean up zero-width space (\u200B) in text nodes when other text content exists
+        const walkTextNodes = (node: Node) => {
+            if (node.nodeType === Node.TEXT_NODE && node.nodeValue && node.nodeValue.length > 1 && node.nodeValue.includes('\u200B')) {
+                node.nodeValue = node.nodeValue.replace(/\u200B/g, '');
+            } else if (node.nodeType === Node.ELEMENT_NODE) {
+                node.childNodes.forEach(walkTextNodes);
+            }
+        };
+        walkTextNodes(editor);
+
+        // 2. Remove empty inline elements.
         for (let i = 0; i < 3; i++) {
             let changed = false;
             editor.querySelectorAll('span, strong, em, i, b').forEach(el => {
-                if (!el.hasChildNodes() || el.textContent === '\u200B') {
+                if (!el.hasChildNodes() || el.textContent === '\u200B' || el.textContent === '') {
                     el.remove();
                     changed = true;
                 }
@@ -760,7 +782,15 @@ const StoryIdeaEditorPage = () => {
     const handleEditorInput = (e: React.FormEvent<HTMLDivElement>) => {
         const newHTML = e.currentTarget.innerHTML;
         editorContentRef.current = newHTML;
-        updateStoryIdea({ synopsis: newHTML });
+
+        if (inputDebounceTimeout.current !== null) {
+            window.clearTimeout(inputDebounceTimeout.current);
+        }
+        inputDebounceTimeout.current = window.setTimeout(() => {
+            if (editorContentRef.current !== null) {
+                updateStoryIdea({ synopsis: editorContentRef.current });
+            }
+        }, 200);
     };
 
     const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
@@ -950,7 +980,10 @@ const StoryIdeaEditorPage = () => {
                             onInput={handleEditorInput}
                             onKeyDown={handleKeyDown}
                             onPaste={handlePaste}
-                            onBlur={cleanupEditor}
+                            onBlur={() => {
+                                cleanupEditor();
+                                flushInputChanges();
+                            }}
                             className="w-full leading-relaxed outline-none story-content"
                             style={editorStyle}
                         />

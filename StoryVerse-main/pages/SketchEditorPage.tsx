@@ -176,10 +176,30 @@ const SketchEditorPage = () => {
         });
     }, [novelIndex, sketchIndex, setProjectData]);
 
+    const inputDebounceTimeout = React.useRef<number | null>(null);
+
+    const flushInputChanges = React.useCallback(() => {
+        if (inputDebounceTimeout.current !== null) {
+            window.clearTimeout(inputDebounceTimeout.current);
+            inputDebounceTimeout.current = null;
+        }
+        if (editorContentRef.current !== null) {
+            updateSketch({ content: editorContentRef.current });
+        }
+    }, [updateSketch]);
+
     const handleEditorInput = (e: React.FormEvent<HTMLDivElement>) => {
         const newHTML = e.currentTarget.innerHTML;
         editorContentRef.current = newHTML;
-        updateSketch({ content: newHTML });
+
+        if (inputDebounceTimeout.current !== null) {
+            window.clearTimeout(inputDebounceTimeout.current);
+        }
+        inputDebounceTimeout.current = window.setTimeout(() => {
+            if (editorContentRef.current !== null) {
+                updateSketch({ content: editorContentRef.current });
+            }
+        }, 200);
     };
     
     const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -417,7 +437,7 @@ const SketchEditorPage = () => {
                     </div>
                     <div className="px-8 md:px-16 lg:px-24 pt-8 pb-48">
                         <input type="text" value={sketch.title} onChange={e => updateSketch({ title: e.target.value })} onBlur={(e) => updateSketch({ title: enhancePlainText(e.target.value) })} placeholder={t.sketchTitlePlaceholder} className="text-4xl font-bold bg-transparent outline-none w-full mb-8" />
-                        <div ref={editorRef} contentEditable spellCheck={true} suppressContentEditableWarning onInput={handleEditorInput} onKeyDown={handleKeyDown} onPaste={handlePaste} className="w-full leading-relaxed outline-none story-content" style={{ fontSize: `${projectData?.settings?.baseFontSize || 18}px` }}/>
+                        <div ref={editorRef} contentEditable spellCheck={true} suppressContentEditableWarning onInput={handleEditorInput} onKeyDown={handleKeyDown} onPaste={handlePaste} onBlur={flushInputChanges} className="w-full leading-relaxed outline-none story-content" style={{ fontSize: `${projectData?.settings?.baseFontSize || 18}px` }}/>
                     </div>
                 </div>
                 <div className={`fixed top-0 right-0 h-full z-40 transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>

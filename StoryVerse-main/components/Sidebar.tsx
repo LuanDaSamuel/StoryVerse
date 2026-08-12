@@ -59,10 +59,10 @@ const Sidebar = ({ onLinkClick = () => {} }: SidebarProps) => {
     return (
         <>
             <div className={`flex flex-col w-60 h-full ${themeClasses.bgSecondary} ${sidebarTextColor} border-r ${themeClasses.border}`}>
-                <div className="flex items-center justify-center h-16 px-6 border-b border-inherit flex-shrink-0">
+                <NavLink to="/" onClick={onLinkClick} className="flex items-center justify-center h-16 px-6 border-b border-inherit flex-shrink-0 hover:opacity-80 transition-opacity">
                     <AppLogoIcon className={`w-8 h-8 mr-3 ${themeClasses.logoColor}`} />
                     <span className="text-xl font-bold">StoryVerse</span>
-                </div>
+                </NavLink>
                 <nav className="flex-1 p-4 space-y-2">
                     <NavLink to="/" className={navLinkClasses} onClick={onLinkClick}>
                         <HomeIcon className="w-5 h-5" />

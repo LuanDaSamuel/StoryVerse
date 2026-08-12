@@ -40,7 +40,10 @@ export const SKETCH_TAG_OPTIONS: string[] = [
 function applyTypographicReplacements(text: string): string {
     if (!text) return text;
 
-    return text
+    // Remove zero-width spaces that can get embedded and stick words together
+    const cleanText = text.replace(/\u200B/g, '');
+
+    return cleanText
         .replace(/\.\.\./g, '…')
         .replace(/--/g, '—')
         // Handle common English contractions and possessives first to ensure apostrophes are curly.
@@ -49,9 +52,9 @@ function applyTypographicReplacements(text: string): string {
         .replace(/([a-zA-Z\u00C0-\u017F])'(\s|$)/g, '$1’$2')
         // Handle opening quotes. 
         // A quote is "opening" if it follows whitespace, specific brackets, or start of string.
-        .replace(/(^|[\s\[\(\{\u200B])"/g, '$1“')
+        .replace(/(^|[\s\[\(\{])"/g, '$1“')
         .replace(/"/g, '”')
-        .replace(/(^|[\s\[\(\{\u200B])'/g, '$1‘')
+        .replace(/(^|[\s\[\(\{])'/g, '$1‘')
         .replace(/'/g, '’');
 }
 

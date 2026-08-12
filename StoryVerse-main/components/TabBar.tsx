@@ -102,14 +102,26 @@ export const TabBar: React.FC<TabBarProps> = ({ onToggleSidebar }) => {
         openTab,
         popOutTab,
         reattachTab,
+        reorderTabs,
         isPopoutWindow,
         popoutTabId
     } = React.useContext(TabContext);
 
     const { theme, themeClasses } = React.useContext(ProjectContext);
     const tabsContainerRef = React.useRef<HTMLDivElement>(null);
+    const [draggedIndex, setDraggedIndex] = React.useState<number | null>(null);
+    const [dragOverIndex, setDragOverIndex] = React.useState<number | null>(null);
 
     const isDark = theme === 'dark';
+
+    const handleGoHome = React.useCallback(() => {
+        const homeTab = tabs.find(t => t.path === '/');
+        if (homeTab) {
+            selectTab(homeTab.id);
+        } else {
+            openTab({ path: '/', title: 'Home', iconType: 'home', select: true });
+        }
+    }, [tabs, selectTab, openTab]);
 
     // If inside a popped-out window, render a specialized window header
     if (isPopoutWindow) {
@@ -159,10 +171,16 @@ export const TabBar: React.FC<TabBarProps> = ({ onToggleSidebar }) => {
                         <Bars3Icon className="w-5 h-5" />
                     </button>
                 )}
-                <div className="hidden sm:flex items-center space-x-2 px-2 py-1 font-bold text-sm text-slate-700 dark:text-slate-200">
+                <button
+                    onClick={handleGoHome}
+                    className={`flex items-center space-x-2 px-2 py-1 font-bold text-sm text-slate-700 dark:text-slate-200 rounded-lg transition-colors cursor-pointer ${
+                        isDark ? 'hover:bg-slate-800' : 'hover:bg-amber-100/70'
+                    }`}
+                    title="Go to Home"
+                >
                     <AppLogoIcon className={`w-5 h-5 ${themeClasses.logoColor}`} />
                     <span className="tracking-tight hidden md:inline">StoryVerse</span>
-                </div>
+                </button>
             </div>
 
             {/* Scrollable Tabs Bar */}
@@ -170,14 +188,50 @@ export const TabBar: React.FC<TabBarProps> = ({ onToggleSidebar }) => {
                 ref={tabsContainerRef}
                 className="flex-1 flex items-center space-x-1 overflow-x-auto scrollbar-none py-0.5 px-1 min-w-0"
             >
-                {tabs.map((tab) => {
+                {tabs.map((tab, index) => {
                     const isActive = tab.id === activeTabId;
+                    const isBeingDragged = draggedIndex === index;
+                    const isTargetOfDrag = dragOverIndex === index && draggedIndex !== index;
 
                     return (
                         <div
                             key={tab.id}
+                            draggable
+                            onDragStart={(e) => {
+                                e.dataTransfer.effectAllowed = 'move';
+                                e.dataTransfer.setData('text/plain', index.toString());
+                                setDraggedIndex(index);
+                            }}
+                            onDragOver={(e) => {
+                                e.preventDefault();
+                                e.dataTransfer.dropEffect = 'move';
+                                if (dragOverIndex !== index) {
+                                    setDragOverIndex(index);
+                                }
+                            }}
+                            onDragLeave={() => {
+                                if (dragOverIndex === index) {
+                                    setDragOverIndex(null);
+                                }
+                            }}
+                            onDrop={(e) => {
+                                e.preventDefault();
+                                if (draggedIndex !== null && draggedIndex !== index) {
+                                    reorderTabs(draggedIndex, index);
+                                }
+                                setDraggedIndex(null);
+                                setDragOverIndex(null);
+                            }}
+                            onDragEnd={() => {
+                                setDraggedIndex(null);
+                                setDragOverIndex(null);
+                            }}
                             onClick={() => selectTab(tab.id)}
-                            className={`group relative flex items-center space-x-2 px-3 py-1.5 text-xs font-medium rounded-t-lg transition-all duration-150 cursor-pointer max-w-[200px] border-t border-x ${
+                            className={`group relative flex items-center space-x-2 px-3 py-1.5 text-xs font-medium rounded-t-lg transition-all duration-150 cursor-grab active:cursor-grabbing max-w-[200px] border-t border-x select-none ${
+                                isBeingDragged ? 'opacity-40 scale-95' : ''
+                            } ${
+                                isTargetOfDrag ? 'ring-2 ring-amber-500 scale-[1.02] z-10' : ''
+                            } ${
                                 isActive
                                     ? isDark
                                         ? 'bg-slate-900 text-amber-400 border-slate-700 shadow-xs'
@@ -186,6 +240,7 @@ export const TabBar: React.FC<TabBarProps> = ({ onToggleSidebar }) => {
                                         ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border-transparent'
                                         : 'text-slate-600 hover:text-slate-900 hover:bg-amber-100/50 border-transparent'
                             }`}
+                            title={`${tab.title} (Drag to rearrange)`}
                         >
                             {/* Icon */}
                             {getTabIcon(tab.iconType)}
