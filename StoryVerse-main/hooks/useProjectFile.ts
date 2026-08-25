@@ -3,6 +3,7 @@ import * as React from 'react';
 import { ProjectData, StorageStatus, Theme, StoryIdeaStatus, NovelSketch, UserProfile, SaveStatus, Language, WritingMode } from '../types';
 import { get, set, del } from 'idb-keyval';
 import { useProjectStorage, PermanentAuthError } from './useProjectStorage';
+import { enforceProjectDataLimits, DATA_LIMITS } from '../utils/dataLimiter';
 
 // --- Constants ---
 const LOCAL_BACKUP_KEY = 'storyverse-local-backup';
@@ -22,95 +23,7 @@ const defaultProjectData: ProjectData = {
 
 // --- Helper Functions ---
 const sanitizeProjectData = (data: any): ProjectData => {
-  const sanitized = JSON.parse(JSON.stringify(defaultProjectData));
-  
-  if (data?.settings) {
-    if (['dark', 'book'].includes(data.settings.theme)) {
-      sanitized.settings.theme = data.settings.theme as Theme;
-    }
-    if (typeof data.settings.baseFontSize === 'number') {
-      sanitized.settings.baseFontSize = data.settings.baseFontSize;
-    }
-    if (['en', 'vi', 'fi', 'sv'].includes(data.settings.language)) {
-        sanitized.settings.language = data.settings.language as Language;
-    }
-    if (['standard', 'book-note'].includes(data.settings.writingMode)) {
-        sanitized.settings.writingMode = data.settings.writingMode as WritingMode;
-    }
-  }
-
-  if (data?.dailyGoal) {
-      sanitized.dailyGoal = {
-          target: typeof data.dailyGoal.target === 'number' ? data.dailyGoal.target : 500,
-          current: typeof data.dailyGoal.current === 'number' ? data.dailyGoal.current : 0,
-          lastUpdated: typeof data.dailyGoal.lastUpdated === 'string' ? data.dailyGoal.lastUpdated : new Date().toISOString().split('T')[0]
-      };
-  }
-
-  if (Array.isArray(data?.userDictionary)) {
-      sanitized.userDictionary = data.userDictionary.filter((w: any) => typeof w === 'string');
-  }
-
-  if (Array.isArray(data?.novels)) {
-    sanitized.novels = data.novels.map((novel: any) => ({
-      id: novel.id || crypto.randomUUID(),
-      title: novel.title || 'Untitled Novel',
-      description: novel.description || '',
-      coverImage: novel.coverImage,
-      tags: Array.isArray(novel.tags) ? novel.tags : [],
-      chapters: Array.isArray(novel.chapters)
-        ? novel.chapters.map((chapter: any) => ({
-            id: chapter.id || crypto.randomUUID(),
-            title: chapter.title || 'Untitled Chapter',
-            content: chapter.content || '',
-            wordCount: typeof chapter.wordCount === 'number' ? chapter.wordCount : 0,
-            createdAt: chapter.createdAt || new Date().toISOString(),
-            updatedAt: chapter.updatedAt || new Date().toISOString(),
-            history: Array.isArray(chapter.history) ? chapter.history : [],
-          }))
-        : [],
-      sketches: Array.isArray(novel.sketches)
-        ? novel.sketches.map((sketch: any): NovelSketch => ({
-            id: sketch.id || crypto.randomUUID(),
-            title: sketch.title || 'Untitled Sketch',
-            content: sketch.content || '',
-            wordCount: typeof sketch.wordCount === 'number' ? sketch.wordCount : 0,
-            tags: Array.isArray(sketch.tags) ? sketch.tags : [],
-            createdAt: sketch.createdAt || new Date().toISOString(),
-            updatedAt: sketch.updatedAt || new Date().toISOString(),
-          }))
-        : [],
-      createdAt: novel.createdAt || new Date().toISOString(),
-    }));
-  }
-
-  if (Array.isArray(data?.ideaFolders)) {
-    sanitized.ideaFolders = data.ideaFolders.map((folder: any) => ({
-        id: folder.id || crypto.randomUUID(),
-        name: folder.name || 'Untitled Folder',
-        createdAt: folder.createdAt || new Date().toISOString(),
-    }));
-  }
-
-  if (Array.isArray(data?.storyIdeas)) {
-    sanitized.storyIdeas = data.storyIdeas.map((idea: any) => {
-      const validStatuses: StoryIdeaStatus[] = ['Seedling', 'Developing', 'Archived'];
-      const status = validStatuses.includes(idea.status) ? idea.status : 'Seedling';
-      return {
-        id: idea.id || crypto.randomUUID(),
-        title: idea.title || 'Untitled Idea',
-        synopsis: idea.synopsis || '',
-        wordCount: typeof idea.wordCount === 'number' ? idea.wordCount : 0,
-        tags: Array.isArray(idea.tags) ? idea.tags : [],
-        status: status,
-        folderId: idea.folderId || null,
-        visitCount: typeof idea.visitCount === 'number' ? idea.visitCount : 0,
-        createdAt: idea.createdAt || new Date().toISOString(),
-        updatedAt: idea.updatedAt || new Date().toISOString(),
-      };
-    });
-  }
-  return sanitized;
+  return enforceProjectDataLimits(data);
 };
 
 
@@ -314,17 +227,27 @@ export function useProject() {
     });
   }, []);
 
+  const broadcastDebounceTimeoutRef = React.useRef<number | null>(null);
+
   const setProjectDataAndMarkDirty = React.useCallback((updater: React.SetStateAction<ProjectData | null>) => {
     setProjectData(prevData => {
         const newData = typeof updater === 'function' ? updater(prevData) : updater;
         projectDataRef.current = newData;
         isDirtyRef.current = true;
+        
+        // Debounce BroadcastChannel transmission to avoid redundant structured cloning on rapid keystrokes
         if (newData && broadcastChannelRef.current) {
-            broadcastChannelRef.current.postMessage({ type: 'PROJECT_DATA_REMOTE_UPDATE', data: newData });
+            if (broadcastDebounceTimeoutRef.current) clearTimeout(broadcastDebounceTimeoutRef.current);
+            broadcastDebounceTimeoutRef.current = window.setTimeout(() => {
+                try {
+                    broadcastChannelRef.current?.postMessage({ type: 'PROJECT_DATA_REMOTE_UPDATE', data: projectDataRef.current });
+                } catch (e) {
+                    console.warn("BroadcastChannel postMessage failed:", e);
+                }
+            }, 600);
         }
         return newData;
     });
-
 
     if (!isSavingRef.current) setSaveStatus('unsaved');
 
@@ -334,8 +257,12 @@ export function useProject() {
         localStorageBackupTimeoutRef.current = window.setTimeout(() => {
             try {
                 if (projectDataRef.current) {
-                     localStorage.setItem(LOCAL_UNLOAD_BACKUP_KEY, JSON.stringify(projectDataRef.current));
-                     localStorage.setItem(LOCAL_UNLOAD_BACKUP_TIMESTAMP_KEY, Date.now().toString());
+                     const jsonString = JSON.stringify(projectDataRef.current);
+                     // Guard against localStorage 5MB browser quota and memory lockup
+                     if (jsonString.length <= DATA_LIMITS.LOCAL_STORAGE_WRITE_LIMIT_BYTES) {
+                         localStorage.setItem(LOCAL_UNLOAD_BACKUP_KEY, jsonString);
+                         localStorage.setItem(LOCAL_UNLOAD_BACKUP_TIMESTAMP_KEY, Date.now().toString());
+                     }
                 }
             } catch (e) { console.error("Unload backup failed", e); }
         }, 2000); 

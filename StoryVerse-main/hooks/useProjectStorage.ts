@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
 import { ProjectData, UserProfile } from '../types';
+import { enforceProjectDataLimits } from '../utils/dataLimiter';
 
 // --- Constants ---
 const PROJECT_FILE_HANDLE_KEY = 'storyverse-project-file-handle';
@@ -194,14 +195,15 @@ export function useProjectStorage() {
         }
         console.log(`File metadata created with ID: ${fileId}`);
         
-        // Step 2: Upload content
+        // Step 2: Upload content with data limits enforced
+        const safeData = enforceProjectDataLimits(data);
         const uploadResponse = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
             method: 'PATCH',
             headers: {
                 'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(data)
+            body: JSON.stringify(safeData)
         });
 
         if (!uploadResponse.ok) {
@@ -255,13 +257,14 @@ export function useProjectStorage() {
             }
 
             console.log(`Initiating upload for Drive file: ${fileId} via fetch`);
+            const safeData = enforceProjectDataLimits(data);
             const response = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
                 method: 'PATCH',
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(data)
+                body: JSON.stringify(safeData)
             });
     
             if (response.ok) {

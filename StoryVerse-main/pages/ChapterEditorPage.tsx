@@ -565,15 +565,17 @@ const ChapterEditorPage = () => {
                 }
 
                 const FIVE_MINUTES = 5 * 60 * 1000;
-                const shouldCreateHistory = now.getTime() - new Date(originalChapter.updatedAt).getTime() > FIVE_MINUTES;
+                const lastHistoryContent = originalChapter.history?.[0]?.content;
+                const hasSignificantContentDiff = !lastHistoryContent || Math.abs(originalChapter.content.length - lastHistoryContent.length) > 20 || originalChapter.content !== lastHistoryContent;
+                const shouldCreateHistory = (now.getTime() - new Date(originalChapter.updatedAt).getTime() > FIVE_MINUTES) && hasSignificantContentDiff && originalChapter.content.trim().length > 0;
 
                 if (shouldCreateHistory) {
                     const newHistoryEntry = {
                         timestamp: originalChapter.updatedAt,
                         content: originalChapter.content,
                     };
-                    // Cap chapter edit history to 20 entries to prevent infinite memory growth
-                    const maxHistoryEntries = 20;
+                    // Cap chapter edit history to 5 entries to prevent out-of-memory errors
+                    const maxHistoryEntries = 5;
                     const cleanHistory = (originalChapter.history || []).slice(0, maxHistoryEntries - 1);
                     updatedChapter.history = [newHistoryEntry, ...cleanHistory];
                 }

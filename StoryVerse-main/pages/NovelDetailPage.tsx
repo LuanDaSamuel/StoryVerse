@@ -11,6 +11,7 @@ import ExportModal from '../components/ExportModal';
 import { useTranslations } from '../hooks/useTranslations';
 import { useTabTitle } from '../hooks/useTabTitle';
 import * as mammoth from 'mammoth';
+import { optimizeCoverImage } from '../utils/imageOptimizer';
 
 interface ImportDocxModalProps {
     isOpen: boolean;
@@ -251,20 +252,24 @@ const NovelDetailPage = () => {
         );
     }
     
-    const handleCoverImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleCoverImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file && novelIndex !== -1) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setProjectData(currentData => {
-                    if (!currentData) return null;
-                    const updatedNovels = [...currentData.novels];
-                    if (novelIndex >= updatedNovels.length) return currentData;
-                    updatedNovels[novelIndex].coverImage = reader.result as string;
-                    return { ...currentData, novels: updatedNovels };
-                });
-            };
-            reader.readAsDataURL(file);
+            try {
+                const optimizedBase64 = await optimizeCoverImage(file);
+                if (optimizedBase64) {
+                    setProjectData(currentData => {
+                        if (!currentData) return null;
+                        const updatedNovels = [...currentData.novels];
+                        if (novelIndex >= updatedNovels.length) return currentData;
+                        updatedNovels[novelIndex].coverImage = optimizedBase64;
+                        return { ...currentData, novels: updatedNovels };
+                    });
+                }
+            } catch (err: any) {
+                console.error("Failed to optimize cover image:", err);
+                alert(err?.message || "Failed to process image. Please try a different image.");
+            }
         }
     };
 
