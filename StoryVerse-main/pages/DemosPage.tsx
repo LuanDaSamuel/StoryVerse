@@ -5,7 +5,7 @@ import { StoryIdea, IdeaFolder } from '../types';
 import { PlusIcon, UploadIcon, BackIcon, TrashIcon, FolderIcon, PencilIcon, ChevronLeftIcon, SparklesIcon, TextIcon, DownloadIcon } from '../components/Icons';
 import ConfirmModal from '../components/ConfirmModal';
 import { enhancePlainText } from '../constants';
-import * as mammoth from 'mammoth';
+import { parseDocxToHtml } from '../utils/docxParser';
 import { useTranslations } from '../hooks/useTranslations';
 import { useTabTitle } from '../hooks/useTabTitle';
 import { downloadAsHtml } from '../utils/htmlExport';
@@ -186,25 +186,7 @@ const DemosPage = () => {
 
         try {
             const arrayBuffer = await file.arrayBuffer();
-            
-            // Safe Mammoth Resolution
-            // @ts-ignore
-            const mammothLib = mammoth.default || mammoth;
-             
-            if (!mammothLib || typeof mammothLib.convertToHtml !== 'function') {
-                 throw new Error("The DOCX processing library could not be loaded.");
-            }
-
-            const styleMap = [
-                "p[style-name='Title'] => h1:fresh",
-                "p[style-name='Subtitle'] => h2:fresh",
-                "p[style-name='Heading 1'] => h2:fresh",
-                "p[style-name='Heading 2'] => h3:fresh",
-                "p[style-name='Heading 3'] => h4:fresh",
-                "p[style-name='Heading 4'] => h5:fresh",
-                "p[style-name='Heading 5'] => h6:fresh",
-            ];
-            const { value: html } = await mammothLib.convertToHtml({ arrayBuffer }, { styleMap });
+            const html = await parseDocxToHtml(arrayBuffer);
             
             const tempDiv = document.createElement('div');
             // Clean up empty paragraphs

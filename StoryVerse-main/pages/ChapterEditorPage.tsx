@@ -4,6 +4,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { BackIcon, BookOpenIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, TextIcon, SearchIcon, BoldIcon, ItalicIcon, UndoIcon, RedoIcon, CloseIcon, Bars3Icon, DownloadIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, LoadingIcon, CheckIcon, ExclamationTriangleIcon, ClipboardIcon, PlusIcon, PencilIcon } from '../components/Icons';
 import { enhancePlainText, enhanceHtml, THEME_CONFIG } from '../constants';
+import { DATA_LIMITS } from '../utils/dataLimiter';
 import ExportModal from '../components/ExportModal';
 import { useTranslations } from '../hooks/useTranslations';
 import { useTabTitle } from '../hooks/useTabTitle';
@@ -574,8 +575,8 @@ const ChapterEditorPage = () => {
                         timestamp: originalChapter.updatedAt,
                         content: originalChapter.content,
                     };
-                    // Cap chapter edit history to 5 entries to prevent out-of-memory errors
-                    const maxHistoryEntries = 5;
+                    // Cap chapter edit history to prevent out-of-memory errors
+                    const maxHistoryEntries = DATA_LIMITS.MAX_HISTORY_ENTRIES_PER_CHAPTER;
                     const cleanHistory = (originalChapter.history || []).slice(0, maxHistoryEntries - 1);
                     updatedChapter.history = [newHistoryEntry, ...cleanHistory];
                 }
@@ -1254,7 +1255,7 @@ const ChapterEditorPage = () => {
         const newHTML = e.currentTarget.innerHTML;
         editorContentRef.current = newHTML;
 
-        // Debounce state synchronization to eliminate typing lag
+        // Debounce state synchronization to eliminate typing lag and memory churn
         if (inputDebounceTimeout.current !== null) {
             window.clearTimeout(inputDebounceTimeout.current);
         }
@@ -1262,7 +1263,7 @@ const ChapterEditorPage = () => {
             if (editorContentRef.current !== null) {
                 updateChapterField('content', editorContentRef.current);
             }
-        }, 200);
+        }, 650);
     };
 
     const handleCopyContent = React.useCallback(async () => {

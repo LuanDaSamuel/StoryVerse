@@ -4,7 +4,7 @@
  * during serialization, BroadcastChannel synchronization, and Google Drive cloud sync.
  */
 
-export const MAX_COVER_IMAGE_BYTES = 350 * 1024; // 350 KB ceiling for base64 image data
+export const MAX_COVER_IMAGE_BYTES = 120 * 1024; // 120 KB ceiling for base64 image data
 export const MAX_UPLOAD_FILE_BYTES = 15 * 1024 * 1024; // 15 MB raw upload limit
 
 /**
@@ -18,13 +18,13 @@ export function isBase64ImageOversized(base64Str?: string | null, maxBytes: numb
 
 /**
  * Resizes and compresses an image (File, Blob, or base64 data URL) into an optimized
- * JPEG/WebP base64 string with reasonable dimensions (default max: 800x1200, quality 0.82).
+ * JPEG/WebP base64 string with reasonable dimensions (default max: 480x720, quality 0.74).
  */
 export async function optimizeCoverImage(
     source: File | Blob | string,
-    maxWidth: number = 800,
-    maxHeight: number = 1200,
-    quality: number = 0.82
+    maxWidth: number = 480,
+    maxHeight: number = 720,
+    quality: number = 0.74
 ): Promise<string> {
     // If source is already a small base64 string, keep it to save compute
     if (typeof source === 'string') {
@@ -32,8 +32,8 @@ export async function optimizeCoverImage(
             // Invalid data URL format
             return '';
         }
-        if (!isBase64ImageOversized(source, 150 * 1024)) {
-            // Under 150KB, safe to use as-is
+        if (!isBase64ImageOversized(source, 80 * 1024)) {
+            // Under 80KB, safe to use as-is
             return source;
         }
     } else if (source instanceof File || source instanceof Blob) {

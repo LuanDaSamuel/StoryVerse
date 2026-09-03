@@ -10,8 +10,8 @@ import NovelHistoryPage from '../components/NovelHistoryPage';
 import ExportModal from '../components/ExportModal';
 import { useTranslations } from '../hooks/useTranslations';
 import { useTabTitle } from '../hooks/useTabTitle';
-import * as mammoth from 'mammoth';
 import { optimizeCoverImage } from '../utils/imageOptimizer';
+import { parseDocxToHtml } from '../utils/docxParser';
 
 interface ImportDocxModalProps {
     isOpen: boolean;
@@ -279,26 +279,7 @@ const NovelDetailPage = () => {
 
         try {
             const arrayBuffer = await file.arrayBuffer();
-            
-            // Safe Mammoth Resolution
-            // @ts-ignore
-            const mammothLib = mammoth.default || mammoth;
-             
-            if (!mammothLib || typeof mammothLib.convertToHtml !== 'function') {
-                 throw new Error("The DOCX processing library could not be loaded.");
-            }
-
-            const styleMap = [
-                "p[style-name='Title'] => h1:fresh",
-                "p[style-name='Subtitle'] => h2:fresh",
-                "p[style-name='Heading 1'] => h1:fresh",
-                "p[style-name='Heading 2'] => h2:fresh",
-                "p[style-name='Heading 3'] => h3:fresh",
-                "p[style-name='Heading 4'] => h4:fresh",
-                "p[style-name='Heading 5'] => h5:fresh",
-                "p[style-name='Heading 6'] => h6:fresh",
-            ];
-            const { value: html } = await mammothLib.convertToHtml({ arrayBuffer }, { styleMap });
+            const html = await parseDocxToHtml(arrayBuffer);
             
             const tempDiv = document.createElement('div');
             // Clean up empty paragraphs

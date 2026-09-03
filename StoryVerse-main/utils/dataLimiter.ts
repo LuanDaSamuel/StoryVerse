@@ -10,8 +10,8 @@ export const DATA_LIMITS = {
     MAX_NOVELS_COUNT: 50,
     MAX_CHAPTERS_PER_NOVEL: 200,
     MAX_CHAPTER_CONTENT_CHARS: 500_000, // ~100k words per chapter
-    MAX_HISTORY_ENTRIES_PER_CHAPTER: 5, // Reduced from 20 to prevent gigabyte memory spikes
-    MAX_HISTORY_ENTRY_CHARS: 250_000,
+    MAX_HISTORY_ENTRIES_PER_CHAPTER: 3, // Capped to 3 snapshots per chapter to prevent high heap usage
+    MAX_HISTORY_ENTRY_CHARS: 200_000,
     MAX_SKETCHES_PER_NOVEL: 100,
     MAX_SKETCH_CONTENT_CHARS: 300_000,
     MAX_IDEA_FOLDERS: 50,
@@ -22,7 +22,7 @@ export const DATA_LIMITS = {
     MAX_TAGS_COUNT: 15,
     MAX_TAG_CHARS: 40,
     MAX_DICTIONARY_WORDS: 2_000,
-    MAX_COVER_IMAGE_STRING_LENGTH: 450_000, // ~340KB
+    MAX_COVER_IMAGE_STRING_LENGTH: 160_000, // ~120KB ceiling for base64 cover images
     MAX_SAFE_PROJECT_JSON_BYTES: 12 * 1024 * 1024, // 12MB ceiling
     LOCAL_STORAGE_WRITE_LIMIT_BYTES: 2 * 1024 * 1024, // 2MB max for localStorage
 };
