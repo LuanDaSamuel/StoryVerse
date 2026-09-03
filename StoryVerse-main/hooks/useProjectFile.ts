@@ -4,12 +4,14 @@ import { ProjectData, StorageStatus, Theme, StoryIdeaStatus, NovelSketch, UserPr
 import { get, set, del } from 'idb-keyval';
 import { useProjectStorage, PermanentAuthError } from './useProjectStorage';
 import { enforceProjectDataLimits, DATA_LIMITS } from '../utils/dataLimiter';
+import { tabLeaderManager } from '../utils/tabLeaderManager';
 
 // --- Constants ---
 const LOCAL_BACKUP_KEY = 'storyverse-local-backup';
 const LOCAL_UNLOAD_BACKUP_KEY = 'storyverse-unload-backup';
 const LOCAL_UNLOAD_BACKUP_TIMESTAMP_KEY = 'storyverse-unload-backup-timestamp';
 const STORAGE_PREFERENCE_KEY = 'storyverse-storage-preference';
+const SHARED_ACTIVE_PROJECT_KEY = 'storyverse-shared-active-project';
 const isFileSystemAccessAPISupported = 'showOpenFilePicker' in window;
 
 const defaultProjectData: ProjectData = {
@@ -50,14 +52,61 @@ export function useProject() {
   const saveTimeoutRef = React.useRef<number | null>(null);
   const localStorageBackupTimeoutRef = React.useRef<number | null>(null);
   const broadcastChannelRef = React.useRef<BroadcastChannel | null>(null);
+  const needsSyncOnVisibleRef = React.useRef<boolean>(false);
 
   React.useEffect(() => {
     if ('BroadcastChannel' in window) {
       const channel = new BroadcastChannel('storyverse_project_data_sync');
       broadcastChannelRef.current = channel;
-      channel.onmessage = (event) => {
-        const { type, data } = event.data || {};
-        if (type === 'PROJECT_DATA_REMOTE_UPDATE' && data) {
+      channel.onmessage = async (event) => {
+        const { type, data, senderTabId } = event.data || {};
+
+        if (type === 'PROJECT_STATE_CHANGED_PING') {
+          // Ignore notifications originated from this tab
+          if (senderTabId === tabLeaderManager.tabId) return;
+
+          // If current tab is in the background, DO NOT deserialize or re-render.
+          // Simply flag that a refresh is needed when the user switches to this tab.
+          if (document.visibilityState === 'hidden') {
+            needsSyncOnVisibleRef.current = true;
+            return;
+          }
+
+          // If current tab is active and visible, pull fresh state from shared IndexedDB
+          try {
+            const shared = await get<ProjectData>(SHARED_ACTIVE_PROJECT_KEY);
+            if (shared) {
+              const safe = sanitizeProjectData(shared);
+              projectDataRef.current = safe;
+              setProjectData(safe);
+            }
+          } catch (e) {
+            console.warn("Cross-tab sync fetch failed:", e);
+          }
+        } else if (type === 'REQUEST_LEADER_CLOUD_SAVE') {
+          // Only the leader tab handles actual Google Drive cloud uploads
+          if (tabLeaderManager.isCurrentTabLeader()) {
+            try {
+              const shared = await get<ProjectData>(SHARED_ACTIVE_PROJECT_KEY);
+              if (shared) {
+                const safe = sanitizeProjectData(shared);
+                projectDataRef.current = safe;
+                setProjectData(safe);
+                isDirtyRef.current = true;
+                if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+                saveTimeoutRef.current = window.setTimeout(() => {
+                  saveProjectRef.current?.();
+                }, 400);
+              }
+            } catch (e) {
+              console.warn("Leader cloud save fetch failed:", e);
+            }
+          }
+        } else if (type === 'LEADER_CLOUD_SAVE_COMPLETED') {
+          if (!tabLeaderManager.isCurrentTabLeader()) {
+            setSaveStatus('saved');
+          }
+        } else if (type === 'PROJECT_DATA_REMOTE_UPDATE' && data) {
           projectDataRef.current = data;
           setProjectData(data);
         }
@@ -69,6 +118,19 @@ export function useProject() {
     }
   }, []);
 
+  // Listen to single-leader election changes
+  React.useEffect(() => {
+    const unsub = tabLeaderManager.onLeaderChange((leader) => {
+      if (leader && isDirtyRef.current) {
+        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = window.setTimeout(() => {
+          saveProjectRef.current?.();
+        }, 500);
+      }
+    });
+    return unsub;
+  }, []);
+
   
   const resetState = React.useCallback(() => {
     setProjectData(null);
@@ -78,6 +140,7 @@ export function useProject() {
     setSaveStatus('idle');
     isDirtyRef.current = false;
     localStorage.removeItem(STORAGE_PREFERENCE_KEY); 
+    del(SHARED_ACTIVE_PROJECT_KEY).catch(() => {});
   }, []);
 
   const flushChanges = React.useCallback(async () => {
@@ -124,6 +187,13 @@ export function useProject() {
                  break;
             }
 
+            // Update shared IndexedDB snapshot so all open tabs have access to latest state
+            try {
+                await set(SHARED_ACTIVE_PROJECT_KEY, dataToSave);
+            } catch (backupError) {
+                console.warn("Shared IDB update failed:", backupError);
+            }
+
             // ONLY save to local backup if NOT in cloud mode
             if (storageMode === 'local') {
                 try {
@@ -131,6 +201,19 @@ export function useProject() {
                 } catch (backupError) {
                     console.warn("Local IDB backup failed:", backupError);
                 }
+            }
+
+            // If in Google Drive mode and this tab is NOT the leader tab,
+            // delegate cloud saving to the leader tab to prevent multi-tab sync races & duplicate uploads!
+            if (storageMode === 'drive' && !tabLeaderManager.isCurrentTabLeader()) {
+                isDirtyRef.current = false;
+                setSaveStatus('saving');
+                broadcastChannelRef.current?.postMessage({
+                    type: 'REQUEST_LEADER_CLOUD_SAVE',
+                    senderTabId: tabLeaderManager.tabId,
+                    timestamp: Date.now()
+                });
+                break;
             }
 
             isDirtyRef.current = false;
@@ -165,6 +248,13 @@ export function useProject() {
                 // Always clear emergency backup on success regardless of mode
                 localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
                 localStorage.removeItem(LOCAL_UNLOAD_BACKUP_TIMESTAMP_KEY);
+
+                if (storageMode === 'drive') {
+                    broadcastChannelRef.current?.postMessage({
+                        type: 'LEADER_CLOUD_SAVE_COMPLETED',
+                        timestamp: Date.now()
+                    });
+                }
             } else {
                 throw lastError || new Error("Save operation failed");
             }
@@ -235,16 +325,23 @@ export function useProject() {
         projectDataRef.current = newData;
         isDirtyRef.current = true;
         
-        // Debounce BroadcastChannel transmission to avoid redundant structured cloning on rapid keystrokes
+        // Persist to shared IndexedDB and broadcast lightweight ping instead of cloning the entire project payload
         if (newData && broadcastChannelRef.current) {
             if (broadcastDebounceTimeoutRef.current) clearTimeout(broadcastDebounceTimeoutRef.current);
-            broadcastDebounceTimeoutRef.current = window.setTimeout(() => {
+            broadcastDebounceTimeoutRef.current = window.setTimeout(async () => {
                 try {
-                    broadcastChannelRef.current?.postMessage({ type: 'PROJECT_DATA_REMOTE_UPDATE', data: projectDataRef.current });
+                    if (projectDataRef.current) {
+                        await set(SHARED_ACTIVE_PROJECT_KEY, projectDataRef.current);
+                        broadcastChannelRef.current?.postMessage({
+                            type: 'PROJECT_STATE_CHANGED_PING',
+                            senderTabId: tabLeaderManager.tabId,
+                            timestamp: Date.now()
+                        });
+                    }
                 } catch (e) {
                     console.warn("BroadcastChannel postMessage failed:", e);
                 }
-            }, 600);
+            }, 350);
         }
         return newData;
     });
@@ -284,8 +381,25 @@ export function useProject() {
   }, [saveStatus]);
     
     React.useEffect(() => {
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === 'hidden') flushChanges();
+        const handleVisibilityChange = async () => {
+            if (document.visibilityState === 'hidden') {
+                flushChanges();
+            } else if (document.visibilityState === 'visible') {
+                // When tab becomes visible again, check if we missed any updates while hidden
+                if (needsSyncOnVisibleRef.current) {
+                    needsSyncOnVisibleRef.current = false;
+                    try {
+                        const shared = await get<ProjectData>(SHARED_ACTIVE_PROJECT_KEY);
+                        if (shared) {
+                            const safe = sanitizeProjectData(shared);
+                            projectDataRef.current = safe;
+                            setProjectData(safe);
+                        }
+                    } catch (e) {
+                        console.warn("Catch-up sync on visible failed:", e);
+                    }
+                }
+            }
         };
         document.addEventListener('visibilitychange', handleVisibilityChange);
         return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
@@ -298,6 +412,8 @@ export function useProject() {
         projectDataRef.current = sanitizedData;
         setProjectName(driveProject.name);
         setStatus('ready');
+        // Cache to shared IndexedDB so secondary tabs have instant access
+        set(SHARED_ACTIVE_PROJECT_KEY, sanitizedData).catch(() => {});
         // Aggressively clear local artifacts when cloud project is loaded
         del(LOCAL_BACKUP_KEY);
         localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
@@ -531,6 +647,7 @@ export function useProject() {
         await storage.clearHandleFromIdb();
     }
     await del(LOCAL_BACKUP_KEY);
+    await del(SHARED_ACTIVE_PROJECT_KEY);
     localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
     localStorage.removeItem(STORAGE_PREFERENCE_KEY);
     resetState();
