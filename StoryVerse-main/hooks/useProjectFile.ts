@@ -48,9 +48,8 @@ export function useProject() {
   const projectDataRef = React.useRef(projectData);
 
   const storage = useProjectStorage();
-  const saveProjectRef = React.useRef<(isExplicitFlush?: boolean) => Promise<void>>(async () => {});
+  const saveProjectRef = React.useRef<() => Promise<void>>(async () => {});
   const saveTimeoutRef = React.useRef<number | null>(null);
-  const lastCloudSaveTimeRef = React.useRef<number>(0);
   const localStorageBackupTimeoutRef = React.useRef<number | null>(null);
   const broadcastChannelRef = React.useRef<BroadcastChannel | null>(null);
   const needsSyncOnVisibleRef = React.useRef<boolean>(false);
@@ -149,7 +148,7 @@ export function useProject() {
         clearTimeout(saveTimeoutRef.current);
     }
     if (!isSavingRef.current && isDirtyRef.current) {
-      await saveProjectRef.current?.(true);
+      await saveProjectRef.current?.();
     }
     while (isSavingRef.current) {
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -172,22 +171,9 @@ export function useProject() {
         setStatus('welcome');
     }, [flushChanges, storage, resetState]);
 
-  const saveProject = React.useCallback(async (isExplicitFlush: boolean = false) => {
+  const saveProject = React.useCallback(async () => {
     if (isSavingRef.current) return;
     if (!isDirtyRef.current) return;
-
-    // Throttle cloud saving (Google Drive) to prevent excessive bandwidth and GC churn
-    if (storageMode === 'drive' && !isExplicitFlush) {
-        const timeSinceLastCloudSave = Date.now() - lastCloudSaveTimeRef.current;
-        const MIN_CLOUD_SAVE_INTERVAL_MS = 3500;
-        if (timeSinceLastCloudSave < MIN_CLOUD_SAVE_INTERVAL_MS) {
-            if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-            saveTimeoutRef.current = window.setTimeout(() => {
-                saveProjectRef.current?.();
-            }, MIN_CLOUD_SAVE_INTERVAL_MS - timeSinceLastCloudSave);
-            return;
-        }
-    }
 
     isSavingRef.current = true;
     setSaveStatus('saving');
@@ -264,7 +250,6 @@ export function useProject() {
                 localStorage.removeItem(LOCAL_UNLOAD_BACKUP_TIMESTAMP_KEY);
 
                 if (storageMode === 'drive') {
-                    lastCloudSaveTimeRef.current = Date.now();
                     broadcastChannelRef.current?.postMessage({
                         type: 'LEADER_CLOUD_SAVE_COMPLETED',
                         timestamp: Date.now()
@@ -325,13 +310,12 @@ export function useProject() {
       isDirtyRef.current = true;
       if (!isSavingRef.current) setSaveStatus('unsaved');
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-      const idleDebounce = storageMode === 'drive' ? 3500 : 1200;
       saveTimeoutRef.current = window.setTimeout(() => {
           saveProjectRef.current?.();
-      }, idleDebounce);
+      }, 350);
       return newData;
     });
-  }, [storageMode]);
+  }, []);
 
   const broadcastDebounceTimeoutRef = React.useRef<number | null>(null);
 
@@ -357,7 +341,7 @@ export function useProject() {
                 } catch (e) {
                     console.warn("BroadcastChannel postMessage failed:", e);
                 }
-            }, 350);
+            }, 300);
         }
         return newData;
     });
@@ -382,10 +366,9 @@ export function useProject() {
     }
 
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    const idleDebounce = storageMode === 'drive' ? 3500 : 1200;
     saveTimeoutRef.current = window.setTimeout(() => {
         saveProjectRef.current?.();
-    }, idleDebounce); 
+    }, 350); 
   }, [storageMode]);
 
   React.useEffect(() => {

@@ -1255,7 +1255,7 @@ const ChapterEditorPage = () => {
         const newHTML = e.currentTarget.innerHTML;
         editorContentRef.current = newHTML;
 
-        // Debounce state synchronization to eliminate typing lag and memory churn
+        // Debounce state synchronization to eliminate typing lag
         if (inputDebounceTimeout.current !== null) {
             window.clearTimeout(inputDebounceTimeout.current);
         }
@@ -1263,7 +1263,7 @@ const ChapterEditorPage = () => {
             if (editorContentRef.current !== null) {
                 updateChapterField('content', editorContentRef.current);
             }
-        }, 650);
+        }, 200);
     };
 
     const handleCopyContent = React.useCallback(async () => {
