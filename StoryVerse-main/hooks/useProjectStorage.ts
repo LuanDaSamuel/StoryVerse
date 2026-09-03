@@ -2,7 +2,6 @@ import * as React from 'react';
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
 import { ProjectData, UserProfile } from '../types';
 import { enforceProjectDataLimits } from '../utils/dataLimiter';
-import { findPreviousCoverImage } from '../utils/coverRecovery';
 
 // --- Constants ---
 const PROJECT_FILE_HANDLE_KEY = 'storyverse-project-file-handle';
@@ -482,11 +481,6 @@ export function useProjectStorage() {
         }
     };
 
-    const recoverNovelCover = React.useCallback(async (novelId: string, novelTitle: string): Promise<string | null> => {
-        const fileId = driveFileIdRef.current || await idbGet<string>(DRIVE_FILE_ID_KEY);
-        return findPreviousCoverImage(novelId, novelTitle, fileId, getAccessToken);
-    }, [getAccessToken]);
-
     return {
         initGapiClient,
         refreshTokenAndGetProfile,
@@ -501,6 +495,5 @@ export function useProjectStorage() {
         clearHandleFromIdb,
         loadFromFileHandle,
         saveToFileHandle,
-        recoverNovelCover,
     };
 }

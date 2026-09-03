@@ -22,6 +22,14 @@ The application uses highly customized implementations of `contentEditable` `div
 -   **HTML Content:** Chapters, Sketches, and Ideas are structurally stored within the JSON tree as sanitized stringified HTML (not Markdown or proprietary abstract syntax trees).
 -   **Parallel Processing:** The `WorkingModelPage` uniquely instantiates two concurrent panes. Left-pane loads read-only or distinct reference data states. Right-pane acts as a standard editor block linked to active drafting data, managing focus state securely. 
 
+### Persistence Layer & Data Integrity
+Data relies on client-side storage mechanisms (IDB Keyval / File System Access API) and Google Drive cloud sync. The serialized JSON structure reflects `ProjectContext`.
+- **Absolute Data & Input Fidelity**: When touching database persistence, local storage, or data usage optimizations:
+  - **Images**: Never downscale, compress, or modify uploaded images (such as novel cover images). Preserve original quality and format without alteration.
+  - **Text Inputs**: Never truncate, slice, or alter any user texts (titles, synopsis, chapter HTML, sketches, custom dictionary, or tags).
+  - **Settings**: Never clamp or alter user settings or font sizes.
+  - **Data Usage Optimizations**: Network data reduction must ONLY be achieved via transmission optimizations (such as payload hash/string equality checks before upload, skipping unchanged cloud pushes, and reducing HTTP roundtrips), never by modifying or degrading user-authored data or settings.
+
 ## Dependency Strategy
 To ensure maximum availability, external dependencies are extremely slim. 
 -   **Lucide / Custom SVGs:** Icons are baked in as React components to prevent dynamic fetch failures.

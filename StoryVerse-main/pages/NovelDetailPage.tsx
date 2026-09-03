@@ -10,7 +10,6 @@ import NovelHistoryPage from '../components/NovelHistoryPage';
 import ExportModal from '../components/ExportModal';
 import { useTranslations } from '../hooks/useTranslations';
 import { useTabTitle } from '../hooks/useTabTitle';
-import { optimizeCoverImage } from '../utils/imageOptimizer';
 import { parseDocxToHtml } from '../utils/docxParser';
 
 interface ImportDocxModalProps {
@@ -146,7 +145,7 @@ const ImportDocxModal = ({
 const NovelDetailPage = () => {
     const { novelId } = useParams<{ novelId: string }>();
     const navigate = useNavigate();
-    const { projectData, setProjectData, themeClasses, recoverNovelCover } = React.useContext(ProjectContext);
+    const { projectData, setProjectData, themeClasses } = React.useContext(ProjectContext);
     const t = useTranslations();
     const coverImageInputRef = React.useRef<HTMLInputElement>(null);
     const descriptionTextareaRef = React.useRef<HTMLTextAreaElement>(null);
@@ -165,8 +164,6 @@ const NovelDetailPage = () => {
     const [activeTab, setActiveTab] = React.useState<'Details' | 'History'>('Details');
     const [isAddingTag, setIsAddingTag] = React.useState(false);
     const [newTag, setNewTag] = React.useState('');
-    const [isRecoveringCover, setIsRecoveringCover] = React.useState(false);
-    const [recoveryStatusMessage, setRecoveryStatusMessage] = React.useState<string | null>(null);
 
     const { novel, novelIndex } = React.useMemo(() => {
         const novels = projectData?.novels;
@@ -254,64 +251,22 @@ const NovelDetailPage = () => {
         );
     }
     
-    const handleCoverImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleCoverImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file && novelIndex !== -1) {
-            try {
-                const optimizedBase64 = await optimizeCoverImage(file);
-                if (optimizedBase64) {
-                    setProjectData(currentData => {
-                        if (!currentData) return null;
-                        const updatedNovels = [...currentData.novels];
-                        if (novelIndex >= updatedNovels.length) return currentData;
-                        updatedNovels[novelIndex].coverImage = optimizedBase64;
-                        return { ...currentData, novels: updatedNovels };
-                    });
-                    setRecoveryStatusMessage(null);
-                }
-            } catch (err: any) {
-                console.error("Failed to optimize cover image:", err);
-                alert(err?.message || "Failed to process image. Please try a different image.");
-            }
-        }
-    };
-
-    const handleRecoverCover = React.useCallback(async (isAuto = false) => {
-        if (!novel || novel.coverImage || !recoverNovelCover) return;
-        setIsRecoveringCover(true);
-        if (!isAuto) setRecoveryStatusMessage("Searching backups and Google Drive revisions...");
-        try {
-            const restored = await recoverNovelCover(novel.id, novel.title);
-            if (restored) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
                 setProjectData(currentData => {
                     if (!currentData) return null;
                     const updatedNovels = [...currentData.novels];
-                    if (novelIndex < 0 || novelIndex >= updatedNovels.length) return currentData;
-                    updatedNovels[novelIndex] = {
-                        ...updatedNovels[novelIndex],
-                        coverImage: restored
-                    };
+                    if (novelIndex >= updatedNovels.length) return currentData;
+                    updatedNovels[novelIndex].coverImage = reader.result as string;
                     return { ...currentData, novels: updatedNovels };
                 });
-                setRecoveryStatusMessage("Cover image recovered successfully!");
-            } else {
-                if (!isAuto) setRecoveryStatusMessage("No previous cover found in backup or cloud history.");
-            }
-        } catch (err) {
-            console.error("Failed to recover cover image:", err);
-            if (!isAuto) setRecoveryStatusMessage("Failed to check cloud history.");
-        } finally {
-            setIsRecoveringCover(false);
+            };
+            reader.readAsDataURL(file);
         }
-    }, [novel, novelIndex, recoverNovelCover, setProjectData]);
-
-    const autoRecoverAttemptedRef = React.useRef(false);
-    React.useEffect(() => {
-        if (novel && !novel.coverImage && !autoRecoverAttemptedRef.current) {
-            autoRecoverAttemptedRef.current = true;
-            handleRecoverCover(true);
-        }
-    }, [novel?.id, novel?.coverImage, handleRecoverCover]);
+    };
 
     const handleFileSelectForDocx = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -675,60 +630,20 @@ const NovelDetailPage = () => {
                 {/* Left Column */}
                 <div className="lg:col-span-1 space-y-8">
                     <div className={`p-6 rounded-lg ${themeClasses.bgSecondary}`}>
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className={`text-xl font-bold ${themeClasses.accentText}`}>{t.coverImage}</h2>
-                            {novel.coverImage && (
-                                <button
-                                    onClick={() => handleRecoverCover(false)}
-                                    disabled={isRecoveringCover}
-                                    title="Search revision history if you want to restore an earlier cover"
-                                    className={`text-xs ${themeClasses.textSecondary} hover:text-emerald-500 underline transition-colors disabled:opacity-50`}
-                                >
-                                    {isRecoveringCover ? 'Searching...' : 'Restore Earlier'}
-                                </button>
-                            )}
-                        </div>
+                        <h2 className={`text-xl font-bold mb-4 ${themeClasses.accentText}`}>{t.coverImage}</h2>
                         <div className="relative w-full aspect-[3/4]">
                             {novel.coverImage ? (
-                                <img src={novel.coverImage} alt="Cover" className="w-full h-full object-cover rounded-md shadow" />
+                                <img src={novel.coverImage} alt="Cover" className="w-full h-full object-cover rounded-md" />
                             ) : (
-                                <div className={`w-full h-full flex flex-col items-center justify-center rounded-md p-4 text-center ${themeClasses.bgTertiary}`}>
+                                <div className={`w-full h-full flex items-center justify-center rounded-md ${themeClasses.bgTertiary}`}>
                                     <span className={themeClasses.textSecondary}>{t.noCover}</span>
-                                    {isRecoveringCover && (
-                                        <span className="text-xs text-emerald-500 mt-2 animate-pulse">
-                                            Scanning cloud history for previous cover...
-                                        </span>
-                                    )}
                                 </div>
                             )}
                         </div>
                         <input type="file" ref={coverImageInputRef} onChange={handleCoverImageChange} className="hidden" accept="image/*" />
-                        <div className="space-y-2 mt-4">
-                            <button onClick={() => coverImageInputRef.current?.click()} className={`w-full py-2 px-4 rounded-lg font-semibold transition-colors ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-80`}>
-                                {t.uploadFile}
-                            </button>
-                            {!novel.coverImage && (
-                                <button
-                                    onClick={() => handleRecoverCover(false)}
-                                    disabled={isRecoveringCover}
-                                    className={`w-full py-2 px-4 rounded-lg font-semibold text-sm transition-all border border-emerald-500/40 text-emerald-500 hover:bg-emerald-500/10 disabled:opacity-50 flex items-center justify-center gap-2`}
-                                >
-                                    {isRecoveringCover ? (
-                                        <>
-                                            <span className="inline-block w-3 h-3 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></span>
-                                            <span>Searching History...</span>
-                                        </>
-                                    ) : (
-                                        <span>Restore Previous Cover</span>
-                                    )}
-                                </button>
-                            )}
-                            {recoveryStatusMessage && (
-                                <p className={`text-xs text-center mt-2 ${recoveryStatusMessage.includes('successfully') ? 'text-emerald-400 font-medium' : themeClasses.textSecondary}`}>
-                                    {recoveryStatusMessage}
-                                </p>
-                            )}
-                        </div>
+                        <button onClick={() => coverImageInputRef.current?.click()} className={`w-full mt-4 py-2 px-4 rounded-lg font-semibold transition-colors ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-80`}>
+                            {t.uploadFile}
+                        </button>
                     </div>
 
                     <div className={`p-6 rounded-lg ${themeClasses.bgSecondary}`}>

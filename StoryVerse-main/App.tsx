@@ -217,7 +217,6 @@ const AppContent = () => {
         overwriteDriveProject: project.overwriteDriveProject,
         loadDriveProjectAndDiscardLocal: project.loadDriveProjectAndDiscardLocal,
         connectLocalToDrive: project.connectLocalToDrive,
-        recoverNovelCover: project.recoverNovelCover,
         theme,
         themeClasses,
     }), [
@@ -240,7 +239,6 @@ const AppContent = () => {
         project.overwriteDriveProject,
         project.loadDriveProjectAndDiscardLocal,
         project.connectLocalToDrive,
-        project.recoverNovelCover,
         theme,
         themeClasses,
     ]);

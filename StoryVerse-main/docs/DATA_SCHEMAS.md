@@ -3,6 +3,13 @@
 This document outlines the core data structures used in the StoryVerse application. 
 The main state revolves around the `ProjectData` interface, which encapsulates all user-generated content and settings.
 
+## Data Preservation & Input Integrity Policy
+When storing, modifying, or optimizing data in the database, local storage, or cloud sync:
+- **Never modify images**: Cover images and user-uploaded media must be stored and preserved in their original state and resolution without compression or downscaling.
+- **Never alter user inputs**: Texts, chapter contents, descriptions, synopses, titles, dictionary entries, and tags must remain untruncated and unaltered.
+- **Never alter user settings**: Font sizes (`baseFontSize`), writing mode, theme, and language choices must never be forcefully reset or clamped.
+- **Data usage reduction**: Lower bandwidth data usage must be achieved purely by reducing network transmission (e.g. diffing payloads before sending across the internet and eliminating redundant roundtrips), not by altering user data.
+
 ## Core Entities
 
 ### ProjectData
