@@ -21,6 +21,7 @@ interface ProjectContextType {
   // Drive Conflict Resolution
   overwriteDriveProject: () => void;
   loadDriveProjectAndDiscardLocal: () => void;
+  recoverNovelCover?: (novelId: string, novelTitle: string) => Promise<string | null>;
 }
 
 export const ProjectContext = React.createContext<ProjectContextType>({
@@ -53,4 +54,5 @@ export const ProjectContext = React.createContext<ProjectContextType>({
   connectLocalToDrive: () => {},
   overwriteDriveProject: () => {},
   loadDriveProjectAndDiscardLocal: () => {},
+  recoverNovelCover: async () => null,
 });

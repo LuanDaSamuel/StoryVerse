@@ -712,6 +712,10 @@ export function useProject() {
         }
     }, [storage, handleDriveProject]);
 
+    const recoverNovelCover = React.useCallback(async (novelId: string, novelTitle: string): Promise<string | null> => {
+        return storage.recoverNovelCover(novelId, novelTitle);
+    }, [storage]);
+
   return { 
     projectData, 
     setProjectData: setProjectDataAndMarkDirty, 
@@ -732,5 +736,6 @@ export function useProject() {
     overwriteDriveProject,
     loadDriveProjectAndDiscardLocal,
     connectLocalToDrive: signInWithGoogle,
+    recoverNovelCover,
   };
 }

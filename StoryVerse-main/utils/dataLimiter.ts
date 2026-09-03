@@ -22,8 +22,8 @@ export const DATA_LIMITS = {
     MAX_TAGS_COUNT: 15,
     MAX_TAG_CHARS: 40,
     MAX_DICTIONARY_WORDS: 2_000,
-    MAX_COVER_IMAGE_STRING_LENGTH: 160_000, // ~120KB ceiling for base64 cover images
-    MAX_SAFE_PROJECT_JSON_BYTES: 12 * 1024 * 1024, // 12MB ceiling
+    MAX_COVER_IMAGE_STRING_LENGTH: 20_000_000, // Generous ceiling ensuring no covers are stripped
+    MAX_SAFE_PROJECT_JSON_BYTES: 25 * 1024 * 1024, // 25MB ceiling
     LOCAL_STORAGE_WRITE_LIMIT_BYTES: 2 * 1024 * 1024, // 2MB max for localStorage
 };
 
@@ -109,13 +109,8 @@ export function enforceProjectDataLimits(data: any): ProjectData {
             .slice(0, DATA_LIMITS.MAX_NOVELS_COUNT)
             .map((novel: any): Novel => {
                 let coverImage: string | undefined = undefined;
-                if (typeof novel.coverImage === 'string' && novel.coverImage.startsWith('data:image/')) {
-                    // Check if base64 string exceeds max string length
-                    if (novel.coverImage.length <= DATA_LIMITS.MAX_COVER_IMAGE_STRING_LENGTH) {
-                        coverImage = novel.coverImage;
-                    } else {
-                        console.warn(`Cover image for novel "${novel.title || 'Untitled'}" exceeds safe limit (${novel.coverImage.length} chars). It will be sanitized.`);
-                    }
+                if (typeof novel.coverImage === 'string' && novel.coverImage.trim().length > 0) {
+                    coverImage = novel.coverImage;
                 }
 
                 const tags = Array.isArray(novel.tags)

@@ -4,8 +4,8 @@
  * during serialization, BroadcastChannel synchronization, and Google Drive cloud sync.
  */
 
-export const MAX_COVER_IMAGE_BYTES = 120 * 1024; // 120 KB ceiling for base64 image data
-export const MAX_UPLOAD_FILE_BYTES = 15 * 1024 * 1024; // 15 MB raw upload limit
+export const MAX_COVER_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB ceiling
+export const MAX_UPLOAD_FILE_BYTES = 50 * 1024 * 1024; // 50 MB raw upload limit
 
 /**
  * Checks if a base64 image string exceeds the safe byte size.
@@ -18,27 +18,27 @@ export function isBase64ImageOversized(base64Str?: string | null, maxBytes: numb
 
 /**
  * Resizes and compresses an image (File, Blob, or base64 data URL) into an optimized
- * JPEG/WebP base64 string with reasonable dimensions (default max: 480x720, quality 0.74).
+ * JPEG/WebP base64 string with reasonable dimensions (default max: 960x1440, quality 0.85).
  */
 export async function optimizeCoverImage(
     source: File | Blob | string,
-    maxWidth: number = 480,
-    maxHeight: number = 720,
-    quality: number = 0.74
+    maxWidth: number = 960,
+    maxHeight: number = 1440,
+    quality: number = 0.85
 ): Promise<string> {
-    // If source is already a small base64 string, keep it to save compute
+    // If source is already a string URL (http/https/blob) or reasonable size base64, keep it
     if (typeof source === 'string') {
         if (!source.startsWith('data:image/')) {
-            // Invalid data URL format
-            return '';
+            // Standard URL (http/https/blob/path), use as-is
+            return source;
         }
-        if (!isBase64ImageOversized(source, 80 * 1024)) {
-            // Under 80KB, safe to use as-is
+        if (!isBase64ImageOversized(source, 500 * 1024)) {
+            // Under 500KB, safe to use as-is without recompressing
             return source;
         }
     } else if (source instanceof File || source instanceof Blob) {
         if (source.size > MAX_UPLOAD_FILE_BYTES) {
-            throw new Error(`File is too large (${(source.size / (1024 * 1024)).toFixed(1)}MB). Please choose an image under 15MB.`);
+            throw new Error(`File is too large (${(source.size / (1024 * 1024)).toFixed(1)}MB). Please choose an image under 50MB.`);
         }
     }
 

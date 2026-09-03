@@ -2,6 +2,7 @@ import * as React from 'react';
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
 import { ProjectData, UserProfile } from '../types';
 import { enforceProjectDataLimits } from '../utils/dataLimiter';
+import { findPreviousCoverImage } from '../utils/coverRecovery';
 
 // --- Constants ---
 const PROJECT_FILE_HANDLE_KEY = 'storyverse-project-file-handle';
@@ -48,6 +49,8 @@ async function verifyPermission(handle: FileSystemHandle) {
 export function useProjectStorage() {
     const driveFileIdRef = React.useRef<string | null>(null);
     const driveFileModifiedTimeRef = React.useRef<string | null>(null);
+    const lastUploadedPayloadRef = React.useRef<string | null>(null);
+    const lastCheckTimeRef = React.useRef<number>(0);
     const projectFileHandleRef = React.useRef<FileSystemFileHandle | null>(null);
 
     const tokenClientRef = React.useRef<any>(null);
@@ -83,6 +86,8 @@ export function useProjectStorage() {
         await idbDel(USER_PROFILE_KEY);
         driveFileIdRef.current = null;
         driveFileModifiedTimeRef.current = null;
+        lastUploadedPayloadRef.current = null;
+        lastCheckTimeRef.current = 0;
         if (google?.accounts?.id) {
           google.accounts.id.disableAutoSelect();
         }
@@ -221,6 +226,8 @@ export function useProjectStorage() {
 
         console.log("File content uploaded successfully.");
         driveFileIdRef.current = fileId;
+        lastUploadedPayloadRef.current = JSON.stringify(safeData);
+        lastCheckTimeRef.current = Date.now();
         await idbSet(DRIVE_FILE_ID_KEY, fileId);
         return { fileId: fileId, name: createResult.name };
     }, [getAccessToken]);
@@ -236,14 +243,24 @@ export function useProjectStorage() {
         }
         
         driveFileIdRef.current = fileId;
+        const safeData = enforceProjectDataLimits(data);
+        const serializedPayload = JSON.stringify(safeData);
+
+        // DATA USAGE OPTIMIZATION: Skip upload if data is identical to what is already on Drive
+        if (lastUploadedPayloadRef.current === serializedPayload) {
+            console.log("[saveToDrive] Project content is unchanged since last cloud sync. 0 bytes transferred.");
+            return;
+        }
     
         try {
             const accessToken = await getAccessToken();
 
-            if (driveFileModifiedTimeRef.current) {
+            // Conflict check only if enough time has passed to reduce redundant roundtrips
+            if (driveFileModifiedTimeRef.current && (Date.now() - lastCheckTimeRef.current > 25000)) {
                 const checkResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=modifiedTime`, {
                     headers: { 'Authorization': `Bearer ${accessToken}` }
                 });
+                lastCheckTimeRef.current = Date.now();
                 if (checkResponse.ok) {
                     const checkData = await checkResponse.json();
                     if (checkData.modifiedTime) {
@@ -256,26 +273,24 @@ export function useProjectStorage() {
                 }
             }
 
-            console.log(`Initiating upload for Drive file: ${fileId} via fetch`);
-            const safeData = enforceProjectDataLimits(data);
-            const response = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+            console.log(`[saveToDrive] Uploading changed project to Drive (${(serializedPayload.length / 1024).toFixed(1)} KB)`);
+            const response = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media&fields=id,modifiedTime`, {
                 method: 'PATCH',
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(safeData)
+                body: serializedPayload
             });
     
             if (response.ok) {
-                console.log("File updated successfully using fetch.");
-                const updateResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=modifiedTime`, {
-                    headers: { 'Authorization': `Bearer ${accessToken}` }
-                });
-                if (updateResponse.ok) {
-                    const updateData = await updateResponse.json();
+                const updateData = await response.json().catch(() => ({}));
+                if (updateData.modifiedTime) {
                     driveFileModifiedTimeRef.current = updateData.modifiedTime;
                 }
+                lastUploadedPayloadRef.current = serializedPayload;
+                lastCheckTimeRef.current = Date.now();
+                console.log("[saveToDrive] Drive upload successful. Cloud sync complete.");
                 return; // Success
             }
     
@@ -285,6 +300,7 @@ export function useProjectStorage() {
                  console.log("File not found on Drive. Creating a new one.");
                  await idbDel(DRIVE_FILE_ID_KEY);
                  driveFileIdRef.current = null;
+                 lastUploadedPayloadRef.current = null;
                  await createOnDrive(data);
                  return;
             }
@@ -317,6 +333,8 @@ export function useProjectStorage() {
                     });
                     driveFileIdRef.current = storedFileId;
                     driveFileModifiedTimeRef.current = fileMetadata.result.modifiedTime;
+                    lastUploadedPayloadRef.current = JSON.stringify(enforceProjectDataLimits(contentResponse.result));
+                    lastCheckTimeRef.current = Date.now();
                     console.log(`Successfully loaded file from stored ID.`);
                     return { name: fileMetadata.result.name, data: contentResponse.result };
                 } else {
@@ -358,6 +376,9 @@ export function useProjectStorage() {
                 path: `https://www.googleapis.com/drive/v3/files/${file.id}`,
                 params: { alt: 'media' }
             });
+
+            lastUploadedPayloadRef.current = JSON.stringify(enforceProjectDataLimits(contentResponse.result));
+            lastCheckTimeRef.current = Date.now();
 
             return { name: file.name, data: contentResponse.result };
         }
@@ -461,6 +482,11 @@ export function useProjectStorage() {
         }
     };
 
+    const recoverNovelCover = React.useCallback(async (novelId: string, novelTitle: string): Promise<string | null> => {
+        const fileId = driveFileIdRef.current || await idbGet<string>(DRIVE_FILE_ID_KEY);
+        return findPreviousCoverImage(novelId, novelTitle, fileId, getAccessToken);
+    }, [getAccessToken]);
+
     return {
         initGapiClient,
         refreshTokenAndGetProfile,
@@ -475,5 +501,6 @@ export function useProjectStorage() {
         clearHandleFromIdb,
         loadFromFileHandle,
         saveToFileHandle,
+        recoverNovelCover,
     };
 }
