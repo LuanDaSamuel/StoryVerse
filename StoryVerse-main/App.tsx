@@ -26,6 +26,7 @@ import { LanguageContext } from './contexts/LanguageContext';
 import { translations } from './utils/translations';
 import { useTranslations } from './hooks/useTranslations';
 import { startPeriodicCacheCleanup } from './utils/cacheManager';
+import { initSpaceRateLimiter } from './utils/spaceRateLimiter';
 
 const NovelEditRedirect = () => {
     const { novelId } = useParams<{ novelId: string }>();
@@ -176,6 +177,12 @@ const AppContent = () => {
     // Start periodic cache cleanup (deletes browser/temp caches after 30 minutes)
     React.useEffect(() => {
         const cleanup = startPeriodicCacheCleanup();
+        return cleanup;
+    }, []);
+
+    // Rate-limit space key to eliminate accidental double-clicks / rapid chatter in all editable areas
+    React.useEffect(() => {
+        const cleanup = initSpaceRateLimiter();
         return cleanup;
     }, []);
 

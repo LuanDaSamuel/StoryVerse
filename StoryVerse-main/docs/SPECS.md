@@ -24,6 +24,7 @@ The `contentEditable` engines must support:
 4.  Blockquotes for dialogue segmentation.
 5.  Text indentation standardizations utilizing CSS `text-indent` applied to paragraph blocks rather than trailing `<span>` spacers.
 6.  *Smart Typography Features*: Dynamically shifting standard dashes (`-`) to Em dashes (`—`) or En dashes intuitively.
+7.  *Space Key Rate Limiting & Debouncing*: Debounces rapid consecutive Space key presses with a ~260ms cooldown in all editable areas to prevent accidental double-clicks or key chatter, while preserving instantaneous typing across distinct words.
 
 ### Styling System (Tailwind + CSS Custom Properties)
 Theme toggles drive global state configuration parameters inside `SettingsModal`, which push updates to the `root` wrapper.
