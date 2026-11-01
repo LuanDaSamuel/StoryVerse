@@ -1,0 +1,6 @@
+{
+  "summary":  "Implementation plan to fix the cursor undo/revert bug when pressing Enter in DOCX imported chapters, ensuring new paragraphs inherit clean chapter styling without DOM collapse.",
+  "updatedAt":  "2026-11-01T01:27:00.733254187Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}

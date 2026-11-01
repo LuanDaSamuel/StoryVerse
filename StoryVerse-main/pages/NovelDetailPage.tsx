@@ -319,19 +319,24 @@ const NovelDetailPage = () => {
                         };
                         parsedChapters.push(currentChapter);
                     } else {
+                        if (el.tagName.toLowerCase() === 'p' && (!el.hasChildNodes() || el.innerHTML.trim() === '')) {
+                            el.innerHTML = '<br>';
+                        }
+                        const htmlContent = el.outerHTML;
                         if (currentChapter) {
-                            currentChapter.content += el.outerHTML;
+                            currentChapter.content += htmlContent;
                         } else {
-                            preambleHtml += el.outerHTML;
+                            preambleHtml += htmlContent;
                         }
                     }
                 } else if (node.nodeType === Node.TEXT_NODE) {
                     const text = node.textContent || '';
                     if (text.trim()) {
+                        const wrappedText = `<p>${text}</p>`;
                         if (currentChapter) {
-                            currentChapter.content += text;
+                            currentChapter.content += wrappedText;
                         } else {
-                            preambleHtml += text;
+                            preambleHtml += wrappedText;
                         }
                     }
                 }
@@ -349,8 +354,13 @@ const NovelDetailPage = () => {
                 preambleHtml = '';
             }
 
-            // Calculate word count for each parsed chapter
+            // Calculate word count for each parsed chapter and ensure valid empty line placeholders
             parsedChapters.forEach(ch => {
+                if (!ch.content.trim()) {
+                    ch.content = '<p><br></p>';
+                } else {
+                    ch.content = ch.content.replace(/<p>(\s|&nbsp;)*<\/p>/gi, '<p><br></p>');
+                }
                 const plainText = ch.content.replace(/<[^>]*>/g, ' ');
                 let wordCount = 0;
                 const regex = /\S+/g;

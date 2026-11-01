@@ -502,6 +502,7 @@ const ChapterEditorPage = () => {
     const editorContentRef = React.useRef<string>("");
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
     const toolbarRef = React.useRef<HTMLDivElement>(null);
+    const lastSpaceTimeRef = React.useRef<number>(0);
     
     const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
     const [isSketchSidebarOpen, setIsSketchSidebarOpen] = React.useState(false);
@@ -609,6 +610,8 @@ const ChapterEditorPage = () => {
     const cleanupEditor = React.useCallback(() => {
         if (!editorRef.current) return;
         const editor = editorRef.current;
+        const sel = window.getSelection();
+        const activeNode = sel?.anchorNode;
     
         // 1. Clean up zero-width space (\u200B) in text nodes when other text content exists
         const walkTextNodes = (node: Node) => {
@@ -620,11 +623,13 @@ const ChapterEditorPage = () => {
         };
         walkTextNodes(editor);
 
-        // 2. Remove empty inline elements that can cause bugs.
-        // Run multiple passes to handle nested empty elements.
+        // 2. Remove empty inline elements that can cause bugs, but protect active caret node
         for (let i = 0; i < 3; i++) {
             let changed = false;
-            editor.querySelectorAll('span, strong, em, i, b').forEach(el => {
+            editor.querySelectorAll('span, strong, em, i, b, u, s').forEach(el => {
+                if (activeNode && (el === activeNode || el.contains(activeNode))) {
+                    return;
+                }
                 if (!el.hasChildNodes() || el.textContent === '\u200B' || el.textContent === '') {
                     el.remove();
                     changed = true;
@@ -632,8 +637,15 @@ const ChapterEditorPage = () => {
             });
             if (!changed) break;
         }
+
+        // 3. Ensure any block-level element that became empty has a <br> placeholder
+        editor.querySelectorAll('p, h1, h2, h3, blockquote, li, div').forEach(block => {
+            if (!block.hasChildNodes() || (block.children.length === 0 && (!block.textContent || block.textContent.trim() === ''))) {
+                block.innerHTML = '<br>';
+            }
+        });
     
-        // 3. Merge adjacent sibling elements with identical styles/tags.
+        // 4. Merge adjacent sibling elements with identical styles/tags.
         const mergeAdjacentSiblings = (parent: HTMLElement) => {
             let child = parent.firstChild;
             while (child) {
@@ -663,7 +675,7 @@ const ChapterEditorPage = () => {
             mergeAdjacentSiblings(block as HTMLElement);
         });
     
-        // 4. Merge adjacent text nodes. This fixes "stuck word" issues.
+        // 5. Merge adjacent text nodes.
         editor.normalize();
     }, []);
 
@@ -986,6 +998,15 @@ const ChapterEditorPage = () => {
             return;
         }
 
+        if (e.key === ' ') {
+            const now = Date.now();
+            if (now - lastSpaceTimeRef.current < 80) {
+                e.preventDefault();
+                return;
+            }
+            lastSpaceTimeRef.current = now;
+        }
+
         if (e.key === 'Backspace' || e.key === 'Delete') {
             if (range.collapsed && range.startContainer.nodeType === Node.TEXT_NODE) {
                 const textNode = range.startContainer as Text;
@@ -1135,63 +1156,34 @@ const ChapterEditorPage = () => {
         
                 if (currentBlock instanceof HTMLElement) {
                     const isNewBlockEmpty = (currentBlock.textContent?.trim() === '' && currentBlock.children.length === 0) || currentBlock.innerHTML === '<br>';
+                    
                     if (isNewBlockEmpty) {
+                        // Ensure the new empty paragraph keeps a valid <br> placeholder for caret positioning
+                        if (!currentBlock.querySelector('br')) {
+                            currentBlock.innerHTML = '<br>';
+                        }
+
+                        // Inherit standard block-level styles from previous block (clean line break)
                         const previousBlock = currentBlock.previousElementSibling;
                         if (previousBlock instanceof HTMLElement) {
-                            let styleSource: Element = previousBlock;
-                            let lastNode: Node | null = previousBlock;
-                            while (lastNode && lastNode.lastChild) {
-                                lastNode = lastNode.lastChild;
-                            }
-                            
-                            if (lastNode) {
-                                styleSource = lastNode.nodeType === Node.TEXT_NODE ? lastNode.parentElement! : lastNode as Element;
-                            }
-                            
-                            const computedStyle = window.getComputedStyle(styleSource);
-                            const stylesToCopy = {
-                                fontSize: computedStyle.fontSize,
-                                fontFamily: computedStyle.fontFamily,
-                                color: computedStyle.color,
-                                marginBottom: computedStyle.marginBottom,
-                                lineHeight: computedStyle.lineHeight,
-                                textIndent: computedStyle.textIndent,
-                            };
-                            
-                            const editorStyles = window.getComputedStyle(editorRef.current!);
-                            const styleCarrier = document.createElement('span');
-                            let styleApplied = false;
-                            
-                            if (stylesToCopy.fontSize !== editorStyles.fontSize) {
-                                styleCarrier.style.fontSize = stylesToCopy.fontSize;
-                                styleApplied = true;
-                            }
-                            if (stylesToCopy.fontFamily !== editorStyles.fontFamily) {
-                                styleCarrier.style.fontFamily = stylesToCopy.fontFamily;
-                                styleApplied = true;
-                            }
-                            if (stylesToCopy.color !== editorStyles.color) {
-                                styleCarrier.style.color = stylesToCopy.color;
-                                styleApplied = true;
-                            }
-                            
-                            // Copy block level styles
-                            if (stylesToCopy.marginBottom !== editorStyles.marginBottom) currentBlock.style.marginBottom = stylesToCopy.marginBottom;
-                            if (stylesToCopy.lineHeight !== editorStyles.lineHeight) currentBlock.style.lineHeight = stylesToCopy.lineHeight;
-                            if (stylesToCopy.textIndent !== editorStyles.textIndent) currentBlock.style.textIndent = stylesToCopy.textIndent;
-                            
-                            if (styleApplied) {
-                                currentBlock.innerHTML = '';
-                                styleCarrier.innerHTML = '&#8203;';
-                                currentBlock.appendChild(styleCarrier);
-                                
-                                const range = document.createRange();
-                                range.setStart(styleCarrier, 1);
-                                range.collapse(true);
-                                newSelection.removeAllRanges();
-                                newSelection.addRange(range);
-                            }
+                            const prevComputed = window.getComputedStyle(previousBlock);
+                            if (prevComputed.marginBottom) currentBlock.style.marginBottom = prevComputed.marginBottom;
+                            if (prevComputed.lineHeight) currentBlock.style.lineHeight = prevComputed.lineHeight;
+                            if (prevComputed.textIndent) currentBlock.style.textIndent = prevComputed.textIndent;
                         }
+
+                        // Position caret cleanly inside the new block
+                        const range = document.createRange();
+                        range.setStart(currentBlock, 0);
+                        range.collapse(true);
+                        newSelection.removeAllRanges();
+                        newSelection.addRange(range);
+                    }
+
+                    // Keep tracked content in sync so programmatic effects don't revert
+                    if (editorRef.current) {
+                        editorContentRef.current = editorRef.current.innerHTML;
+                        editorRef.current.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
                     }
                 }
         
@@ -1213,7 +1205,6 @@ const ChapterEditorPage = () => {
                     scrollContainerEl.scrollBy({ top: scrollAmount, behavior: 'smooth' });
                 }
             }, 0);
-            setTimeout(cleanupEditor, 10);
         }
     };
 
