@@ -1258,10 +1258,14 @@ const ChapterEditorPage = () => {
     };
 
     const handleCopyContent = React.useCallback(async () => {
-        if (editorRef.current) {
+        if (editorRef.current && chapter) {
             try {
-                // Using innerText preserves paragraph breaks better than textContent.
-                const textToCopy = editorRef.current.innerText;
+                // Prepend title (fallback to 'Untitled Chapter') followed by a separator line
+                const title = (chapter.title || 'Untitled Chapter').trim();
+                const bodyText = editorRef.current.innerText;
+                const separator = '--------------------------------------------------';
+                const textToCopy = `${title}\n${separator}\n${bodyText}`;
+                
                 await navigator.clipboard.writeText(textToCopy);
                 setIsCopied(true);
                 setTimeout(() => setIsCopied(false), 2000); // Reset after 2 seconds
@@ -1269,7 +1273,7 @@ const ChapterEditorPage = () => {
                 console.error('Failed to copy text: ', err);
             }
         }
-    }, []);
+    }, [chapter]);
 
     // --- Effects ---
     React.useEffect(() => {

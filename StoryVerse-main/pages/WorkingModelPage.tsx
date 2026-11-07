@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { PlusIcon, CloseIcon, DownloadIcon, BoldIcon, ItalicIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, UndoIcon, RedoIcon, BookOpenIcon } from '../components/Icons';
 import { parseDocxToHtml } from '../utils/docxParser';
+import { sanitizeImportedContent } from '../utils/docxSanitizer';
 import { useTranslations } from '../hooks/useTranslations';
 import { useTabTitle } from '../hooks/useTabTitle';
 import { StoryIdea } from '../types';
@@ -39,10 +40,11 @@ const Pane = ({ data, onSetData, themeClasses, projectData, setProjectData, t }:
         try {
             setShowOptions(false);
             const arrayBuffer = await file.arrayBuffer();
-            const html = await parseDocxToHtml(arrayBuffer);
+            const rawHtml = await parseDocxToHtml(arrayBuffer);
+            const sanitizedHtml = sanitizeImportedContent(rawHtml);
             
             const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = html.replace(/<p>(\s|&nbsp;|<br\s*\/?>)*<\/p>/gi, '').trim();
+            tempDiv.innerHTML = sanitizedHtml;
 
             const formatTextNodes = (node: Node) => {
                 if (node.nodeType === Node.TEXT_NODE) {

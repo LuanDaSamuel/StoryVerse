@@ -26,3 +26,5 @@ export async function parseDocxToHtml(arrayBuffer: ArrayBuffer, customStyleMap?:
     const { value: html } = await mammothLib.convertToHtml({ arrayBuffer }, { styleMap });
     return html;
 }
+
+export { sanitizeImportedContent } from './docxSanitizer';

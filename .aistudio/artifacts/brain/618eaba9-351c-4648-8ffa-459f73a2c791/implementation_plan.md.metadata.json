@@ -1,6 +1,6 @@
 {
-  "summary":  "Implementation plan to fix the cursor undo/revert bug when pressing Enter in DOCX imported chapters, ensuring new paragraphs inherit clean chapter styling without DOM collapse.",
-  "updatedAt":  "2026-11-01T01:27:00.733254187Z",
+  "summary":  "Implementation plan to modify the chapter copy functionality to include the chapter title.\n- Update `handleCopyContent` in `ChapterEditorPage.tsx` to prepend the title.\n- Handle empty titles by defaulting to \"Untitled Chapter\".\n- Use two line breaks as a separator.",
+  "updatedAt":  "2026-11-07T14:03:57.377135354Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

@@ -6,6 +6,7 @@ import { PlusIcon, UploadIcon, BackIcon, TrashIcon, FolderIcon, PencilIcon, Chev
 import ConfirmModal from '../components/ConfirmModal';
 import { enhancePlainText } from '../constants';
 import { parseDocxToHtml } from '../utils/docxParser';
+import { sanitizeImportedContent } from '../utils/docxSanitizer';
 import { useTranslations } from '../hooks/useTranslations';
 import { useTabTitle } from '../hooks/useTabTitle';
 import { downloadAsHtml } from '../utils/htmlExport';
@@ -186,11 +187,11 @@ const DemosPage = () => {
 
         try {
             const arrayBuffer = await file.arrayBuffer();
-            const html = await parseDocxToHtml(arrayBuffer);
+            const rawHtml = await parseDocxToHtml(arrayBuffer);
+            const sanitizedHtml = sanitizeImportedContent(rawHtml);
             
             const tempDiv = document.createElement('div');
-            // Clean up empty paragraphs
-            tempDiv.innerHTML = html.replace(/<p>(\s|&nbsp;|<br\s*\/?>)*<\/p>/gi, '').trim();
+            tempDiv.innerHTML = sanitizedHtml;
             
             const formatTextNodes = (node: Node) => {
                 if (node.nodeType === Node.TEXT_NODE) {

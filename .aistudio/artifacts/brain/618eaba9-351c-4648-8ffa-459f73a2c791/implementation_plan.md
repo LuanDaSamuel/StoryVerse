@@ -1,50 +1,54 @@
-# Implementation Plan: Fix Enter Key Cursor Revert in DOCX-Imported Chapters
+# Implementation Plan - Include Title in Chapter Copy
 
-## Problem Summary
-When editing chapters uploaded via DOCX files, pressing the Enter key causes the cursor to immediately undo the line break and jump back to the previous paragraph.
+This plan outlines the steps to modify the "Copy Chapter Text" feature so that it includes the chapter's title at the top of the copied content.
 
-### Root Cause Analysis
-1. **Destructive Style Inheritance**: In `ChapterEditorPage.tsx`, the `handleKeyDown` handler for `Enter` detects differences between the previous block's inline styles and default styles (which commonly exist in DOCX imports). It replaces the new line's contents with a `<span style="...">&#8203;</span>` (zero-width space).
-2. **Immediate Deletion by Editor Cleanup**: 10 milliseconds later, `cleanupEditor()` executes and strips any inline element containing `\u200B` or empty text. This removes the `<span>`, leaving the block as `<p></p>` (without even a placeholder `<br>`).
-3. **DOM Normalization & Caret Collapse**: Browsers cannot place a cursor inside an empty `<p></p>` without a `<br>`. When `editor.normalize()` runs or the browser repaints, the empty block collapses, the cursor is ejected, and the editor snaps the caret back to the previous block, creating an "automatic undo" effect.
-4. **State / DOM Divergence**: DOCX content often has differing whitespace or un-normalized markup, triggering re-sync loops in the programmatic change effect if the editor innerHTML differs from state.
+## User Review & Critical Decisions
 
----
+> [!IMPORTANT]
+> Based on the provided clarifications:
+> - **Separator**: The title will be followed by two line breaks (`\n\n`) before the body text.
+> - **Empty Title Handling**: If a chapter has no title, "Untitled Chapter" will be used as the header.
 
-## Proposed Changes
+## 1. Overview & Core Concept
 
-### 1. Robust Paragraph Creation & Clean Line Breaks on Enter
-- In `ChapterEditorPage.tsx`:
-  - When Enter is pressed, ensure newly created blocks retain a valid `<br>` placeholder so the browser's caret engine never collapses the block.
-  - Per user preference ("Inherit standard chapter text style with a clean line break"), ensure new paragraphs inherit paragraph-level block styling (such as text indent, line height, and margin) while keeping the content clean without temporary zero-width inline spans that get purged.
-  - If a placeholder `<br>` is needed for an empty paragraph, ensure `<p><br></p>` is preserved and not stripped by cleanup passes.
+Currently, clicking "Copy Chapter Text" only copies the content inside the editor. The update will ensure that the title is also captured, making it easier for users to share or backup individual chapters with their headers intact.
 
-### 2. Safeguard Editor Cleanup
-- In `cleanupEditor()`:
-  - Ensure empty block elements (`<p>`, `<div>`) retain `<br>` if they have no text content so they remain focusable and maintain visual height.
-  - Prevent cleanup from stripping elements that are currently the active cursor container.
-  - Ensure zero-width spaces are only cleaned when non-whitespace text exists around them, without destroying active cursor targets.
+## 2. Technical Architecture & Data Strategy
 
-### 3. DOCX Import Sanitization & Normalization
-- In `NovelDetailPage.tsx` (or import handling):
-  - Ensure imported DOCX chapter content is cleanly wrapped in semantic `<p>` tags with consistent block structure.
-  - Remove empty orphan spans and redundant inline style overrides from Word exports that confuse contenteditable caret positioning.
+### Key Changes
+- **File**: `/StoryVerse-main/pages/ChapterEditorPage.tsx`
+- **Function**: `handleCopyContent`
+- **Logic**:
+  1. Retrieve `chapter.title` from the active state.
+  2. Normalize title (default to "Untitled Chapter" if empty).
+  3. Combine `title + "\n\n" + editorContent`.
+  4. Write the result to `navigator.clipboard`.
 
----
+### Component Diagram
 
-## Verification Plan
+```unicode
+┌─────────────────────────────────┐
+│       ChapterEditorPage         │
+│ ┌─────────────────────────────┐ │
+│ │      handleCopyContent      │ │
+│ │  (Combines Title + Body)    │ │
+│ └──────────────┬──────────────┘ │
+└────────────────┼────────────────┘
+                 │
+        ┌────────▼────────┐
+        │   Clipboard API │
+        └─────────────────┘
+```
 
-### Automated Build & Lint
-- Run `compile_applet` to verify compilation and type safety.
-- Run `lint_applet` to ensure no lint regressions.
+## 3. Verification Plan
 
-### Manual Verification Scenarios
-1. **Enter Key Behavior in DOCX Chapters**:
-   - Open a chapter imported from a DOCX file with formatted text.
-   - Press Enter in the middle and at the end of paragraphs.
-   - Confirm a new line is created cleanly, the cursor stays on the new line, and does not jump back or undo.
-2. **Text Typing on New Line**:
-   - Immediately start typing on the newly created line.
-   - Confirm text appears as expected without disappearing or resetting.
-3. **Formatting & Indentation**:
-   - Verify that paragraph indentation and spacing match standard novel settings.
+### Automated Tests
+- **Linting**: Run `npm run lint` to ensure no syntax or type errors.
+- **Compilation**: Run `npm run build` (via `compile_applet`) to verify the build.
+
+### Manual Verification
+1. Open a novel and enter the Chapter Editor.
+2. Ensure the chapter has a title (e.g., "Chapter 1: The Beginning").
+3. Click the sidebar menu and select "Copy Chapter Text".
+4. Paste the content into a text editor and verify the title is at the top followed by two blank lines.
+5. Repeat with a chapter that has an empty title and verify "Untitled Chapter" appears.
