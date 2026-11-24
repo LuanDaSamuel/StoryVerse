@@ -91,6 +91,23 @@ export interface ProjectData {
 
 export type StorageStatus = 'loading' | 'welcome' | 'ready' | 'error' | 'drive-no-project' | 'drive-conflict';
 
+export type DiskSyncState = 'disk-synced' | 'needs-permission' | 'browser-local' | 'disk-error' | 'drive';
+
+export interface LocalProjectMeta {
+  projectName: string;
+  openedAt: string;
+  lastLocalModifiedAt: string;
+  lastDiskSyncAt?: string | null;
+  hasLinkedHandle: boolean;
+}
+
+export interface LocalFileNotice {
+  type: 'blocked' | 'invalid-json' | 'read-error';
+  fileName?: string;
+  detail?: string;
+  showStandardPickerOption: boolean;
+}
+
 export interface UserProfile {
   name: string;
   email: string;

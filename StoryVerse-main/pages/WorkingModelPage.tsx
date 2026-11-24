@@ -2,8 +2,7 @@ import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { PlusIcon, CloseIcon, DownloadIcon, BoldIcon, ItalicIcon, ListBulletIcon, OrderedListIcon, BlockquoteIcon, UndoIcon, RedoIcon, BookOpenIcon } from '../components/Icons';
-import { parseDocxToHtml } from '../utils/docxParser';
-import { sanitizeImportedContent } from '../utils/docxSanitizer';
+import * as mammoth from 'mammoth';
 import { useTranslations } from '../hooks/useTranslations';
 import { useTabTitle } from '../hooks/useTabTitle';
 import { StoryIdea } from '../types';
@@ -40,11 +39,11 @@ const Pane = ({ data, onSetData, themeClasses, projectData, setProjectData, t }:
         try {
             setShowOptions(false);
             const arrayBuffer = await file.arrayBuffer();
-            const rawHtml = await parseDocxToHtml(arrayBuffer);
-            const sanitizedHtml = sanitizeImportedContent(rawHtml);
+            const mammothLib = (mammoth as any).default || mammoth;
+            const { value: html } = await mammothLib.convertToHtml({ arrayBuffer });
             
             const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = sanitizedHtml;
+            tempDiv.innerHTML = html.replace(/<p>(\s|&nbsp;|<br\s*\/?>)*<\/p>/gi, '').trim();
 
             const formatTextNodes = (node: Node) => {
                 if (node.nodeType === Node.TEXT_NODE) {

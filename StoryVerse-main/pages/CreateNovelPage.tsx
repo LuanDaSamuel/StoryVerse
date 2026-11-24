@@ -5,7 +5,6 @@ import { Novel } from '../types';
 import { UploadIcon, BackIcon, CloseIcon, PlusIcon } from '../components/Icons';
 import { useTranslations } from '../hooks/useTranslations';
 import { useTabTitle } from '../hooks/useTabTitle';
-import { optimizeCoverImage } from '../utils/imageOptimizer';
 
 const DRAFT_KEY = 'storyverse-novel-draft';
 
@@ -97,23 +96,14 @@ const CreateNovelPage = () => {
         handleAddTag();
     };
 
-    const [isOptimizingImage, setIsOptimizingImage] = React.useState(false);
-
-    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            try {
-                setIsOptimizingImage(true);
-                const optimizedBase64 = await optimizeCoverImage(file);
-                if (optimizedBase64) {
-                    setCoverImage(optimizedBase64);
-                }
-            } catch (err: any) {
-                console.error("Failed to optimize cover image:", err);
-                alert(err?.message || "Failed to process image. Please try a different image.");
-            } finally {
-                setIsOptimizingImage(false);
-            }
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setCoverImage(reader.result as string);
+            };
+            reader.readAsDataURL(file);
         }
     };
 

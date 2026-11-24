@@ -12,7 +12,6 @@ export interface TabContextType {
     updateTabInfo: (path: string, info: { title?: string; iconType?: TabIconType }) => void;
     popOutTab: (tabId: string) => void;
     reattachTab: (tabId: string) => void;
-    reorderTabs: (startIndex: number, endIndex: number) => void;
 }
 
 const DEFAULT_TAB: TabItem = {
@@ -35,8 +34,7 @@ export const TabContext = React.createContext<TabContextType>({
     selectTab: () => {},
     updateTabInfo: () => {},
     popOutTab: () => {},
-    reattachTab: () => {},
-    reorderTabs: () => {}
+    reattachTab: () => {}
 });
 
 export const TabProvider: React.FC<{ children: React.ReactNode; navigate: (path: string) => void; currentPath: string }> = ({
@@ -125,19 +123,7 @@ export const TabProvider: React.FC<{ children: React.ReactNode; navigate: (path:
         }
     }, [tabs, navigate]);
 
-    const MAX_ACTIVE_TABS = 10;
-
     const openTab = React.useCallback(({ path, title, iconType = 'home', select = true }: { path: string; title: string; iconType?: TabIconType; select?: boolean }): string => {
-        // If a tab with this path already exists, focus it instead of duplicating
-        const existingTab = tabs.find(t => t.path === path);
-        if (existingTab) {
-            if (select) {
-                setActiveTabId(existingTab.id);
-                navigate(path);
-            }
-            return existingTab.id;
-        }
-
         const newTab: TabItem = {
             id: `tab-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
             title,
@@ -146,24 +132,13 @@ export const TabProvider: React.FC<{ children: React.ReactNode; navigate: (path:
             isPoppedOut: false
         };
 
-        setTabs(prev => {
-            const nextTabs = [...prev, newTab];
-            // If open tabs exceed maximum ceiling, evict oldest inactive, non-home, non-popped-out tab
-            if (nextTabs.length > MAX_ACTIVE_TABS) {
-                const evictIdx = nextTabs.findIndex(t => t.id !== 'tab-home' && t.id !== activeTabId && t.id !== newTab.id && !t.isPoppedOut);
-                if (evictIdx !== -1) {
-                    nextTabs.splice(evictIdx, 1);
-                }
-            }
-            return nextTabs;
-        });
-
+        setTabs(prev => [...prev, newTab]);
         if (select) {
             setActiveTabId(newTab.id);
             navigate(path);
         }
         return newTab.id;
-    }, [tabs, activeTabId, navigate]);
+    }, [navigate]);
 
     const closeTab = React.useCallback((tabId: string) => {
         setTabs(prevTabs => {
@@ -261,17 +236,6 @@ export const TabProvider: React.FC<{ children: React.ReactNode; navigate: (path:
         }
     }, [tabs, isPopoutWindow, navigate]);
 
-    const reorderTabs = React.useCallback((startIndex: number, endIndex: number) => {
-        if (startIndex === endIndex) return;
-        setTabs(prev => {
-            if (startIndex < 0 || startIndex >= prev.length || endIndex < 0 || endIndex >= prev.length) return prev;
-            const newTabs = Array.from(prev);
-            const [moved] = newTabs.splice(startIndex, 1);
-            newTabs.splice(endIndex, 0, moved);
-            return newTabs;
-        });
-    }, []);
-
     return (
         <TabContext.Provider value={{
             tabs,
@@ -283,8 +247,7 @@ export const TabProvider: React.FC<{ children: React.ReactNode; navigate: (path:
             selectTab,
             updateTabInfo,
             popOutTab,
-            reattachTab,
-            reorderTabs
+            reattachTab
         }}>
             {children}
         </TabContext.Provider>

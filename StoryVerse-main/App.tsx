@@ -20,13 +20,12 @@ import SketchesPage from './pages/SketchesPage';
 import SketchEditorPage from './pages/SketchEditorPage';
 import WorkingModelPage from './pages/WorkingModelPage';
 import { THEME_CONFIG } from './constants';
-import { LoadingIcon, Bars3Icon, DocumentPlusIcon, UploadIcon, CloudIcon } from './components/Icons';
+import { LoadingIcon, Bars3Icon, DocumentPlusIcon, UploadIcon, CloudIcon, ExclamationTriangleIcon, FolderIcon } from './components/Icons';
 import { Theme, Language } from './types';
 import { LanguageContext } from './contexts/LanguageContext';
 import { translations } from './utils/translations';
 import { useTranslations } from './hooks/useTranslations';
 import { startPeriodicCacheCleanup } from './utils/cacheManager';
-import { initSpaceRateLimiter } from './utils/spaceRateLimiter';
 
 const NovelEditRedirect = () => {
     const { novelId } = useParams<{ novelId: string }>();
@@ -180,12 +179,6 @@ const AppContent = () => {
         return cleanup;
     }, []);
 
-    // Rate-limit space key to eliminate accidental double-clicks / rapid chatter in all editable areas
-    React.useEffect(() => {
-        const cleanup = initSpaceRateLimiter();
-        return cleanup;
-    }, []);
-
     const theme = React.useMemo(() => {
         const projectTheme = project.projectData?.settings?.theme || 'book';
         return (projectTheme in THEME_CONFIG) ? projectTheme as Theme : 'book';
@@ -211,6 +204,10 @@ const AppContent = () => {
         status: project.status,
         projectName: project.projectName,
         storageMode: project.storageMode,
+        diskSyncState: project.diskSyncState,
+        isNativePickerAvailable: project.isNativePickerAvailable,
+        localFileNotice: project.localFileNotice,
+        dismissLocalFileNotice: project.dismissLocalFileNotice,
         userProfile: project.userProfile,
         saveStatus: project.saveStatus,
         signInWithGoogle: project.signInWithGoogle,
@@ -218,6 +215,9 @@ const AppContent = () => {
         createProjectOnDrive: project.createProjectOnDrive,
         createLocalProject: project.createLocalProject,
         openLocalProject: project.openLocalProject,
+        openLocalProjectStandard: project.openLocalProjectStandard,
+        resumeDiskSync: project.resumeDiskSync,
+        linkLocalDiskFile: project.linkLocalDiskFile,
         downloadProject: project.downloadProject,
         closeProject: project.closeProject,
         uploadProjectToDrive: project.uploadProjectToDrive,
@@ -233,6 +233,10 @@ const AppContent = () => {
         project.status,
         project.projectName,
         project.storageMode,
+        project.diskSyncState,
+        project.isNativePickerAvailable,
+        project.localFileNotice,
+        project.dismissLocalFileNotice,
         project.userProfile,
         project.saveStatus,
         project.signInWithGoogle,
@@ -240,6 +244,9 @@ const AppContent = () => {
         project.createProjectOnDrive,
         project.createLocalProject,
         project.openLocalProject,
+        project.openLocalProjectStandard,
+        project.resumeDiskSync,
+        project.linkLocalDiskFile,
         project.downloadProject,
         project.closeProject,
         project.uploadProjectToDrive,
@@ -360,12 +367,68 @@ const AppContent = () => {
         }
     };
 
+    const notice = project.localFileNotice;
+    const noticeMessage = notice
+        ? notice.type === 'invalid-json'
+            ? currentTranslations.invalidProjectFileMessage(notice.fileName || 'file.json')
+            : notice.type === 'read-error'
+                ? currentTranslations.readErrorMessage(notice.fileName || 'file.json')
+                : currentTranslations.directDiskBlockedMessage
+        : '';
+
     return (
         <ProjectContext.Provider value={contextValue}>
             <LanguageContext.Provider value={currentTranslations}>
                 <TabProvider navigate={navigate} currentPath={location.pathname}>
                     <div className="font-sans">
                         {renderContent()}
+                        {notice && (
+                            <div
+                                className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
+                                role="dialog"
+                                aria-modal="true"
+                                onClick={project.dismissLocalFileNotice}
+                            >
+                                <div
+                                    className={`w-full max-w-md rounded-xl border p-6 shadow-2xl ${themeClasses.bgSecondary} ${theme === 'book' ? themeClasses.accentText : themeClasses.text} ${themeClasses.border}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    <div className="flex items-start space-x-3">
+                                        <ExclamationTriangleIcon className="w-6 h-6 text-amber-500 flex-shrink-0 mt-0.5" />
+                                        <div className="min-w-0 flex-1">
+                                            <h3 className="text-lg font-bold">
+                                                {currentTranslations.fileOpenFailedTitle}
+                                            </h3>
+                                            <p className="mt-2 text-sm opacity-90">
+                                                {noticeMessage}
+                                            </p>
+                                            {notice.detail && (
+                                                <p className="mt-2 text-xs opacity-60 break-words">
+                                                    {notice.detail}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="mt-6 flex flex-wrap justify-end gap-2">
+                                        <button
+                                            onClick={project.dismissLocalFileNotice}
+                                            className={`px-4 py-2 text-sm font-semibold rounded-lg border ${themeClasses.border} hover:opacity-80 transition-opacity`}
+                                        >
+                                            {currentTranslations.close}
+                                        </button>
+                                        {notice.showStandardPickerOption && (
+                                            <button
+                                                onClick={() => project.openLocalProjectStandard()}
+                                                className={`flex items-center space-x-2 px-4 py-2 text-sm font-semibold rounded-lg ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90 transition-opacity`}
+                                            >
+                                                <FolderIcon className="w-4 h-4" />
+                                                <span>{currentTranslations.openWithStandardPicker}</span>
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </TabProvider>
             </LanguageContext.Provider>

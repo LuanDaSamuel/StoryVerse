@@ -10,8 +10,7 @@ import NovelHistoryPage from '../components/NovelHistoryPage';
 import ExportModal from '../components/ExportModal';
 import { useTranslations } from '../hooks/useTranslations';
 import { useTabTitle } from '../hooks/useTabTitle';
-import { parseDocxToHtml } from '../utils/docxParser';
-import { sanitizeImportedContent } from '../utils/docxSanitizer';
+import * as mammoth from 'mammoth';
 
 interface ImportDocxModalProps {
     isOpen: boolean;
@@ -275,11 +274,30 @@ const NovelDetailPage = () => {
 
         try {
             const arrayBuffer = await file.arrayBuffer();
-            const rawHtml = await parseDocxToHtml(arrayBuffer);
-            const sanitizedHtml = sanitizeImportedContent(rawHtml);
+            
+            // Safe Mammoth Resolution
+            // @ts-ignore
+            const mammothLib = mammoth.default || mammoth;
+             
+            if (!mammothLib || typeof mammothLib.convertToHtml !== 'function') {
+                 throw new Error("The DOCX processing library could not be loaded.");
+            }
+
+            const styleMap = [
+                "p[style-name='Title'] => h1:fresh",
+                "p[style-name='Subtitle'] => h2:fresh",
+                "p[style-name='Heading 1'] => h1:fresh",
+                "p[style-name='Heading 2'] => h2:fresh",
+                "p[style-name='Heading 3'] => h3:fresh",
+                "p[style-name='Heading 4'] => h4:fresh",
+                "p[style-name='Heading 5'] => h5:fresh",
+                "p[style-name='Heading 6'] => h6:fresh",
+            ];
+            const { value: html } = await mammothLib.convertToHtml({ arrayBuffer }, { styleMap });
             
             const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = sanitizedHtml;
+            // Clean up empty paragraphs
+            tempDiv.innerHTML = html.replace(/<p>(\s|&nbsp;|<br\s*\/?>)*<\/p>/gi, '').trim();
             
             const formatTextNodes = (node: Node) => {
                 if (node.nodeType === Node.TEXT_NODE) {
@@ -320,24 +338,19 @@ const NovelDetailPage = () => {
                         };
                         parsedChapters.push(currentChapter);
                     } else {
-                        if (el.tagName.toLowerCase() === 'p' && (!el.hasChildNodes() || el.innerHTML.trim() === '')) {
-                            el.innerHTML = '<br>';
-                        }
-                        const htmlContent = el.outerHTML;
                         if (currentChapter) {
-                            currentChapter.content += htmlContent;
+                            currentChapter.content += el.outerHTML;
                         } else {
-                            preambleHtml += htmlContent;
+                            preambleHtml += el.outerHTML;
                         }
                     }
                 } else if (node.nodeType === Node.TEXT_NODE) {
                     const text = node.textContent || '';
                     if (text.trim()) {
-                        const wrappedText = `<p>${text}</p>`;
                         if (currentChapter) {
-                            currentChapter.content += wrappedText;
+                            currentChapter.content += text;
                         } else {
-                            preambleHtml += wrappedText;
+                            preambleHtml += text;
                         }
                     }
                 }
@@ -355,13 +368,8 @@ const NovelDetailPage = () => {
                 preambleHtml = '';
             }
 
-            // Calculate word count for each parsed chapter and ensure valid empty line placeholders
+            // Calculate word count for each parsed chapter
             parsedChapters.forEach(ch => {
-                if (!ch.content.trim()) {
-                    ch.content = '<p><br></p>';
-                } else {
-                    ch.content = ch.content.replace(/<p>(\s|&nbsp;)*<\/p>/gi, '<p><br></p>');
-                }
                 const plainText = ch.content.replace(/<[^>]*>/g, ' ');
                 let wordCount = 0;
                 const regex = /\S+/g;
@@ -651,7 +659,7 @@ const NovelDetailPage = () => {
                                 </div>
                             )}
                         </div>
-                        <input type="file" ref={coverImageInputRef} onChange={handleCoverImageChange} className="hidden" accept="image/*" />
+                         <input type="file" ref={coverImageInputRef} onChange={handleCoverImageChange} className="hidden" accept="image/*" />
                         <button onClick={() => coverImageInputRef.current?.click()} className={`w-full mt-4 py-2 px-4 rounded-lg font-semibold transition-colors ${themeClasses.bgTertiary} ${themeClasses.accentText} hover:opacity-80`}>
                             {t.uploadFile}
                         </button>

@@ -4,7 +4,7 @@ import * as ReactDOM from 'react-dom';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { Theme, Language } from '../types';
 import { THEME_CONFIG } from '../constants';
-import { CloseIcon, DownloadIcon, TrashIcon, GoogleIcon } from './Icons';
+import { CloseIcon, DownloadIcon, TrashIcon, GoogleIcon, FolderIcon, RefreshIcon, CheckIcon, ExclamationTriangleIcon } from './Icons';
 import ConfirmModal from './ConfirmModal';
 import { useTranslations } from '../hooks/useTranslations';
 
@@ -21,7 +21,8 @@ const themeOptions: { name: Theme; label: string; colors: string[] }[] = [
 const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
   const { 
       projectData, theme, setProjectData, downloadProject, closeProject, 
-      themeClasses, projectName, storageMode, signOut, connectLocalToDrive
+      themeClasses, projectName, storageMode, signOut, connectLocalToDrive,
+      diskSyncState, isNativePickerAvailable, openLocalProject, resumeDiskSync, linkLocalDiskFile
   } = React.useContext(ProjectContext);
   const t = useTranslations();
   const [isConfirmOpen, setIsConfirmOpen] = React.useState(false);
@@ -79,17 +80,57 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
     return themeClasses.border;
   };
   
-  const storageLocation = storageMode === 'drive' ? 'Google Drive' : 'a local file';
+  const storageLocation = storageMode === 'drive'
+    ? 'Google Drive'
+    : diskSyncState === 'disk-synced'
+      ? t.localDiskLocation
+      : diskSyncState === 'needs-permission'
+        ? t.localDiskPendingLocation
+        : t.localBrowserLocation;
   const closeButtonText = storageMode === 'drive' ? t.signOutAndClose : t.closeProject;
   const confirmTitle = storageMode === 'drive' ? t.signOutTitle : t.closeProjectTitle;
   const confirmMessage = storageMode === 'drive' ? t.signOutMessage : t.closeProjectMessage;
 
+  const renderSyncBadge = () => {
+    if (storageMode !== 'local') return null;
+
+    if (diskSyncState === 'disk-synced') {
+      return (
+        <span className="inline-flex items-center space-x-1.5 text-xs font-semibold text-emerald-500">
+          <CheckIcon className="w-4 h-4 flex-shrink-0" />
+          <span>{t.diskSyncedLabel}</span>
+        </span>
+      );
+    }
+    if (diskSyncState === 'needs-permission') {
+      return (
+        <span className="inline-flex items-center space-x-1.5 text-xs font-semibold text-amber-500">
+          <RefreshIcon className="w-4 h-4 flex-shrink-0" />
+          <span>{t.needsPermissionLabel}</span>
+        </span>
+      );
+    }
+    if (diskSyncState === 'disk-error') {
+      return (
+        <span className="inline-flex items-center space-x-1.5 text-xs font-semibold text-rose-500">
+          <ExclamationTriangleIcon className="w-4 h-4 flex-shrink-0" />
+          <span>{t.diskErrorLabel}</span>
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center space-x-1.5 text-xs font-semibold text-emerald-500">
+        <CheckIcon className="w-4 h-4 flex-shrink-0" />
+        <span>{t.browserAutoSaveLabel}</span>
+      </span>
+    );
+  };
 
   return ReactDOM.createPortal(
     <>
       <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 font-sans" onClick={onClose} role="dialog" aria-modal="true">
         <div 
-            className={`w-full max-w-lg p-6 rounded-lg shadow-xl ${themeClasses.bgSecondary} ${modalTextColor} border ${themeClasses.border}`} 
+            className={`w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 rounded-lg shadow-xl ${themeClasses.bgSecondary} ${modalTextColor} border ${themeClasses.border}`} 
             onClick={(e) => e.stopPropagation()}
         >
           <div className="flex justify-between items-center mb-6">
@@ -156,7 +197,43 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                 <p className={`${descriptionColor} text-sm break-words`}>{projectName}</p>
                 <p className="font-semibold mt-3">{t.storageLocation}</p>
                 <p className={`${descriptionColor} text-sm`}>{t.storageLocationText(storageLocation)}</p>
+                {storageMode === 'local' && (
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <span className="font-semibold text-sm">{t.syncStatusLabel}</span>
+                    {renderSyncBadge()}
+                  </div>
+                )}
                 <div className="mt-4 grid grid-cols-1 gap-3">
+                  {storageMode === 'local' && diskSyncState === 'needs-permission' && (
+                    <button
+                      onClick={() => { void resumeDiskSync(); }}
+                      className="w-full flex items-center justify-center space-x-2 px-4 py-2 text-sm font-semibold rounded-lg transition-colors bg-amber-600 text-white hover:bg-amber-700"
+                    >
+                      <RefreshIcon className="w-4 h-4" />
+                      <span>{t.resumeDiskSync}</span>
+                    </button>
+                  )}
+                  {storageMode === 'local' && isNativePickerAvailable && (diskSyncState === 'browser-local' || diskSyncState === 'disk-error') && (
+                    <button
+                      onClick={() => { void linkLocalDiskFile(); }}
+                      className={`w-full flex items-center justify-center space-x-2 px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${themeClasses.accent} ${themeClasses.accentText} hover:opacity-90`}
+                    >
+                      <RefreshIcon className="w-4 h-4" />
+                      <span>{diskSyncState === 'disk-error' ? t.relinkDiskFile : t.linkDiskFile}</span>
+                    </button>
+                  )}
+                  {storageMode === 'local' && (
+                    <button
+                      onClick={() => {
+                        const promise = openLocalProject();
+                        void promise.then(() => onClose());
+                      }}
+                      className={`w-full flex items-center justify-center space-x-2 px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${themeClasses.bgSecondary} ${modalTextColor} border ${themeClasses.border} hover:opacity-80`}
+                    >
+                      <FolderIcon className="w-4 h-4" />
+                      <span>{t.switchFile}</span>
+                    </button>
+                  )}
                   {storageMode === 'local' && (
                     <button onClick={connectLocalToDrive} className="w-full flex items-center justify-center space-x-2 px-4 py-2 text-sm font-semibold rounded-lg transition-colors bg-white text-gray-800 hover:bg-gray-200">
                       <GoogleIcon className="w-4 h-4" />

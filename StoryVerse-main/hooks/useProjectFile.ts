@@ -1,18 +1,17 @@
 
 import * as React from 'react';
-import { ProjectData, StorageStatus, Theme, StoryIdeaStatus, NovelSketch, UserProfile, SaveStatus, Language, WritingMode } from '../types';
+import { ProjectData, StorageStatus, Theme, StoryIdeaStatus, NovelSketch, UserProfile, SaveStatus, Language, WritingMode, DiskSyncState, LocalProjectMeta, LocalFileNotice } from '../types';
 import { get, set, del } from 'idb-keyval';
-import { useProjectStorage, PermanentAuthError } from './useProjectStorage';
-import { enforceProjectDataLimits, DATA_LIMITS } from '../utils/dataLimiter';
-import { tabLeaderManager } from '../utils/tabLeaderManager';
+import { useProjectStorage, PermanentAuthError, isNativeFileSystemPickerUsable, requestPermissionSafe } from './useProjectStorage';
 
 // --- Constants ---
 const LOCAL_BACKUP_KEY = 'storyverse-local-backup';
+const LOCAL_META_KEY = 'storyverse-local-meta';
 const LOCAL_UNLOAD_BACKUP_KEY = 'storyverse-unload-backup';
+const LOCAL_UNLOAD_META_KEY = 'storyverse-unload-meta';
 const LOCAL_UNLOAD_BACKUP_TIMESTAMP_KEY = 'storyverse-unload-backup-timestamp';
 const STORAGE_PREFERENCE_KEY = 'storyverse-storage-preference';
-const SHARED_ACTIVE_PROJECT_KEY = 'storyverse-shared-active-project';
-const isFileSystemAccessAPISupported = 'showOpenFilePicker' in window;
+const DEFAULT_LOCAL_FILENAME = 'StoryVerse-Project.json';
 
 const defaultProjectData: ProjectData = {
   settings: { theme: 'book', baseFontSize: 18, language: 'en', writingMode: 'standard' },
@@ -24,10 +23,122 @@ const defaultProjectData: ProjectData = {
 };
 
 // --- Helper Functions ---
-const sanitizeProjectData = (data: any): ProjectData => {
-  return enforceProjectDataLimits(data);
+const generateId = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 };
 
+const parseStoryVerseProjectJson = (rawText: string): any => {
+  const cleaned = rawText.replace(/^\uFEFF/, '').trim();
+  if (!cleaned) {
+    throw new Error('The selected file is empty.');
+  }
+  const parsed = JSON.parse(cleaned);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('The selected file is not a valid StoryVerse JSON object.');
+  }
+  return parsed;
+};
+
+const sanitizeProjectData = (data: any): ProjectData => {
+  const sanitized = JSON.parse(JSON.stringify(defaultProjectData));
+  
+  if (data?.settings) {
+    if (['dark', 'book'].includes(data.settings.theme)) {
+      sanitized.settings.theme = data.settings.theme as Theme;
+    }
+    if (typeof data.settings.baseFontSize === 'number') {
+      sanitized.settings.baseFontSize = data.settings.baseFontSize;
+    }
+    if (['en', 'vi', 'fi', 'sv'].includes(data.settings.language)) {
+        sanitized.settings.language = data.settings.language as Language;
+    }
+    if (['standard', 'book-note'].includes(data.settings.writingMode)) {
+        sanitized.settings.writingMode = data.settings.writingMode as WritingMode;
+    }
+  }
+
+  if (data?.dailyGoal) {
+      sanitized.dailyGoal = {
+          target: typeof data.dailyGoal.target === 'number' ? data.dailyGoal.target : 500,
+          current: typeof data.dailyGoal.current === 'number' ? data.dailyGoal.current : 0,
+          lastUpdated: typeof data.dailyGoal.lastUpdated === 'string' ? data.dailyGoal.lastUpdated : new Date().toISOString().split('T')[0]
+      };
+  }
+
+  if (Array.isArray(data?.userDictionary)) {
+      sanitized.userDictionary = data.userDictionary.filter((w: any) => typeof w === 'string');
+  }
+
+  if (Array.isArray(data?.novels)) {
+    sanitized.novels = data.novels.map((novel: any) => ({
+      id: novel.id || generateId(),
+      title: novel.title || 'Untitled Novel',
+      description: novel.description || '',
+      coverImage: novel.coverImage,
+      tags: Array.isArray(novel.tags) ? novel.tags : [],
+      chapters: Array.isArray(novel.chapters)
+        ? novel.chapters.map((chapter: any) => ({
+            id: chapter.id || generateId(),
+            title: chapter.title || 'Untitled Chapter',
+            content: chapter.content || '',
+            wordCount: typeof chapter.wordCount === 'number' ? chapter.wordCount : 0,
+            createdAt: chapter.createdAt || new Date().toISOString(),
+            updatedAt: chapter.updatedAt || new Date().toISOString(),
+            history: Array.isArray(chapter.history) ? chapter.history : [],
+          }))
+        : [],
+      sketches: Array.isArray(novel.sketches)
+        ? novel.sketches.map((sketch: any): NovelSketch => ({
+            id: sketch.id || generateId(),
+            title: sketch.title || 'Untitled Sketch',
+            content: sketch.content || '',
+            wordCount: typeof sketch.wordCount === 'number' ? sketch.wordCount : 0,
+            tags: Array.isArray(sketch.tags) ? sketch.tags : [],
+            createdAt: sketch.createdAt || new Date().toISOString(),
+            updatedAt: sketch.updatedAt || new Date().toISOString(),
+          }))
+        : [],
+      createdAt: novel.createdAt || new Date().toISOString(),
+    }));
+  }
+
+  if (Array.isArray(data?.ideaFolders)) {
+    sanitized.ideaFolders = data.ideaFolders.map((folder: any) => ({
+        id: folder.id || generateId(),
+        name: folder.name || 'Untitled Folder',
+        createdAt: folder.createdAt || new Date().toISOString(),
+    }));
+  }
+
+  if (Array.isArray(data?.storyIdeas)) {
+    sanitized.storyIdeas = data.storyIdeas.map((idea: any) => {
+      const validStatuses: StoryIdeaStatus[] = ['Seedling', 'Developing', 'Archived'];
+      const status = validStatuses.includes(idea.status) ? idea.status : 'Seedling';
+      return {
+        id: idea.id || generateId(),
+        title: idea.title || 'Untitled Idea',
+        synopsis: idea.synopsis || '',
+        wordCount: typeof idea.wordCount === 'number' ? idea.wordCount : 0,
+        tags: Array.isArray(idea.tags) ? idea.tags : [],
+        status: status,
+        folderId: idea.folderId || null,
+        visitCount: typeof idea.visitCount === 'number' ? idea.visitCount : 0,
+        createdAt: idea.createdAt || new Date().toISOString(),
+        updatedAt: idea.updatedAt || new Date().toISOString(),
+      };
+    });
+  }
+  return sanitized;
+};
+
+function parseTimestampMs(isoOrNull?: string | null): number {
+    if (!isoOrNull) return 0;
+    const ms = Date.parse(isoOrNull);
+    return Number.isFinite(ms) ? ms : 0;
+}
 
 export function useProject() {
   const [projectData, setProjectData] = React.useState<ProjectData | null>(null);
@@ -36,15 +147,43 @@ export function useProject() {
   const [storageMode, setStorageMode] = React.useState<'local' | 'drive' | null>(null);
   const [userProfile, setUserProfile] = React.useState<UserProfile | null>(null);
   const [saveStatus, setSaveStatus] = React.useState<SaveStatus>('idle');
+  const [diskSyncState, setDiskSyncState] = React.useState<DiskSyncState>('browser-local');
+  const [localFileNotice, setLocalFileNotice] = React.useState<LocalFileNotice | null>(null);
+
+  const dismissLocalFileNotice = React.useCallback(() => {
+    setLocalFileNotice(null);
+  }, []);
+
+  const isNativePickerAvailable = React.useMemo(() => isNativeFileSystemPickerUsable(), []);
 
   const saveStatusRef = React.useRef(saveStatus);
   React.useEffect(() => {
       saveStatusRef.current = saveStatus;
   }, [saveStatus]);
 
+  const storageModeRef = React.useRef(storageMode);
+  const setStorageModeSync = React.useCallback((mode: 'local' | 'drive' | null) => {
+      storageModeRef.current = mode;
+      setStorageMode(mode);
+  }, []);
+
+  const projectNameRef = React.useRef(projectName);
+  const setProjectNameSync = React.useCallback((name: string) => {
+      projectNameRef.current = name;
+      setProjectName(name);
+  }, []);
+
+  const diskSyncStateRef = React.useRef<DiskSyncState>(diskSyncState);
+  const setDiskSyncStateSync = React.useCallback((nextState: DiskSyncState) => {
+      diskSyncStateRef.current = nextState;
+      setDiskSyncState(nextState);
+  }, []);
+
+  const localMetaRef = React.useRef<LocalProjectMeta | null>(null);
   const isInitialLoadRef = React.useRef(true);
   const isDirtyRef = React.useRef(false);
   const isSavingRef = React.useRef(false);
+  const hasAttemptedAutoGestureReconnectRef = React.useRef(false);
   const projectDataRef = React.useRef(projectData);
 
   const storage = useProjectStorage();
@@ -52,61 +191,38 @@ export function useProject() {
   const saveTimeoutRef = React.useRef<number | null>(null);
   const localStorageBackupTimeoutRef = React.useRef<number | null>(null);
   const broadcastChannelRef = React.useRef<BroadcastChannel | null>(null);
-  const needsSyncOnVisibleRef = React.useRef<boolean>(false);
+
+  const writeEmergencyLocalStorageSnapshot = React.useCallback((data: ProjectData, meta: LocalProjectMeta | null) => {
+      try {
+          localStorage.setItem(LOCAL_UNLOAD_BACKUP_KEY, JSON.stringify(data));
+          localStorage.setItem(LOCAL_UNLOAD_BACKUP_TIMESTAMP_KEY, Date.now().toString());
+          if (meta) {
+              localStorage.setItem(LOCAL_UNLOAD_META_KEY, JSON.stringify(meta));
+          }
+          localStorage.setItem(STORAGE_PREFERENCE_KEY, 'local');
+      } catch (e) {
+          console.warn("Could not write emergency localStorage snapshot:", e);
+      }
+  }, []);
+
+  const persistLocalMirror = React.useCallback(async (data: ProjectData, meta: LocalProjectMeta) => {
+      localMetaRef.current = meta;
+      writeEmergencyLocalStorageSnapshot(data, meta);
+      try {
+          await set(LOCAL_BACKUP_KEY, data);
+          await set(LOCAL_META_KEY, meta);
+      } catch (err) {
+          console.warn("Local IDB mirror save failed:", err);
+      }
+  }, [writeEmergencyLocalStorageSnapshot]);
 
   React.useEffect(() => {
     if ('BroadcastChannel' in window) {
       const channel = new BroadcastChannel('storyverse_project_data_sync');
       broadcastChannelRef.current = channel;
-      channel.onmessage = async (event) => {
-        const { type, data, senderTabId } = event.data || {};
-
-        if (type === 'PROJECT_STATE_CHANGED_PING') {
-          // Ignore notifications originated from this tab
-          if (senderTabId === tabLeaderManager.tabId) return;
-
-          // If current tab is in the background, DO NOT deserialize or re-render.
-          // Simply flag that a refresh is needed when the user switches to this tab.
-          if (document.visibilityState === 'hidden') {
-            needsSyncOnVisibleRef.current = true;
-            return;
-          }
-
-          // If current tab is active and visible, pull fresh state from shared IndexedDB
-          try {
-            const shared = await get<ProjectData>(SHARED_ACTIVE_PROJECT_KEY);
-            if (shared) {
-              const safe = sanitizeProjectData(shared);
-              projectDataRef.current = safe;
-              setProjectData(safe);
-            }
-          } catch (e) {
-            console.warn("Cross-tab sync fetch failed:", e);
-          }
-        } else if (type === 'REQUEST_LEADER_CLOUD_SAVE') {
-          // Only the leader tab handles actual Google Drive cloud uploads
-          if (tabLeaderManager.isCurrentTabLeader()) {
-            try {
-              const shared = await get<ProjectData>(SHARED_ACTIVE_PROJECT_KEY);
-              if (shared) {
-                const safe = sanitizeProjectData(shared);
-                projectDataRef.current = safe;
-                setProjectData(safe);
-                isDirtyRef.current = true;
-                if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-                saveTimeoutRef.current = window.setTimeout(() => {
-                  saveProjectRef.current?.();
-                }, 400);
-              }
-            } catch (e) {
-              console.warn("Leader cloud save fetch failed:", e);
-            }
-          }
-        } else if (type === 'LEADER_CLOUD_SAVE_COMPLETED') {
-          if (!tabLeaderManager.isCurrentTabLeader()) {
-            setSaveStatus('saved');
-          }
-        } else if (type === 'PROJECT_DATA_REMOTE_UPDATE' && data) {
+      channel.onmessage = (event) => {
+        const { type, data } = event.data || {};
+        if (type === 'PROJECT_DATA_REMOTE_UPDATE' && data) {
           projectDataRef.current = data;
           setProjectData(data);
         }
@@ -118,30 +234,19 @@ export function useProject() {
     }
   }, []);
 
-  // Listen to single-leader election changes
-  React.useEffect(() => {
-    const unsub = tabLeaderManager.onLeaderChange((leader) => {
-      if (leader && isDirtyRef.current) {
-        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-        saveTimeoutRef.current = window.setTimeout(() => {
-          saveProjectRef.current?.();
-        }, 500);
-      }
-    });
-    return unsub;
-  }, []);
-
-  
   const resetState = React.useCallback(() => {
     setProjectData(null);
-    setProjectName('');
-    setStorageMode(null);
+    projectDataRef.current = null;
+    setProjectNameSync('');
+    setStorageModeSync(null);
     setUserProfile(null);
     setSaveStatus('idle');
+    setDiskSyncStateSync('browser-local');
+    localMetaRef.current = null;
     isDirtyRef.current = false;
-    localStorage.removeItem(STORAGE_PREFERENCE_KEY); 
-    del(SHARED_ACTIVE_PROJECT_KEY).catch(() => {});
-  }, []);
+    hasAttemptedAutoGestureReconnectRef.current = false;
+    localStorage.removeItem(STORAGE_PREFERENCE_KEY);
+  }, [setProjectNameSync, setStorageModeSync, setDiskSyncStateSync]);
 
   const flushChanges = React.useCallback(async () => {
     if (saveTimeoutRef.current) {
@@ -155,21 +260,21 @@ export function useProject() {
     }
   }, []);
   
-    const signOut = React.useCallback(async (options?: { flush?: boolean }) => {
-        const shouldFlush = options?.flush ?? true;
-        
-        setStatus('loading');
-        if (shouldFlush) {
-            try {
-                await flushChanges();
-            } catch (error) {
-                console.error("Failed to flush changes during sign out:", error);
-            }
-        }
-        await storage.signOut();
-        resetState();
-        setStatus('welcome');
-    }, [flushChanges, storage, resetState]);
+  const signOut = React.useCallback(async (options?: { flush?: boolean }) => {
+      const shouldFlush = options?.flush ?? true;
+      
+      setStatus('loading');
+      if (shouldFlush) {
+          try {
+              await flushChanges();
+          } catch (error) {
+              console.error("Failed to flush changes during sign out:", error);
+          }
+      }
+      await storage.signOut();
+      resetState();
+      setStatus('welcome');
+  }, [flushChanges, storage, resetState]);
 
   const saveProject = React.useCallback(async () => {
     if (isSavingRef.current) return;
@@ -182,38 +287,23 @@ export function useProject() {
     try {
         while (isDirtyRef.current) {
             const dataToSave = projectDataRef.current;
+            const activeMode = storageModeRef.current;
             if (!dataToSave) {
                  isDirtyRef.current = false;
                  break;
             }
 
-            // Update shared IndexedDB snapshot so all open tabs have access to latest state
-            try {
-                await set(SHARED_ACTIVE_PROJECT_KEY, dataToSave);
-            } catch (backupError) {
-                console.warn("Shared IDB update failed:", backupError);
-            }
+            const nowIso = new Date().toISOString();
+            const currentMeta: LocalProjectMeta = {
+                projectName: localMetaRef.current?.projectName || projectNameRef.current || DEFAULT_LOCAL_FILENAME,
+                openedAt: localMetaRef.current?.openedAt || nowIso,
+                lastLocalModifiedAt: nowIso,
+                lastDiskSyncAt: localMetaRef.current?.lastDiskSyncAt ?? null,
+                hasLinkedHandle: localMetaRef.current?.hasLinkedHandle ?? false,
+            };
 
-            // ONLY save to local backup if NOT in cloud mode
-            if (storageMode === 'local') {
-                try {
-                    await set(LOCAL_BACKUP_KEY, dataToSave);
-                } catch (backupError) {
-                    console.warn("Local IDB backup failed:", backupError);
-                }
-            }
-
-            // If in Google Drive mode and this tab is NOT the leader tab,
-            // delegate cloud saving to the leader tab to prevent multi-tab sync races & duplicate uploads!
-            if (storageMode === 'drive' && !tabLeaderManager.isCurrentTabLeader()) {
-                isDirtyRef.current = false;
-                setSaveStatus('saving');
-                broadcastChannelRef.current?.postMessage({
-                    type: 'REQUEST_LEADER_CLOUD_SAVE',
-                    senderTabId: tabLeaderManager.tabId,
-                    timestamp: Date.now()
-                });
-                break;
+            if (activeMode === 'local') {
+                await persistLocalMirror(dataToSave, currentMeta);
             }
 
             isDirtyRef.current = false;
@@ -225,16 +315,36 @@ export function useProject() {
 
             for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
                 try {
-                    if (storageMode === 'drive') {
+                    if (activeMode === 'drive') {
                         await storage.saveToDrive(dataToSave);
-                    } else if (storageMode === 'local') {
-                        await storage.saveToFileHandle(dataToSave);
+                        setDiskSyncStateSync('drive');
+                        success = true;
+                    } else if (activeMode === 'local') {
+                        const writeResult = await storage.writeFileToHandle(dataToSave, false);
+                        if (writeResult.ok) {
+                            const syncedMeta: LocalProjectMeta = {
+                                ...currentMeta,
+                                lastDiskSyncAt: writeResult.syncedAt,
+                                hasLinkedHandle: true,
+                            };
+                            await persistLocalMirror(dataToSave, syncedMeta);
+                            setDiskSyncStateSync('disk-synced');
+                            success = true;
+                        } else if (writeResult.reason === 'needs-permission') {
+                            // Keep handle linked and mirror saved in IDB; user gesture will resume disk sync.
+                            setDiskSyncStateSync('needs-permission');
+                            success = true;
+                        } else if (writeResult.reason === 'no-handle') {
+                            setDiskSyncStateSync('browser-local');
+                            success = true;
+                        } else {
+                            setDiskSyncStateSync('disk-error');
+                            lastError = writeResult.error || new Error("Disk write failed.");
+                        }
                     } else {
-                        success = true; 
-                        break;
+                        success = true;
                     }
-                    success = true;
-                    break;
+                    if (success) break;
                 } catch (error: any) {
                     lastError = error;
                     if (error instanceof PermanentAuthError || error.name === 'ExpiredVersionError') throw error; 
@@ -245,15 +355,10 @@ export function useProject() {
             }
             
             if (success) {
-                // Always clear emergency backup on success regardless of mode
-                localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
-                localStorage.removeItem(LOCAL_UNLOAD_BACKUP_TIMESTAMP_KEY);
-
-                if (storageMode === 'drive') {
-                    broadcastChannelRef.current?.postMessage({
-                        type: 'LEADER_CLOUD_SAVE_COMPLETED',
-                        timestamp: Date.now()
-                    });
+                if (activeMode === 'drive') {
+                    localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
+                    localStorage.removeItem(LOCAL_UNLOAD_META_KEY);
+                    localStorage.removeItem(LOCAL_UNLOAD_BACKUP_TIMESTAMP_KEY);
                 }
             } else {
                 throw lastError || new Error("Save operation failed");
@@ -288,11 +393,38 @@ export function useProject() {
             }, retryDelay); 
         }
     }
-  }, [storage, storageMode, signOut]);
+  }, [storage, signOut, persistLocalMirror, setDiskSyncStateSync]);
 
   React.useEffect(() => {
     saveProjectRef.current = saveProject;
   }, [saveProject]);
+
+  const scheduleAutoSave = React.useCallback((delayMs = 800) => {
+    if (!isSavingRef.current) setSaveStatus('unsaved');
+
+    if (storageModeRef.current !== 'drive') {
+        if (localStorageBackupTimeoutRef.current) clearTimeout(localStorageBackupTimeoutRef.current);
+        localStorageBackupTimeoutRef.current = window.setTimeout(() => {
+            if (projectDataRef.current) {
+                const nowIso = new Date().toISOString();
+                const meta: LocalProjectMeta = {
+                    projectName: localMetaRef.current?.projectName || projectNameRef.current || DEFAULT_LOCAL_FILENAME,
+                    openedAt: localMetaRef.current?.openedAt || nowIso,
+                    lastLocalModifiedAt: nowIso,
+                    lastDiskSyncAt: localMetaRef.current?.lastDiskSyncAt ?? null,
+                    hasLinkedHandle: localMetaRef.current?.hasLinkedHandle ?? false,
+                };
+                localMetaRef.current = meta;
+                writeEmergencyLocalStorageSnapshot(projectDataRef.current, meta);
+            }
+        }, 400);
+    }
+
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = window.setTimeout(() => {
+        saveProjectRef.current?.();
+    }, delayMs);
+  }, [writeEmergencyLocalStorageSnapshot]);
 
   const updateDailyWordCount = React.useCallback((wordCountDelta: number) => {
     setProjectData((prevData) => {
@@ -308,68 +440,23 @@ export function useProject() {
       };
       projectDataRef.current = newData;
       isDirtyRef.current = true;
-      if (!isSavingRef.current) setSaveStatus('unsaved');
-      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-      saveTimeoutRef.current = window.setTimeout(() => {
-          saveProjectRef.current?.();
-      }, 350);
       return newData;
     });
-  }, []);
-
-  const broadcastDebounceTimeoutRef = React.useRef<number | null>(null);
+    scheduleAutoSave(500);
+  }, [scheduleAutoSave]);
 
   const setProjectDataAndMarkDirty = React.useCallback((updater: React.SetStateAction<ProjectData | null>) => {
     setProjectData(prevData => {
         const newData = typeof updater === 'function' ? updater(prevData) : updater;
         projectDataRef.current = newData;
         isDirtyRef.current = true;
-        
-        // Persist to shared IndexedDB and broadcast lightweight ping instead of cloning the entire project payload
         if (newData && broadcastChannelRef.current) {
-            if (broadcastDebounceTimeoutRef.current) clearTimeout(broadcastDebounceTimeoutRef.current);
-            broadcastDebounceTimeoutRef.current = window.setTimeout(async () => {
-                try {
-                    if (projectDataRef.current) {
-                        await set(SHARED_ACTIVE_PROJECT_KEY, projectDataRef.current);
-                        broadcastChannelRef.current?.postMessage({
-                            type: 'PROJECT_STATE_CHANGED_PING',
-                            senderTabId: tabLeaderManager.tabId,
-                            timestamp: Date.now()
-                        });
-                    }
-                } catch (e) {
-                    console.warn("BroadcastChannel postMessage failed:", e);
-                }
-            }, 300);
+            broadcastChannelRef.current.postMessage({ type: 'PROJECT_DATA_REMOTE_UPDATE', data: newData });
         }
         return newData;
     });
-
-    if (!isSavingRef.current) setSaveStatus('unsaved');
-
-    // ONLY perform emergency unload backup if NOT in drive mode
-    if (storageMode !== 'drive') {
-        if (localStorageBackupTimeoutRef.current) clearTimeout(localStorageBackupTimeoutRef.current);
-        localStorageBackupTimeoutRef.current = window.setTimeout(() => {
-            try {
-                if (projectDataRef.current) {
-                     const jsonString = JSON.stringify(projectDataRef.current);
-                     // Guard against localStorage 5MB browser quota and memory lockup
-                     if (jsonString.length <= DATA_LIMITS.LOCAL_STORAGE_WRITE_LIMIT_BYTES) {
-                         localStorage.setItem(LOCAL_UNLOAD_BACKUP_KEY, jsonString);
-                         localStorage.setItem(LOCAL_UNLOAD_BACKUP_TIMESTAMP_KEY, Date.now().toString());
-                     }
-                }
-            } catch (e) { console.error("Unload backup failed", e); }
-        }, 2000); 
-    }
-
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = window.setTimeout(() => {
-        saveProjectRef.current?.();
-    }, 350); 
-  }, [storageMode]);
+    scheduleAutoSave(800);
+  }, [scheduleAutoSave]);
 
   React.useEffect(() => {
     if (saveStatus === 'saved') {
@@ -380,74 +467,141 @@ export function useProject() {
     }
   }, [saveStatus]);
     
-    React.useEffect(() => {
-        const handleVisibilityChange = async () => {
-            if (document.visibilityState === 'hidden') {
-                flushChanges();
-            } else if (document.visibilityState === 'visible') {
-                // When tab becomes visible again, check if we missed any updates while hidden
-                if (needsSyncOnVisibleRef.current) {
-                    needsSyncOnVisibleRef.current = false;
-                    try {
-                        const shared = await get<ProjectData>(SHARED_ACTIVE_PROJECT_KEY);
-                        if (shared) {
-                            const safe = sanitizeProjectData(shared);
-                            projectDataRef.current = safe;
-                            setProjectData(safe);
-                        }
-                    } catch (e) {
-                        console.warn("Catch-up sync on visible failed:", e);
-                    }
-                }
-            }
-        };
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-    }, [flushChanges]);
+  React.useEffect(() => {
+      const handleBeforeUnloadOrPageHide = () => {
+          if (storageModeRef.current === 'local' && projectDataRef.current) {
+              const nowIso = new Date().toISOString();
+              const meta: LocalProjectMeta = {
+                  projectName: localMetaRef.current?.projectName || projectNameRef.current || DEFAULT_LOCAL_FILENAME,
+                  openedAt: localMetaRef.current?.openedAt || nowIso,
+                  lastLocalModifiedAt: isDirtyRef.current ? nowIso : (localMetaRef.current?.lastLocalModifiedAt || nowIso),
+                  lastDiskSyncAt: localMetaRef.current?.lastDiskSyncAt ?? null,
+                  hasLinkedHandle: localMetaRef.current?.hasLinkedHandle ?? false,
+              };
+              writeEmergencyLocalStorageSnapshot(projectDataRef.current, meta);
+          }
+          flushChanges();
+      };
+      const handleVisibilityChange = () => {
+          if (document.visibilityState === 'hidden') {
+              handleBeforeUnloadOrPageHide();
+          }
+      };
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      window.addEventListener('pagehide', handleBeforeUnloadOrPageHide);
+      window.addEventListener('beforeunload', handleBeforeUnloadOrPageHide);
+      return () => {
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+          window.removeEventListener('pagehide', handleBeforeUnloadOrPageHide);
+          window.removeEventListener('beforeunload', handleBeforeUnloadOrPageHide);
+      };
+  }, [flushChanges, writeEmergencyLocalStorageSnapshot]);
+
+  // --- Resume Disk Sync on User Gesture ---
+  const resumeDiskSync = React.useCallback(async (): Promise<boolean> => {
+      if (storageModeRef.current !== 'local' || !projectDataRef.current) return false;
+      const handle = await storage.getCachedFileHandle();
+      if (!handle) return false;
+
+      setSaveStatus('saving');
+      const result = await storage.writeFileToHandle(projectDataRef.current, true);
+      if (result.ok) {
+          const nowIso = result.syncedAt;
+          const updatedMeta: LocalProjectMeta = {
+              projectName: handle.name || localMetaRef.current?.projectName || projectNameRef.current || DEFAULT_LOCAL_FILENAME,
+              openedAt: localMetaRef.current?.openedAt || nowIso,
+              lastLocalModifiedAt: localMetaRef.current?.lastLocalModifiedAt || nowIso,
+              lastDiskSyncAt: nowIso,
+              hasLinkedHandle: true,
+          };
+          setProjectNameSync(updatedMeta.projectName);
+          await persistLocalMirror(projectDataRef.current, updatedMeta);
+          setDiskSyncStateSync('disk-synced');
+          isDirtyRef.current = false;
+          setSaveStatus('saved');
+          return true;
+      }
+
+      if (result.reason === 'needs-permission') {
+          setDiskSyncStateSync('needs-permission');
+          setSaveStatus('idle');
+      } else {
+          setDiskSyncStateSync('disk-error');
+          setSaveStatus('error');
+      }
+      return false;
+  }, [storage, persistLocalMirror, setProjectNameSync, setDiskSyncStateSync]);
+
+  // Attempt one automatic permission resume on first user click after reload when handle is pending permission
+  React.useEffect(() => {
+      if (status !== 'ready' || storageMode !== 'local' || diskSyncState !== 'needs-permission') {
+          return;
+      }
+      if (hasAttemptedAutoGestureReconnectRef.current) {
+          return;
+      }
+
+      const handleFirstUserClick = async () => {
+          if (hasAttemptedAutoGestureReconnectRef.current) return;
+          hasAttemptedAutoGestureReconnectRef.current = true;
+          await resumeDiskSync();
+      };
+
+      window.addEventListener('click', handleFirstUserClick, { capture: true, once: true });
+      return () => {
+          window.removeEventListener('click', handleFirstUserClick, { capture: true });
+      };
+  }, [status, storageMode, diskSyncState, resumeDiskSync]);
   
   const handleDriveProject = React.useCallback((driveProject: { name: string, data: any } | null) => {
     if (driveProject) {
         const sanitizedData = sanitizeProjectData(driveProject.data);
         setProjectData(sanitizedData);
         projectDataRef.current = sanitizedData;
-        setProjectName(driveProject.name);
+        setProjectNameSync(driveProject.name);
+        setStorageModeSync('drive');
+        setDiskSyncStateSync('drive');
         setStatus('ready');
-        // Cache to shared IndexedDB so secondary tabs have instant access
-        set(SHARED_ACTIVE_PROJECT_KEY, sanitizedData).catch(() => {});
-        // Aggressively clear local artifacts when cloud project is loaded
         del(LOCAL_BACKUP_KEY);
+        del(LOCAL_META_KEY);
         localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
+        localStorage.removeItem(LOCAL_UNLOAD_META_KEY);
         localStorage.removeItem(LOCAL_UNLOAD_BACKUP_TIMESTAMP_KEY);
     } else {
         setStatus('drive-no-project');
     }
-  }, []);
+  }, [setProjectNameSync, setStorageModeSync, setDiskSyncStateSync]);
 
   const signInWithGoogle = React.useCallback(async () => {
     setStatus('loading');
     try {
+        await storage.initGapiClient();
         const profile = await storage.signIn();
         setUserProfile(profile);
-        setStorageMode('drive');
+        setStorageModeSync('drive');
         
-        const localData = await getLocalProjectData();
+        const idbBackup = await get<ProjectData>(LOCAL_BACKUP_KEY);
+        const idbMeta = await get<LocalProjectMeta>(LOCAL_META_KEY);
         const driveProject = await storage.loadFromDrive();
 
-        if (driveProject && localData) {
-            setProjectName(localData.name);
+        if (driveProject && idbBackup) {
+            setProjectNameSync(idbMeta?.projectName || DEFAULT_LOCAL_FILENAME);
+            projectDataRef.current = sanitizeProjectData(idbBackup);
             setStatus('drive-conflict');
         } else if (driveProject) {
             handleDriveProject(driveProject);
-        } else if (localData) {
-            const sanitizedLocal = sanitizeProjectData(localData.data);
+        } else if (idbBackup) {
+            const sanitizedLocal = sanitizeProjectData(idbBackup);
             setProjectData(sanitizedLocal);
             projectDataRef.current = sanitizedLocal;
-            setProjectName(localData.name);
-            await storage.createOnDrive(localData.data);
+            setProjectNameSync(idbMeta?.projectName || DEFAULT_LOCAL_FILENAME);
+            await storage.createOnDrive(sanitizedLocal);
+            setDiskSyncStateSync('drive');
             setStatus('ready');
-            // Clean up local after migration
             del(LOCAL_BACKUP_KEY);
+            del(LOCAL_META_KEY);
             localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
+            localStorage.removeItem(LOCAL_UNLOAD_META_KEY);
         } else {
             setStatus('drive-no-project');
         }
@@ -457,202 +611,537 @@ export function useProject() {
         resetState();
         setStatus('welcome');
     }
-  }, [storage, resetState, handleDriveProject]);
+  }, [storage, resetState, handleDriveProject, setStorageModeSync, setProjectNameSync, setDiskSyncStateSync]);
   
   const createProjectOnDrive = React.useCallback(async () => {
     setStatus('loading');
     try {
         const { name } = await storage.createOnDrive(defaultProjectData);
-        setProjectName(name);
+        setProjectNameSync(name);
         setProjectData(defaultProjectData);
         projectDataRef.current = defaultProjectData;
+        setStorageModeSync('drive');
+        setDiskSyncStateSync('drive');
         setStatus('ready');
-        // Clear local artifacts
         del(LOCAL_BACKUP_KEY);
+        del(LOCAL_META_KEY);
         localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
+        localStorage.removeItem(LOCAL_UNLOAD_META_KEY);
     } catch (error) {
         alert("Could not create project on Drive.");
         await signOut();
     }
-  }, [storage, signOut]);
+  }, [storage, signOut, setProjectNameSync, setStorageModeSync, setDiskSyncStateSync]);
 
-    const getLocalProjectData = React.useCallback(async (): Promise<{ name: string; data: ProjectData } | null> => {
-        if (isFileSystemAccessAPISupported) {
-            const handle = await storage.getHandleFromIdb();
-            if (handle) {
-                const fileData = await storage.loadFromFileHandle(handle);
-                if (fileData) return fileData;
-            }
-        }
-        const backup = await get<ProjectData>(LOCAL_BACKUP_KEY);
-        if (backup) return { name: 'Local Backup', data: backup };
-        return null;
-    }, [storage]);
-
-  const checkForRecentLocalProject = React.useCallback(async () => {
-    const backupJson = localStorage.getItem(LOCAL_UNLOAD_BACKUP_KEY);
-    if (backupJson) {
+  const restoreLatestLocalProject = React.useCallback(async (): Promise<boolean> => {
+    // 1. Read both emergency localStorage snapshot and IndexedDB mirror + metadata
+    let unloadData: ProjectData | null = null;
+    let unloadMeta: LocalProjectMeta | null = null;
+    const unloadJson = localStorage.getItem(LOCAL_UNLOAD_BACKUP_KEY);
+    if (unloadJson) {
         try {
-            const unloadBackup = sanitizeProjectData(JSON.parse(backupJson));
-            if (isFileSystemAccessAPISupported) {
-                const handle = await storage.getHandleFromIdb();
-                if (handle) await storage.saveToFileHandle(unloadBackup);
+            unloadData = sanitizeProjectData(JSON.parse(unloadJson));
+            const unloadMetaRaw = localStorage.getItem(LOCAL_UNLOAD_META_KEY);
+            if (unloadMetaRaw) {
+                unloadMeta = JSON.parse(unloadMetaRaw);
+            } else {
+                const ts = localStorage.getItem(LOCAL_UNLOAD_BACKUP_TIMESTAMP_KEY);
+                unloadMeta = {
+                    projectName: DEFAULT_LOCAL_FILENAME,
+                    openedAt: new Date().toISOString(),
+                    lastLocalModifiedAt: ts ? new Date(parseInt(ts, 10)).toISOString() : new Date().toISOString(),
+                    lastDiskSyncAt: null,
+                    hasLinkedHandle: false,
+                };
             }
-            await set(LOCAL_BACKUP_KEY, unloadBackup);
-            return unloadBackup; 
-        } catch (e) {
+        } catch {
             localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
+            localStorage.removeItem(LOCAL_UNLOAD_META_KEY);
         }
     }
 
-    const localData = await getLocalProjectData();
-    if (localData) {
-        const sanitizedData = sanitizeProjectData(localData.data);
-        setProjectData(sanitizedData);
-        projectDataRef.current = sanitizedData;
-        setProjectName(localData.name);
-        return sanitizedData;
+    const idbDataRaw = await get<ProjectData>(LOCAL_BACKUP_KEY).catch(() => undefined);
+    const idbData = idbDataRaw ? sanitizeProjectData(idbDataRaw) : null;
+    const idbMeta = await get<LocalProjectMeta>(LOCAL_META_KEY).catch(() => undefined);
+
+    const unloadMs = parseTimestampMs(unloadMeta?.lastLocalModifiedAt);
+    const idbMs = parseTimestampMs(idbMeta?.lastLocalModifiedAt);
+
+    let freshestLocalData: ProjectData | null = null;
+    let freshestLocalMeta: LocalProjectMeta | null = null;
+
+    if (unloadData && (!idbData || unloadMs >= idbMs)) {
+        freshestLocalData = unloadData;
+        freshestLocalMeta = unloadMeta || idbMeta || null;
+    } else if (idbData) {
+        freshestLocalData = idbData;
+        freshestLocalMeta = idbMeta || null;
     }
-    return null;
-  }, [getLocalProjectData, storage]);
+
+    // 2. Check persisted FileSystemFileHandle without calling requestPermission (non-gesture safe!)
+    const handle = await storage.getCachedFileHandle();
+    if (handle) {
+        const readResult = await storage.readFileFromHandle(handle, false);
+
+        if (readResult.status === 'ok') {
+            const diskData = sanitizeProjectData(readResult.data);
+            const diskModifiedMs = readResult.lastModified || 0;
+            const localModifiedMs = parseTimestampMs(freshestLocalMeta?.lastLocalModifiedAt);
+            const lastDiskSyncMs = parseTimestampMs(freshestLocalMeta?.lastDiskSyncAt);
+
+            const localHasNewerUnsyncedEdits = Boolean(
+                freshestLocalData && localModifiedMs > Math.max(diskModifiedMs, lastDiskSyncMs) + 500
+            );
+
+            const chosenData = localHasNewerUnsyncedEdits && freshestLocalData ? freshestLocalData : diskData;
+            const nowIso = new Date().toISOString();
+            const chosenMeta: LocalProjectMeta = {
+                projectName: readResult.name,
+                openedAt: freshestLocalMeta?.openedAt || nowIso,
+                lastLocalModifiedAt: localHasNewerUnsyncedEdits && freshestLocalMeta?.lastLocalModifiedAt
+                    ? freshestLocalMeta.lastLocalModifiedAt
+                    : new Date(diskModifiedMs || Date.now()).toISOString(),
+                lastDiskSyncAt: localHasNewerUnsyncedEdits ? (freshestLocalMeta?.lastDiskSyncAt ?? null) : nowIso,
+                hasLinkedHandle: true,
+            };
+
+            setProjectData(chosenData);
+            projectDataRef.current = chosenData;
+            setProjectNameSync(readResult.name);
+            setStorageModeSync('local');
+
+            if (readResult.writePermission === 'granted') {
+                if (localHasNewerUnsyncedEdits) {
+                    const syncRes = await storage.writeFileToHandle(chosenData, false);
+                    if (syncRes.ok) {
+                        chosenMeta.lastDiskSyncAt = syncRes.syncedAt;
+                    }
+                }
+                setDiskSyncStateSync('disk-synced');
+            } else {
+                setDiskSyncStateSync('needs-permission');
+            }
+
+            await persistLocalMirror(chosenData, chosenMeta);
+            setStatus('ready');
+            return true;
+        }
+
+        if (readResult.status === 'needs-permission') {
+            // Keep handle permanently linked! Immediately reopen from mirror if available.
+            if (freshestLocalData) {
+                const nowIso = new Date().toISOString();
+                const restoredMeta: LocalProjectMeta = {
+                    projectName: handle.name || freshestLocalMeta?.projectName || DEFAULT_LOCAL_FILENAME,
+                    openedAt: freshestLocalMeta?.openedAt || nowIso,
+                    lastLocalModifiedAt: freshestLocalMeta?.lastLocalModifiedAt || nowIso,
+                    lastDiskSyncAt: freshestLocalMeta?.lastDiskSyncAt ?? null,
+                    hasLinkedHandle: true,
+                };
+                setProjectData(freshestLocalData);
+                projectDataRef.current = freshestLocalData;
+                setProjectNameSync(restoredMeta.projectName);
+                setStorageModeSync('local');
+                setDiskSyncStateSync('needs-permission');
+                await persistLocalMirror(freshestLocalData, restoredMeta);
+                setStatus('ready');
+                return true;
+            }
+            // Handle exists without cached mirror yet: open empty safe shell? Better: wait on welcome only if zero data exists.
+        }
+
+        if (readResult.status === 'not-found' || readResult.status === 'error') {
+            if (freshestLocalData) {
+                const nowIso = new Date().toISOString();
+                const restoredMeta: LocalProjectMeta = {
+                    projectName: freshestLocalMeta?.projectName || handle.name || DEFAULT_LOCAL_FILENAME,
+                    openedAt: freshestLocalMeta?.openedAt || nowIso,
+                    lastLocalModifiedAt: freshestLocalMeta?.lastLocalModifiedAt || nowIso,
+                    lastDiskSyncAt: freshestLocalMeta?.lastDiskSyncAt ?? null,
+                    hasLinkedHandle: true,
+                };
+                setProjectData(freshestLocalData);
+                projectDataRef.current = freshestLocalData;
+                setProjectNameSync(restoredMeta.projectName);
+                setStorageModeSync('local');
+                setDiskSyncStateSync('disk-error');
+                await persistLocalMirror(freshestLocalData, restoredMeta);
+                setStatus('ready');
+                return true;
+            }
+        }
+    }
+
+    // 3. No handle (iframe or non-FS-Access browser) — auto-reopen from IndexedDB / localStorage mirror
+    if (freshestLocalData) {
+        const nowIso = new Date().toISOString();
+        const restoredMeta: LocalProjectMeta = {
+            projectName: freshestLocalMeta?.projectName || DEFAULT_LOCAL_FILENAME,
+            openedAt: freshestLocalMeta?.openedAt || nowIso,
+            lastLocalModifiedAt: freshestLocalMeta?.lastLocalModifiedAt || nowIso,
+            lastDiskSyncAt: freshestLocalMeta?.lastDiskSyncAt ?? null,
+            hasLinkedHandle: Boolean(handle),
+        };
+        setProjectData(freshestLocalData);
+        projectDataRef.current = freshestLocalData;
+        setProjectNameSync(restoredMeta.projectName);
+        setStorageModeSync('local');
+        setDiskSyncStateSync(handle ? 'needs-permission' : 'browser-local');
+        await persistLocalMirror(freshestLocalData, restoredMeta);
+        setStatus('ready');
+        return true;
+    }
+
+    return false;
+  }, [storage, persistLocalMirror, setProjectNameSync, setStorageModeSync, setDiskSyncStateSync]);
 
   React.useEffect(() => {
     if (!isInitialLoadRef.current) return;
+    isInitialLoadRef.current = false;
 
     const initializeApp = async () => {
         try {
-            await storage.initGapiClient(); 
             const storedProfile = await storage.getStoredProfile();
             
-            // If user is logged in, we ignore local restored data to ensure cloud-only flow
             if (storedProfile) {
                 setUserProfile(storedProfile);
-                setStorageMode('drive');
+                setStorageModeSync('drive');
                 try {
+                    await storage.initGapiClient();
                     const driveProject = await storage.loadFromDrive();
                     if (driveProject) {
                         handleDriveProject(driveProject);
                     } else {
-                        // Profile exists but file gone? Check local one last time for migration
-                        const restoredLocalData = await checkForRecentLocalProject();
-                        if (restoredLocalData) {
+                        const restoredLocal = await restoreLatestLocalProject();
+                        if (restoredLocal) {
                             setStatus('drive-no-project');
                         } else {
                             setStatus('welcome');
                         }
                     }
                 } catch (error) {
-                    setStatus('welcome');
+                    console.warn("Drive boot failed, attempting local fallback:", error);
+                    const restoredLocal = await restoreLatestLocalProject();
+                    if (!restoredLocal) {
+                        setStatus('welcome');
+                    }
                 }
             } else {
-                // NO CLOUD SESSION: Proceed with standard local flow
-                const restoredLocalData = await checkForRecentLocalProject();
-                if (restoredLocalData) {
-                    setStorageMode('local');
-                    setStatus('ready');
-                } else {
+                // Local-first instant boot: do NOT wait for Google API scripts
+                const restoredLocal = await restoreLatestLocalProject();
+                if (!restoredLocal) {
                     setStatus('welcome');
                 }
             }
-        } catch (error: any) { setStatus('welcome'); }
+        } catch (error: any) {
+            console.error("App initialization error:", error);
+            setStatus('welcome');
+        }
     };
     initializeApp();
-    isInitialLoadRef.current = false;
-  }, [storage, checkForRecentLocalProject, handleDriveProject]);
+  }, [storage, restoreLatestLocalProject, handleDriveProject, setStorageModeSync]);
+
+  const fallbackFileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const onFallbackFileSelectedRef = React.useRef<(e: Event) => void>(() => {});
+
+  const handleFallbackFileChosen = React.useCallback(async (e: Event) => {
+      const target = e.target as HTMLInputElement;
+      const file = target.files?.[0];
+      target.value = '';
+      if (!file) return;
+
+      try {
+          const text = await file.text();
+          const json = parseStoryVerseProjectJson(text);
+          const sanitizedData = sanitizeProjectData(json);
+          const nowIso = new Date().toISOString();
+
+          // Opening via standard <input type="file"> cannot yield a FileSystemFileHandle,
+          // so unlink any previous file handle to prevent overwriting an older file by mistake.
+          await storage.clearHandleFromIdb();
+
+          const meta: LocalProjectMeta = {
+              projectName: file.name || DEFAULT_LOCAL_FILENAME,
+              openedAt: nowIso,
+              lastLocalModifiedAt: nowIso,
+              lastDiskSyncAt: null,
+              hasLinkedHandle: false,
+          };
+
+          setLocalFileNotice(null);
+          setProjectNameSync(meta.projectName);
+          setProjectData(sanitizedData);
+          projectDataRef.current = sanitizedData;
+          setStorageModeSync('local');
+          setDiskSyncStateSync('browser-local');
+          isDirtyRef.current = false;
+          hasAttemptedAutoGestureReconnectRef.current = false;
+          setSaveStatus('saved');
+          setStatus('ready');
+          await persistLocalMirror(sanitizedData, meta);
+      } catch (err: any) {
+          console.error("Failed to open selected project file:", err);
+          setLocalFileNotice({
+              type: 'invalid-json',
+              fileName: file.name,
+              detail: err?.message,
+              showStandardPickerOption: true,
+          });
+      }
+  }, [storage, persistLocalMirror, setProjectNameSync, setStorageModeSync, setDiskSyncStateSync]);
+
+  React.useEffect(() => {
+      onFallbackFileSelectedRef.current = (e: Event) => {
+          void handleFallbackFileChosen(e);
+      };
+  }, [handleFallbackFileChosen]);
+
+  React.useEffect(() => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json,application/json';
+      input.tabIndex = -1;
+      input.setAttribute('aria-hidden', 'true');
+      input.style.position = 'fixed';
+      input.style.left = '-9999px';
+      input.style.top = '-9999px';
+      input.style.width = '1px';
+      input.style.height = '1px';
+      input.style.opacity = '0';
+      input.style.pointerEvents = 'none';
+
+      const onChange = (e: Event) => {
+          onFallbackFileSelectedRef.current(e);
+      };
+      input.addEventListener('change', onChange);
+      document.body.appendChild(input);
+      fallbackFileInputRef.current = input;
+
+      return () => {
+          input.removeEventListener('change', onChange);
+          input.remove();
+          if (fallbackFileInputRef.current === input) {
+              fallbackFileInputRef.current = null;
+          }
+      };
+  }, []);
+
+  const openLocalProjectStandard = React.useCallback(() => {
+      setLocalFileNotice(null);
+      const input = fallbackFileInputRef.current;
+      if (input) {
+          input.value = '';
+          input.click();
+          return;
+      }
+      // Emergency inline fallback if ref is somehow not mounted yet
+      const tempInput = document.createElement('input');
+      tempInput.type = 'file';
+      tempInput.accept = '.json,application/json';
+      tempInput.onchange = (ev) => {
+          void handleFallbackFileChosen(ev);
+          tempInput.remove();
+      };
+      document.body.appendChild(tempInput);
+      tempInput.click();
+  }, [handleFallbackFileChosen]);
   
   const openLocalProject = React.useCallback(async () => {
-    const fallbackInput = () => {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.json,application/json';
-        input.onchange = async (e: any) => {
-            const file = e.target.files[0];
-            if (file) {
-                const text = await file.text();
-                try {
-                    const json = JSON.parse(text);
-                    const sanitizedData = sanitizeProjectData(json);
-                    setProjectName(file.name.replace('.json', ''));
-                    setProjectData(sanitizedData);
-                    projectDataRef.current = sanitizedData;
-                    setStorageMode('local');
-                    setStatus('ready');
-                    await storage.clearHandleFromIdb();
-                } catch (err) {
-                    alert("Failed to parse project file.");
-                }
-            }
-        };
-        input.click();
-    };
+    setLocalFileNotice(null);
 
-    if (!isFileSystemAccessAPISupported) {
-        fallbackInput();
+    // Check synchronously BEFORE any await so user activation is preserved for <input type="file">!
+    if (!isNativeFileSystemPickerUsable()) {
+        openLocalProjectStandard();
         return;
     }
-    
+
+    let handle: FileSystemFileHandle | undefined;
     try {
-        const [handle] = await window.showOpenFilePicker({ types: [{ description: 'StoryVerse Projects', accept: { 'application/json': ['.json'] } }] });
-        setStatus('loading');
-        const fileData = await storage.loadFromFileHandle(handle);
-        if (fileData) {
-            await storage.saveHandleToIdb(handle);
-            const sanitizedData = sanitizeProjectData(fileData.data);
-            setProjectName(fileData.name);
-            setProjectData(sanitizedData);
-            projectDataRef.current = sanitizedData;
-            setStorageMode('local');
-            setStatus('ready');
-        } else { setStatus('welcome'); }
-    } catch (error: any) { 
-        console.warn("showOpenFilePicker failed, falling back to input:", error);
-        fallbackInput();
+        const picked = await window.showOpenFilePicker({
+            types: [{ description: 'StoryVerse Projects', accept: { 'application/json': ['.json'] } }]
+        });
+        handle = picked?.[0];
+    } catch (pickerError: any) {
+        if (pickerError?.name === 'AbortError') {
+            return;
+        }
+        console.warn("showOpenFilePicker blocked or failed:", pickerError);
+        setLocalFileNotice({
+            type: 'blocked',
+            detail: pickerError?.message || pickerError?.name,
+            showStandardPickerOption: true,
+        });
+        return;
     }
-  }, [storage]);
+
+    if (!handle) return;
+
+    let rawContent = '';
+    try {
+        const file = await handle.getFile();
+        rawContent = await file.text();
+    } catch (readError: any) {
+        console.warn("Failed to read file from handle:", readError);
+        setLocalFileNotice({
+            type: 'read-error',
+            fileName: handle.name,
+            detail: readError?.message || readError?.name,
+            showStandardPickerOption: true,
+        });
+        return;
+    }
+
+    let sanitizedData: ProjectData;
+    try {
+        const json = parseStoryVerseProjectJson(rawContent);
+        sanitizedData = sanitizeProjectData(json);
+    } catch (parseError: any) {
+        console.warn("Failed to parse project JSON from handle:", parseError);
+        setLocalFileNotice({
+            type: 'invalid-json',
+            fileName: handle.name,
+            detail: parseError?.message,
+            showStandardPickerOption: true,
+        });
+        return;
+    }
+
+    await storage.saveHandleToIdb(handle);
+    const writePerm = await requestPermissionSafe(handle, 'readwrite');
+    const nowIso = new Date().toISOString();
+    const meta: LocalProjectMeta = {
+        projectName: handle.name,
+        openedAt: nowIso,
+        lastLocalModifiedAt: nowIso,
+        lastDiskSyncAt: writePerm === 'granted' ? nowIso : null,
+        hasLinkedHandle: true,
+    };
+
+    setProjectNameSync(handle.name);
+    setProjectData(sanitizedData);
+    projectDataRef.current = sanitizedData;
+    setStorageModeSync('local');
+    setDiskSyncStateSync(writePerm === 'granted' ? 'disk-synced' : 'needs-permission');
+    isDirtyRef.current = false;
+    hasAttemptedAutoGestureReconnectRef.current = false;
+    setSaveStatus('saved');
+    setStatus('ready');
+    await persistLocalMirror(sanitizedData, meta);
+  }, [storage, openLocalProjectStandard, persistLocalMirror, setProjectNameSync, setStorageModeSync, setDiskSyncStateSync]);
+
+  const linkLocalDiskFile = React.useCallback(async (): Promise<boolean> => {
+      if (!projectDataRef.current) return false;
+      if (!isNativeFileSystemPickerUsable()) {
+          return false;
+      }
+
+      try {
+          const handle = await window.showSaveFilePicker({
+              suggestedName: projectNameRef.current || DEFAULT_LOCAL_FILENAME,
+              types: [{ description: 'StoryVerse Projects', accept: { 'application/json': ['.json'] } }]
+          });
+          await storage.saveHandleToIdb(handle);
+          const writeResult = await storage.writeFileToHandle(projectDataRef.current, true);
+          const nowIso = new Date().toISOString();
+          const meta: LocalProjectMeta = {
+              projectName: handle.name,
+              openedAt: localMetaRef.current?.openedAt || nowIso,
+              lastLocalModifiedAt: nowIso,
+              lastDiskSyncAt: writeResult.ok ? writeResult.syncedAt : null,
+              hasLinkedHandle: true,
+          };
+          setProjectNameSync(handle.name);
+          setStorageModeSync('local');
+          setDiskSyncStateSync(writeResult.ok ? 'disk-synced' : 'needs-permission');
+          await persistLocalMirror(projectDataRef.current, meta);
+          setSaveStatus(writeResult.ok ? 'saved' : 'idle');
+          return writeResult.ok;
+      } catch (error: any) {
+          if (error?.name === 'AbortError') return false;
+          console.warn("linkLocalDiskFile failed:", error);
+          return false;
+      }
+  }, [storage, persistLocalMirror, setProjectNameSync, setStorageModeSync, setDiskSyncStateSync]);
   
   const createLocalProject = React.useCallback(async () => {
-    const fallbackCreate = async () => {
-        setProjectName("New Project");
-        setProjectData(defaultProjectData);
-        projectDataRef.current = defaultProjectData;
-        setStorageMode('local');
-        setStatus('ready');
+    const createInBrowserStorage = async () => {
+        const nowIso = new Date().toISOString();
+        const freshData = JSON.parse(JSON.stringify(defaultProjectData)) as ProjectData;
         await storage.clearHandleFromIdb();
+        const meta: LocalProjectMeta = {
+            projectName: DEFAULT_LOCAL_FILENAME,
+            openedAt: nowIso,
+            lastLocalModifiedAt: nowIso,
+            lastDiskSyncAt: null,
+            hasLinkedHandle: false,
+        };
+        setProjectNameSync(DEFAULT_LOCAL_FILENAME);
+        setProjectData(freshData);
+        projectDataRef.current = freshData;
+        setStorageModeSync('local');
+        setDiskSyncStateSync('browser-local');
+        isDirtyRef.current = false;
+        hasAttemptedAutoGestureReconnectRef.current = false;
+        await persistLocalMirror(freshData, meta);
+        setSaveStatus('saved');
+        setStatus('ready');
     };
 
-    if (!isFileSystemAccessAPISupported) {
-        await fallbackCreate();
+    if (!isNativeFileSystemPickerUsable()) {
+        await createInBrowserStorage();
         return;
     }
     
     try {
-        const handle = await window.showSaveFilePicker({ suggestedName: 'StoryVerse-Project.json', types: [{ description: 'StoryVerse Projects', accept: { 'application/json': ['.json'] } }] });
+        const handle = await window.showSaveFilePicker({
+            suggestedName: DEFAULT_LOCAL_FILENAME,
+            types: [{ description: 'StoryVerse Projects', accept: { 'application/json': ['.json'] } }]
+        });
         setStatus('loading');
+        const freshData = JSON.parse(JSON.stringify(defaultProjectData)) as ProjectData;
         await storage.saveHandleToIdb(handle);
-        setProjectName(handle.name);
-        setProjectData(defaultProjectData);
-        projectDataRef.current = defaultProjectData;
-        await storage.saveToFileHandle(defaultProjectData);
-        setStorageMode('local');
+        const writeRes = await storage.writeFileToHandle(freshData, true);
+        const nowIso = new Date().toISOString();
+        const meta: LocalProjectMeta = {
+            projectName: handle.name,
+            openedAt: nowIso,
+            lastLocalModifiedAt: nowIso,
+            lastDiskSyncAt: writeRes.ok ? writeRes.syncedAt : null,
+            hasLinkedHandle: true,
+        };
+        setProjectNameSync(handle.name);
+        setProjectData(freshData);
+        projectDataRef.current = freshData;
+        setStorageModeSync('local');
+        setDiskSyncStateSync(writeRes.ok ? 'disk-synced' : 'needs-permission');
+        isDirtyRef.current = false;
+        hasAttemptedAutoGestureReconnectRef.current = false;
+        await persistLocalMirror(freshData, meta);
+        setSaveStatus('saved');
         setStatus('ready');
-    } catch (error: any) { 
-        console.warn("showSaveFilePicker failed, falling back to in-memory:", error);
-        await fallbackCreate();
+    } catch (error: any) {
+        if (error?.name === 'AbortError') {
+            return;
+        }
+        console.warn("showSaveFilePicker failed, using automatic browser storage:", error);
+        await createInBrowserStorage();
     }
-  }, [storage]);
+  }, [storage, persistLocalMirror, setProjectNameSync, setStorageModeSync, setDiskSyncStateSync]);
   
   const closeProject = React.useCallback(async () => {
     await flushChanges();
-    if (storageMode === 'local') {
+    if (storageModeRef.current === 'local') {
         await storage.clearHandleFromIdb();
     }
     await del(LOCAL_BACKUP_KEY);
-    await del(SHARED_ACTIVE_PROJECT_KEY);
+    await del(LOCAL_META_KEY);
     localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
+    localStorage.removeItem(LOCAL_UNLOAD_META_KEY);
+    localStorage.removeItem(LOCAL_UNLOAD_BACKUP_TIMESTAMP_KEY);
     localStorage.removeItem(STORAGE_PREFERENCE_KEY);
     resetState();
     setStatus('welcome');
-  }, [flushChanges, storageMode, storage, resetState]);
+  }, [flushChanges, storage, resetState]);
   
   const downloadProject = React.useCallback(async () => {
     await flushChanges();
@@ -661,23 +1150,26 @@ export function useProject() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = projectName || 'StoryVerse-Backup.json';
+    a.download = projectNameRef.current || 'StoryVerse-Backup.json';
     a.click();
     URL.revokeObjectURL(url);
     a.remove();
-  }, [flushChanges, projectName]);
+  }, [flushChanges]);
 
   const uploadProjectToDrive = React.useCallback(async () => {
         if (!projectDataRef.current) return;
         setStatus('loading');
         try {
             await storage.createOnDrive(projectDataRef.current);
+            setStorageModeSync('drive');
+            setDiskSyncStateSync('drive');
             setStatus('ready');
-            // Migration complete: remove local traces
             del(LOCAL_BACKUP_KEY);
+            del(LOCAL_META_KEY);
             localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
+            localStorage.removeItem(LOCAL_UNLOAD_META_KEY);
         } catch (error) { setStatus('drive-no-project'); }
-    }, [storage]);
+    }, [storage, setStorageModeSync, setDiskSyncStateSync]);
 
     const overwriteDriveProject = React.useCallback(async () => {
         if (!projectDataRef.current) return;
@@ -685,14 +1177,18 @@ export function useProject() {
         try {
             await storage.saveToDrive(projectDataRef.current);
             localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
+            localStorage.removeItem(LOCAL_UNLOAD_META_KEY);
             del(LOCAL_BACKUP_KEY);
-            localStorage.setItem(STORAGE_PREFERENCE_KEY, 'local'); 
+            del(LOCAL_META_KEY);
+            localStorage.setItem(STORAGE_PREFERENCE_KEY, 'drive'); 
+            setStorageModeSync('drive');
+            setDiskSyncStateSync('drive');
             setStatus('ready');
         } catch (e) {
             alert("Could not overwrite cloud project. Check your connection.");
             setStatus('drive-conflict');
         }
-    }, [storage]);
+    }, [storage, setStorageModeSync, setDiskSyncStateSync]);
 
     const loadDriveProjectAndDiscardLocal = React.useCallback(async () => {
         setStatus('loading');
@@ -701,7 +1197,9 @@ export function useProject() {
             if (driveProject) {
                 handleDriveProject(driveProject);
                 localStorage.removeItem(LOCAL_UNLOAD_BACKUP_KEY);
+                localStorage.removeItem(LOCAL_UNLOAD_META_KEY);
                 del(LOCAL_BACKUP_KEY);
+                del(LOCAL_META_KEY);
                 localStorage.setItem(STORAGE_PREFERENCE_KEY, 'drive'); 
             } else {
                 setStatus('drive-no-project');
@@ -719,13 +1217,20 @@ export function useProject() {
     status, 
     projectName,
     storageMode,
+    diskSyncState,
+    isNativePickerAvailable,
+    localFileNotice,
+    dismissLocalFileNotice,
     userProfile,
     saveStatus,
     signInWithGoogle,
     signOut,
     createProjectOnDrive,
     createLocalProject, 
-    openLocalProject, 
+    openLocalProject,
+    openLocalProjectStandard,
+    resumeDiskSync,
+    linkLocalDiskFile,
     downloadProject, 
     closeProject,
     uploadProjectToDrive,

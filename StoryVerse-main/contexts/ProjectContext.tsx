@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { ProjectData, Theme, ThemeConfig, UserProfile, SaveStatus } from '../types';
+import { ProjectData, Theme, ThemeConfig, UserProfile, SaveStatus, DiskSyncState, LocalFileNotice } from '../types';
 
 interface ProjectContextType {
   projectData: ProjectData | null;
@@ -10,6 +10,15 @@ interface ProjectContextType {
   themeClasses: ThemeConfig;
   projectName: string;
   saveStatus: SaveStatus;
+  diskSyncState: DiskSyncState;
+  isNativePickerAvailable: boolean;
+  localFileNotice: LocalFileNotice | null;
+  dismissLocalFileNotice: () => void;
+  openLocalProject: () => Promise<void>;
+  openLocalProjectStandard: () => void;
+  createLocalProject: () => Promise<void>;
+  resumeDiskSync: () => Promise<boolean>;
+  linkLocalDiskFile: () => Promise<boolean>;
   // Google Drive & Auth properties
   storageMode: 'local' | 'drive' | null;
   userProfile: UserProfile | null;
@@ -44,6 +53,15 @@ export const ProjectContext = React.createContext<ProjectContextType>({
   },
   projectName: '',
   saveStatus: 'idle',
+  diskSyncState: 'browser-local',
+  isNativePickerAvailable: false,
+  localFileNotice: null,
+  dismissLocalFileNotice: () => {},
+  openLocalProject: async () => {},
+  openLocalProjectStandard: () => {},
+  createLocalProject: async () => {},
+  resumeDiskSync: async () => false,
+  linkLocalDiskFile: async () => false,
   storageMode: null,
   userProfile: null,
   signInWithGoogle: async () => {},

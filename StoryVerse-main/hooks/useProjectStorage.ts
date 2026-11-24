@@ -1,7 +1,6 @@
 import * as React from 'react';
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
 import { ProjectData, UserProfile } from '../types';
-import { enforceProjectDataLimits } from '../utils/dataLimiter';
 
 // --- Constants ---
 const PROJECT_FILE_HANDLE_KEY = 'storyverse-project-file-handle';
@@ -38,18 +37,57 @@ export class ExpiredVersionError extends Error {
 
 
 // --- Helper Functions ---
-async function verifyPermission(handle: FileSystemHandle) {
-    const options = { mode: 'readwrite' as const };
-    if ((await handle.queryPermission(options)) === 'granted') return true;
-    if ((await handle.requestPermission(options)) === 'granted') return true;
-    return false;
+export function isNativeFileSystemPickerUsable(): boolean {
+    if (typeof window === 'undefined') return false;
+    if (!('showOpenFilePicker' in window) || !('showSaveFilePicker' in window)) {
+        return false;
+    }
+    try {
+        if (window.location?.ancestorOrigins && window.location.ancestorOrigins.length > 0) {
+            return false;
+        }
+        // Cross-origin iframes (like embedded previews) throw SecurityError on showOpenFilePicker/showSaveFilePicker.
+        return window.self === window.top;
+    } catch {
+        return false;
+    }
 }
+
+export async function queryPermissionSafe(
+    handle: FileSystemHandle,
+    mode: 'read' | 'readwrite' = 'readwrite'
+): Promise<PermissionState> {
+    try {
+        return await handle.queryPermission({ mode });
+    } catch {
+        return 'denied';
+    }
+}
+
+export async function requestPermissionSafe(
+    handle: FileSystemHandle,
+    mode: 'read' | 'readwrite' = 'readwrite'
+): Promise<PermissionState> {
+    try {
+        return await handle.requestPermission({ mode });
+    } catch {
+        return 'prompt';
+    }
+}
+
+export type HandleReadResult =
+    | { status: 'ok'; name: string; data: any; lastModified: number; writePermission: PermissionState }
+    | { status: 'needs-permission'; name: string }
+    | { status: 'not-found'; name: string }
+    | { status: 'error'; name: string; error: unknown };
+
+export type HandleWriteResult =
+    | { ok: true; syncedAt: string }
+    | { ok: false; reason: 'no-handle' | 'needs-permission' | 'error'; error?: unknown };
 
 export function useProjectStorage() {
     const driveFileIdRef = React.useRef<string | null>(null);
     const driveFileModifiedTimeRef = React.useRef<string | null>(null);
-    const lastUploadedPayloadRef = React.useRef<string | null>(null);
-    const lastCheckTimeRef = React.useRef<number>(0);
     const projectFileHandleRef = React.useRef<FileSystemFileHandle | null>(null);
 
     const tokenClientRef = React.useRef<any>(null);
@@ -77,7 +115,7 @@ export function useProjectStorage() {
     }, []);
 
     const signOut = React.useCallback(async () => {
-        if (gapi.client) {
+        if (typeof gapi !== 'undefined' && gapi.client) {
             gapi.client.setToken('');
         }
         await idbDel(GAPI_AUTH_TOKEN_KEY);
@@ -85,9 +123,7 @@ export function useProjectStorage() {
         await idbDel(USER_PROFILE_KEY);
         driveFileIdRef.current = null;
         driveFileModifiedTimeRef.current = null;
-        lastUploadedPayloadRef.current = null;
-        lastCheckTimeRef.current = 0;
-        if (google?.accounts?.id) {
+        if (typeof google !== 'undefined' && google?.accounts?.id) {
           google.accounts.id.disableAutoSelect();
         }
         console.log('User signed out. Local session data cleared.');
@@ -159,7 +195,7 @@ export function useProjectStorage() {
             if (!newProfile) {
                 throw new PermanentAuthError("Could not refresh your Google session. Please sign in again to continue saving.");
             }
-            token = await idbGet<StoredToken>(GAPI_AUTH_TOKEN_KEY); // Re-fetch the token
+            token = await idbGet<StoredToken>(GAPI_AUTH_TOKEN_KEY);
         }
     
         if (!token || !token.access_token) {
@@ -173,7 +209,6 @@ export function useProjectStorage() {
         console.log("Creating new file on Google Drive via fetch...");
         const accessToken = await getAccessToken();
 
-        // Step 1: Create file metadata
         const createResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
             method: 'POST',
             headers: {
@@ -199,15 +234,13 @@ export function useProjectStorage() {
         }
         console.log(`File metadata created with ID: ${fileId}`);
         
-        // Step 2: Upload content with data limits enforced
-        const safeData = enforceProjectDataLimits(data);
         const uploadResponse = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
             method: 'PATCH',
             headers: {
                 'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(safeData)
+            body: JSON.stringify(data)
         });
 
         if (!uploadResponse.ok) {
@@ -225,8 +258,6 @@ export function useProjectStorage() {
 
         console.log("File content uploaded successfully.");
         driveFileIdRef.current = fileId;
-        lastUploadedPayloadRef.current = JSON.stringify(safeData);
-        lastCheckTimeRef.current = Date.now();
         await idbSet(DRIVE_FILE_ID_KEY, fileId);
         return { fileId: fileId, name: createResult.name };
     }, [getAccessToken]);
@@ -242,24 +273,14 @@ export function useProjectStorage() {
         }
         
         driveFileIdRef.current = fileId;
-        const safeData = enforceProjectDataLimits(data);
-        const serializedPayload = JSON.stringify(safeData);
-
-        // DATA USAGE OPTIMIZATION: Skip upload if data is identical to what is already on Drive
-        if (lastUploadedPayloadRef.current === serializedPayload) {
-            console.log("[saveToDrive] Project content is unchanged since last cloud sync. 0 bytes transferred.");
-            return;
-        }
     
         try {
             const accessToken = await getAccessToken();
 
-            // Conflict check only if enough time has passed to reduce redundant roundtrips
-            if (driveFileModifiedTimeRef.current && (Date.now() - lastCheckTimeRef.current > 25000)) {
+            if (driveFileModifiedTimeRef.current) {
                 const checkResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=modifiedTime`, {
                     headers: { 'Authorization': `Bearer ${accessToken}` }
                 });
-                lastCheckTimeRef.current = Date.now();
                 if (checkResponse.ok) {
                     const checkData = await checkResponse.json();
                     if (checkData.modifiedTime) {
@@ -272,25 +293,26 @@ export function useProjectStorage() {
                 }
             }
 
-            console.log(`[saveToDrive] Uploading changed project to Drive (${(serializedPayload.length / 1024).toFixed(1)} KB)`);
-            const response = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media&fields=id,modifiedTime`, {
+            console.log(`Initiating upload for Drive file: ${fileId} via fetch`);
+            const response = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
                 method: 'PATCH',
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
                     'Content-Type': 'application/json'
                 },
-                body: serializedPayload
+                body: JSON.stringify(data)
             });
     
             if (response.ok) {
-                const updateData = await response.json().catch(() => ({}));
-                if (updateData.modifiedTime) {
+                console.log("File updated successfully using fetch.");
+                const updateResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=modifiedTime`, {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                if (updateResponse.ok) {
+                    const updateData = await updateResponse.json();
                     driveFileModifiedTimeRef.current = updateData.modifiedTime;
                 }
-                lastUploadedPayloadRef.current = serializedPayload;
-                lastCheckTimeRef.current = Date.now();
-                console.log("[saveToDrive] Drive upload successful. Cloud sync complete.");
-                return; // Success
+                return;
             }
     
             const errorBody = await response.json().catch(() => ({}));
@@ -299,7 +321,6 @@ export function useProjectStorage() {
                  console.log("File not found on Drive. Creating a new one.");
                  await idbDel(DRIVE_FILE_ID_KEY);
                  driveFileIdRef.current = null;
-                 lastUploadedPayloadRef.current = null;
                  await createOnDrive(data);
                  return;
             }
@@ -332,8 +353,6 @@ export function useProjectStorage() {
                     });
                     driveFileIdRef.current = storedFileId;
                     driveFileModifiedTimeRef.current = fileMetadata.result.modifiedTime;
-                    lastUploadedPayloadRef.current = JSON.stringify(enforceProjectDataLimits(contentResponse.result));
-                    lastCheckTimeRef.current = Date.now();
                     console.log(`Successfully loaded file from stored ID.`);
                     return { name: fileMetadata.result.name, data: contentResponse.result };
                 } else {
@@ -347,7 +366,6 @@ export function useProjectStorage() {
                     console.error("An error occurred loading from stored ID. Clearing ID.", error);
                  }
                  await idbDel(DRIVE_FILE_ID_KEY);
-                 // Rethrow so the caller can handle auth errors
                  throw error;
             }
         }
@@ -375,9 +393,6 @@ export function useProjectStorage() {
                 path: `https://www.googleapis.com/drive/v3/files/${file.id}`,
                 params: { alt: 'media' }
             });
-
-            lastUploadedPayloadRef.current = JSON.stringify(enforceProjectDataLimits(contentResponse.result));
-            lastCheckTimeRef.current = Date.now();
 
             return { name: file.name, data: contentResponse.result };
         }
@@ -442,7 +457,6 @@ export function useProjectStorage() {
             throw new Error(`Initialization failed:\n${err.details || 'Unknown error.'}`);
         });
 
-        // Proactive token restoration
         const storedToken = await idbGet<StoredToken>(GAPI_AUTH_TOKEN_KEY);
         if (storedToken && storedToken.access_token) {
             console.log("Restoring previous session token to GAPI client.");
@@ -451,35 +465,115 @@ export function useProjectStorage() {
     }, []);
 
     // --- Local File System Functions ---
-    const getHandleFromIdb = async () => idbGet<FileSystemFileHandle>(PROJECT_FILE_HANDLE_KEY);
-    const saveHandleToIdb = async (handle: FileSystemFileHandle) => {
+    const getHandleFromIdb = React.useCallback(async () => {
+        try {
+            return await idbGet<FileSystemFileHandle>(PROJECT_FILE_HANDLE_KEY);
+        } catch {
+            return undefined;
+        }
+    }, []);
+
+    const saveHandleToIdb = React.useCallback(async (handle: FileSystemFileHandle) => {
         projectFileHandleRef.current = handle;
-        await idbSet(PROJECT_FILE_HANDLE_KEY, handle);
-    };
-    const clearHandleFromIdb = async () => {
+        try {
+            await idbSet(PROJECT_FILE_HANDLE_KEY, handle);
+        } catch (err) {
+            console.warn("Could not persist file handle to IndexedDB:", err);
+        }
+    }, []);
+
+    const clearHandleFromIdb = React.useCallback(async () => {
         projectFileHandleRef.current = null;
-        await idbDel(PROJECT_FILE_HANDLE_KEY);
-    };
-    const loadFromFileHandle = async (handle: FileSystemFileHandle): Promise<{ name: string; data: any } | null> => {
-        if (await verifyPermission(handle)) {
-            projectFileHandleRef.current = handle;
-            const file = await handle.getFile();
-            const content = await file.text();
-            return { name: handle.name, data: JSON.parse(content) };
+        try {
+            await idbDel(PROJECT_FILE_HANDLE_KEY);
+        } catch (err) {
+            console.warn("Could not clear file handle from IndexedDB:", err);
+        }
+    }, []);
+
+    const getCachedFileHandle = React.useCallback(async (): Promise<FileSystemFileHandle | null> => {
+        if (projectFileHandleRef.current) return projectFileHandleRef.current;
+        const stored = await getHandleFromIdb();
+        if (stored) {
+            projectFileHandleRef.current = stored;
+            return stored;
         }
         return null;
-    };
-    const saveToFileHandle = async (data: ProjectData) => {
-        const handle = projectFileHandleRef.current ?? await getHandleFromIdb();
-        if (handle && await verifyPermission(handle)) {
-            projectFileHandleRef.current = handle;
+    }, [getHandleFromIdb]);
+
+    const readFileFromHandle = React.useCallback(async (
+        handle: FileSystemFileHandle,
+        requestGesturePermission = false
+    ): Promise<HandleReadResult> => {
+        projectFileHandleRef.current = handle;
+        try {
+            let readState = await queryPermissionSafe(handle, 'read');
+            let writeState = await queryPermissionSafe(handle, 'readwrite');
+
+            if (readState !== 'granted') {
+                if (!requestGesturePermission) {
+                    return { status: 'needs-permission', name: handle.name };
+                }
+                writeState = await requestPermissionSafe(handle, 'readwrite');
+                readState = writeState === 'granted' ? 'granted' : await queryPermissionSafe(handle, 'read');
+                if (readState !== 'granted') {
+                    return { status: 'needs-permission', name: handle.name };
+                }
+            }
+
+            const file = await handle.getFile();
+            const content = await file.text();
+            const parsed = JSON.parse(content);
+            return {
+                status: 'ok',
+                name: handle.name,
+                data: parsed,
+                lastModified: file.lastModified,
+                writePermission: writeState,
+            };
+        } catch (error: any) {
+            if (error?.name === 'NotFoundError') {
+                return { status: 'not-found', name: handle.name };
+            }
+            if (error?.name === 'NotAllowedError' || error?.name === 'SecurityError') {
+                return { status: 'needs-permission', name: handle.name };
+            }
+            return { status: 'error', name: handle.name, error };
+        }
+    }, []);
+
+    const writeFileToHandle = React.useCallback(async (
+        data: ProjectData,
+        requestGesturePermission = false
+    ): Promise<HandleWriteResult> => {
+        const handle = await getCachedFileHandle();
+        if (!handle) {
+            return { ok: false, reason: 'no-handle' };
+        }
+
+        try {
+            let writeState = await queryPermissionSafe(handle, 'readwrite');
+            if (writeState !== 'granted') {
+                if (!requestGesturePermission) {
+                    return { ok: false, reason: 'needs-permission' };
+                }
+                writeState = await requestPermissionSafe(handle, 'readwrite');
+                if (writeState !== 'granted') {
+                    return { ok: false, reason: 'needs-permission' };
+                }
+            }
+
             const writable = await handle.createWritable();
             await writable.write(JSON.stringify(data));
             await writable.close();
-        } else {
-             console.error("No file handle available or permission denied.");
+            return { ok: true, syncedAt: new Date().toISOString() };
+        } catch (error: any) {
+            if (error?.name === 'NotAllowedError' || error?.name === 'SecurityError') {
+                return { ok: false, reason: 'needs-permission', error };
+            }
+            return { ok: false, reason: 'error', error };
         }
-    };
+    }, [getCachedFileHandle]);
 
     return {
         initGapiClient,
@@ -491,9 +585,10 @@ export function useProjectStorage() {
         saveToDrive,
         createOnDrive,
         getHandleFromIdb,
+        getCachedFileHandle,
         saveHandleToIdb,
         clearHandleFromIdb,
-        loadFromFileHandle,
-        saveToFileHandle,
+        readFileFromHandle,
+        writeFileToHandle,
     };
 }

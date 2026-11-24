@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { TabContext } from '../contexts/TabContext';
 import { ProjectContext } from '../contexts/ProjectContext';
+import SettingsModal from './SettingsModal';
 import {
     HomeIcon,
     PencilIcon,
@@ -17,9 +18,14 @@ import {
     ExclamationTriangleIcon,
     AppLogoIcon,
     DocumentPlusIcon,
-    Bars3Icon
+    Bars3Icon,
+    SettingsIcon,
+    FolderIcon,
+    RefreshIcon,
+    CloudIcon
 } from './Icons';
 import { TabIconType } from '../types';
+import { useTranslations } from '../hooks/useTranslations';
 
 const getTabIcon = (iconType?: TabIconType) => {
     switch (iconType) {
@@ -44,45 +50,158 @@ const getTabIcon = (iconType?: TabIconType) => {
 };
 
 const HeaderSaveStatusBadge = () => {
-    const { theme, saveStatus, userProfile, storageMode } = React.useContext(ProjectContext);
+    const {
+        theme,
+        saveStatus,
+        userProfile,
+        storageMode,
+        projectName,
+        diskSyncState,
+        isNativePickerAvailable,
+        openLocalProject,
+        resumeDiskSync,
+        linkLocalDiskFile
+    } = React.useContext(ProjectContext);
+    const t = useTranslations();
 
     const isDark = theme === 'dark';
 
     return (
-        <div className="flex items-center space-x-2 text-xs">
-            {/* Account / Storage Badge */}
-            <div className={`hidden sm:flex items-center space-x-1.5 px-2.5 py-1 rounded-full border text-xs font-medium ${
-                isDark ? 'bg-white/5 border-white/10 text-white/80' : 'bg-black/5 border-black/10 text-slate-700'
-            }`}>
-                <span className={`w-2 h-2 rounded-full ${storageMode === 'drive' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                <span className="truncate max-w-[140px]">
-                    {storageMode === 'drive' ? (userProfile?.email || 'Google Drive') : 'Local Storage'}
-                </span>
-            </div>
+        <div className="flex items-center space-x-1.5 text-xs shrink-0">
+            {/* Account / Linked File Badge */}
+            {storageMode === 'drive' ? (
+                <div className={`hidden sm:flex items-center space-x-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium whitespace-nowrap shrink-0 ${
+                    isDark ? 'bg-white/5 border-white/10 text-white/80' : 'bg-black/5 border-black/10 text-slate-700'
+                }`}>
+                    <CloudIcon className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+                    <span className="truncate max-w-[140px]">
+                        {userProfile?.email || 'Google Drive'}
+                    </span>
+                </div>
+            ) : (
+                <>
+                    {/* Linked Filename Pill/Badge */}
+                    <div
+                        className={`hidden md:flex items-center space-x-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium whitespace-nowrap shrink-0 ${
+                            isDark ? 'bg-white/5 border-white/10 text-slate-200' : 'bg-amber-100/70 border-amber-300/60 text-amber-950'
+                        }`}
+                        title={projectName || 'StoryVerse-Project.json'}
+                    >
+                        <FolderIcon className={`w-3.5 h-3.5 flex-shrink-0 ${isDark ? 'text-indigo-400' : 'text-amber-700'}`} />
+                        <span className="truncate max-w-[150px]">
+                            {projectName || 'StoryVerse-Project.json'}
+                        </span>
+                    </div>
+
+                    {/* Disk Sync State / Reconnect Control */}
+                    {diskSyncState === 'needs-permission' && (
+                        <button
+                            onClick={() => { void resumeDiskSync(); }}
+                            className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-lg border text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                                isDark
+                                    ? 'bg-amber-500/20 border-amber-400/40 text-amber-300 hover:bg-amber-500/30'
+                                    : 'bg-amber-200/80 border-amber-400 text-amber-950 hover:bg-amber-300/80'
+                            }`}
+                            title={t.resumeDiskSync}
+                        >
+                            <RefreshIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                            <span>{t.resumeDiskSync}</span>
+                        </button>
+                    )}
+
+                    {diskSyncState === 'disk-error' && (
+                        <button
+                            onClick={() => {
+                                if (isNativePickerAvailable) {
+                                    void linkLocalDiskFile();
+                                } else {
+                                    void openLocalProject();
+                                }
+                            }}
+                            className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-lg border text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                                isDark
+                                    ? 'bg-rose-500/20 border-rose-400/40 text-rose-300 hover:bg-rose-500/30'
+                                    : 'bg-rose-100 border-rose-300 text-rose-900 hover:bg-rose-200'
+                            }`}
+                            title={isNativePickerAvailable ? t.relinkDiskFile : t.diskErrorLabel}
+                        >
+                            <ExclamationTriangleIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                            <span>{isNativePickerAvailable ? t.relinkDiskFile : t.diskErrorLabel}</span>
+                        </button>
+                    )}
+
+                    {diskSyncState === 'browser-local' && isNativePickerAvailable && (
+                        <button
+                            onClick={() => { void linkLocalDiskFile(); }}
+                            className={`hidden sm:flex items-center space-x-1 px-2 py-1 rounded-lg border text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                                isDark
+                                    ? 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700'
+                                    : 'bg-amber-100/60 border-amber-300/60 text-amber-900 hover:bg-amber-200/80'
+                            }`}
+                            title={t.linkDiskFile}
+                        >
+                            <RefreshIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                            <span>{t.linkDiskFile}</span>
+                        </button>
+                    )}
+
+                    {diskSyncState === 'browser-local' && !isNativePickerAvailable && (
+                        <div className={`hidden lg:flex items-center space-x-1 px-2 py-1 rounded-lg border text-xs font-medium whitespace-nowrap shrink-0 ${
+                            isDark ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300' : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                        }`}>
+                            <CheckIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                            <span>{t.browserAutoSaveLabel}</span>
+                        </div>
+                    )}
+
+                    {diskSyncState === 'disk-synced' && (
+                        <div className={`hidden lg:flex items-center space-x-1 px-2 py-1 rounded-lg border text-xs font-medium whitespace-nowrap shrink-0 ${
+                            isDark ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300' : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                        }`}>
+                            <CheckIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                            <span>{t.diskSyncedLabel}</span>
+                        </div>
+                    )}
+
+                    {/* Quick Open / Switch Local File Button */}
+                    <button
+                        onClick={() => { void openLocalProject(); }}
+                        className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg border text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                            isDark
+                                ? 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700 hover:text-white'
+                                : 'bg-amber-100/60 border-amber-300/60 text-amber-900 hover:bg-amber-200/80'
+                        }`}
+                        title={t.switchFile}
+                    >
+                        <FolderIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span className="hidden sm:inline">{t.openFile}</span>
+                    </button>
+                </>
+            )}
 
             {/* Save Status Indicator */}
             {saveStatus === 'saving' && (
-                <div className="flex items-center space-x-1 text-blue-500 font-medium">
-                    <LoadingIcon className="w-3.5 h-3.5 animate-spin" />
-                    <span className="hidden md:inline">Saving...</span>
+                <div className="flex items-center space-x-1 text-blue-500 font-medium whitespace-nowrap shrink-0">
+                    <LoadingIcon className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
+                    <span className="hidden xl:inline">{t.savingStatus}</span>
                 </div>
             )}
             {saveStatus === 'unsaved' && (
-                <div className="flex items-center space-x-1 text-amber-500 font-medium">
-                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                    <span className="hidden md:inline">Unsaved</span>
+                <div className="flex items-center space-x-1 text-amber-500 font-medium whitespace-nowrap shrink-0">
+                    <PencilIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span className="hidden xl:inline">{t.unsavedStatus}</span>
                 </div>
             )}
             {saveStatus === 'saved' && (
-                <div className="flex items-center space-x-1 text-emerald-500 font-medium">
-                    <CheckIcon className="w-3.5 h-3.5" />
-                    <span className="hidden md:inline">Saved</span>
+                <div className="flex items-center space-x-1 text-emerald-500 font-medium whitespace-nowrap shrink-0">
+                    <CheckIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span className="hidden xl:inline">{t.savedStatus}</span>
                 </div>
             )}
             {saveStatus === 'error' && (
-                <div className="flex items-center space-x-1 text-rose-500 font-medium">
-                    <ExclamationTriangleIcon className="w-3.5 h-3.5" />
-                    <span className="hidden md:inline">Save Error</span>
+                <div className="flex items-center space-x-1 text-rose-500 font-medium whitespace-nowrap shrink-0">
+                    <ExclamationTriangleIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span className="hidden xl:inline">{t.saveErrorStatus}</span>
                 </div>
             )}
         </div>
@@ -102,15 +221,13 @@ export const TabBar: React.FC<TabBarProps> = ({ onToggleSidebar }) => {
         openTab,
         popOutTab,
         reattachTab,
-        reorderTabs,
         isPopoutWindow,
         popoutTabId
     } = React.useContext(TabContext);
 
     const { theme, themeClasses } = React.useContext(ProjectContext);
     const tabsContainerRef = React.useRef<HTMLDivElement>(null);
-    const [draggedIndex, setDraggedIndex] = React.useState<number | null>(null);
-    const [dragOverIndex, setDragOverIndex] = React.useState<number | null>(null);
+    const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
 
     const isDark = theme === 'dark';
 
@@ -146,7 +263,7 @@ export const TabBar: React.FC<TabBarProps> = ({ onToggleSidebar }) => {
                 {/* Right: Re-attach button */}
                 <button
                     onClick={() => activeTab && reattachTab(activeTab.id)}
-                    className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shadow-sm"
+                    className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shadow-sm whitespace-nowrap shrink-0"
                     title="Re-attach window back into main StoryVerse tab workspace"
                 >
                     <WindowAttachIcon className="w-4 h-4" />
@@ -188,50 +305,14 @@ export const TabBar: React.FC<TabBarProps> = ({ onToggleSidebar }) => {
                 ref={tabsContainerRef}
                 className="flex-1 flex items-center space-x-1 overflow-x-auto scrollbar-none py-0.5 px-1 min-w-0"
             >
-                {tabs.map((tab, index) => {
+                {tabs.map((tab) => {
                     const isActive = tab.id === activeTabId;
-                    const isBeingDragged = draggedIndex === index;
-                    const isTargetOfDrag = dragOverIndex === index && draggedIndex !== index;
 
                     return (
                         <div
                             key={tab.id}
-                            draggable
-                            onDragStart={(e) => {
-                                e.dataTransfer.effectAllowed = 'move';
-                                e.dataTransfer.setData('text/plain', index.toString());
-                                setDraggedIndex(index);
-                            }}
-                            onDragOver={(e) => {
-                                e.preventDefault();
-                                e.dataTransfer.dropEffect = 'move';
-                                if (dragOverIndex !== index) {
-                                    setDragOverIndex(index);
-                                }
-                            }}
-                            onDragLeave={() => {
-                                if (dragOverIndex === index) {
-                                    setDragOverIndex(null);
-                                }
-                            }}
-                            onDrop={(e) => {
-                                e.preventDefault();
-                                if (draggedIndex !== null && draggedIndex !== index) {
-                                    reorderTabs(draggedIndex, index);
-                                }
-                                setDraggedIndex(null);
-                                setDragOverIndex(null);
-                            }}
-                            onDragEnd={() => {
-                                setDraggedIndex(null);
-                                setDragOverIndex(null);
-                            }}
                             onClick={() => selectTab(tab.id)}
-                            className={`group relative flex items-center space-x-2 px-3 py-1.5 text-xs font-medium rounded-t-lg transition-all duration-150 cursor-grab active:cursor-grabbing max-w-[200px] border-t border-x select-none ${
-                                isBeingDragged ? 'opacity-40 scale-95' : ''
-                            } ${
-                                isTargetOfDrag ? 'ring-2 ring-amber-500 scale-[1.02] z-10' : ''
-                            } ${
+                            className={`group relative flex items-center space-x-2 px-3 py-1.5 text-xs font-medium rounded-t-lg transition-all duration-150 cursor-pointer max-w-[200px] border-t border-x ${
                                 isActive
                                     ? isDark
                                         ? 'bg-slate-900 text-amber-400 border-slate-700 shadow-xs'
@@ -240,7 +321,6 @@ export const TabBar: React.FC<TabBarProps> = ({ onToggleSidebar }) => {
                                         ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border-transparent'
                                         : 'text-slate-600 hover:text-slate-900 hover:bg-amber-100/50 border-transparent'
                             }`}
-                            title={`${tab.title} (Drag to rearrange)`}
                         >
                             {/* Icon */}
                             {getTabIcon(tab.iconType)}
@@ -308,13 +388,13 @@ export const TabBar: React.FC<TabBarProps> = ({ onToggleSidebar }) => {
             </div>
 
             {/* Right Status Actions */}
-            <div className="flex items-center space-x-2 pl-2">
+            <div className="flex items-center space-x-2 pl-2 shrink-0">
                 <HeaderSaveStatusBadge />
 
                 {/* Pop out current tab shortcut */}
                 <button
                     onClick={() => popOutTab(activeTabId)}
-                    className={`hidden sm:flex items-center space-x-1 px-2.5 py-1 text-xs font-semibold rounded-lg border transition-colors ${
+                    className={`hidden sm:flex items-center space-x-1 px-2.5 py-1 text-xs font-semibold rounded-lg border transition-colors whitespace-nowrap shrink-0 ${
                         isDark
                             ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white'
                             : 'bg-amber-100/60 border-amber-300/60 text-amber-900 hover:bg-amber-200/80'
@@ -324,7 +404,20 @@ export const TabBar: React.FC<TabBarProps> = ({ onToggleSidebar }) => {
                     <WindowPopoutIcon className="w-3.5 h-3.5" />
                     <span>Pop Out</span>
                 </button>
+
+                {/* Floating Settings button */}
+                <button
+                    onClick={() => setIsSettingsOpen(true)}
+                    className={`p-1.5 rounded-lg transition-colors shrink-0 text-slate-600 dark:text-slate-300 ${
+                        isDark ? 'hover:bg-slate-800 hover:text-white' : 'hover:bg-amber-100/70 hover:text-amber-950'
+                    }`}
+                    title="Open Settings"
+                >
+                    <SettingsIcon className="w-5 h-5" />
+                </button>
             </div>
+
+            <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
         </div>
     );
 };
